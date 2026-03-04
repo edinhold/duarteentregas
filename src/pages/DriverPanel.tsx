@@ -80,16 +80,38 @@ const DriverPanel = () => {
     enabled: !!activeRequest,
   });
 
+  // Request notification permission
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Realtime
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel("driver-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_requests" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+        toast("🚀 Nova entrega disponível!", { duration: 6000 });
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Nova Entrega!", { body: "Uma nova solicitação de entrega está disponível.", icon: "/favicon.ico" });
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
         queryClient.invalidateQueries({ queryKey: ["driver-my-requests", user.id] });
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => {
-        if (activeRequest) queryClient.invalidateQueries({ queryKey: ["driver-chat", activeRequest.id] });
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload: any) => {
+        if (activeRequest) {
+          queryClient.invalidateQueries({ queryKey: ["driver-chat", activeRequest.id] });
+          if (payload.new?.sender_id !== user.id) {
+            toast("💬 Nova mensagem do lojista");
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("Nova mensagem", { body: payload.new?.message || "Mensagem recebida", icon: "/favicon.ico" });
+            }
+          }
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
