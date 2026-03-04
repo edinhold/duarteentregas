@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { GoogleMap, MarkerF, InfoWindowF } from "@react-google-maps/api";
+import { GoogleMap, MarkerF, InfoWindowF } from "@react-google-maps/api"; // keep for other uses
 import { playNotificationSound } from "@/lib/notificationSound";
+import DriverGPS from "@/components/driver/DriverGPS";
 import { GOOGLE_MAPS_API_KEY, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 
 const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
@@ -487,44 +488,12 @@ const DriverPanel = () => {
           </Card>
         )}
 
-        {/* Map */}
-        {hasMapsKey && mapMarkers.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Entregas no Mapa</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 rounded-lg overflow-hidden">
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "100%" }}
-                  center={mapMarkers[0] ? { lat: mapMarkers[0].lat, lng: mapMarkers[0].lng } : DEFAULT_CENTER}
-                  zoom={DEFAULT_ZOOM}
-                >
-                  {mapMarkers.map((m) => (
-                    <MarkerF key={m.id} position={{ lat: m.lat, lng: m.lng }} onClick={() => setSelectedRequest(m)} />
-                  ))}
-                  {selectedRequest && (
-                    <InfoWindowF position={{ lat: selectedRequest.lat, lng: selectedRequest.lng }} onCloseClick={() => setSelectedRequest(null)}>
-                      <div className="p-1 min-w-[140px]">
-                        <h3 style={{ fontWeight: "bold", fontSize: 14 }}>{selectedRequest.name}</h3>
-                        <p style={{ fontSize: 11, color: "#666" }}>{selectedRequest.address}</p>
-                        <p style={{ fontSize: 12, fontWeight: "bold", marginTop: 4 }}>
-                          Ganho: R$ {Number(deliveryConfig?.base_fee || 5).toFixed(2)}
-                        </p>
-                        <button
-                          onClick={() => acceptRequest(selectedRequest.request.id)}
-                          style={{ marginTop: 6, background: "hsl(27, 100%, 50%)", color: "white", border: "none", padding: "4px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
-                        >
-                          Aceitar Entrega
-                        </button>
-                      </div>
-                    </InfoWindowF>
-                  )}
-                </GoogleMap>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* GPS Tracking & Map */}
+        <DriverGPS
+          activeRequest={activeRequest}
+          pendingRequests={pendingRequests}
+          onAcceptRequest={acceptRequest}
+        />
 
         {/* Pending requests list */}
         <Card>
