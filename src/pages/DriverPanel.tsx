@@ -341,7 +341,7 @@ const DriverPanel = () => {
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-extrabold text-green-600">R$ {pendingBalance.toFixed(2)}</p>
+              <p className="text-2xl font-extrabold text-accent">R$ {pendingBalance.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">Saldo Disponível</p>
             </CardContent>
           </Card>
