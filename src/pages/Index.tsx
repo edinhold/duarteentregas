@@ -4,11 +4,13 @@ import { useCategories, useRestaurants } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
+import RestaurantMap from "@/components/RestaurantMap";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Settings } from "lucide-react";
+import { User, LogOut, Settings, Map, List } from "lucide-react";
 import { motion } from "framer-motion";
+import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 const Index = () => {
   const navigate = useNavigate();
