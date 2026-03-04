@@ -1,24 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Store, Mail, Lock, Phone, User, MapPin, ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-}
-
 const RegisterStoreOwner = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -27,7 +19,6 @@ const RegisterStoreOwner = () => {
     password: "",
     restaurantName: "",
     restaurantAddress: "",
-    categoryId: "",
     deliveryTime: "30-45 min",
     deliveryFee: "5",
     minOrder: "15",
@@ -35,11 +26,8 @@ const RegisterStoreOwner = () => {
     image: "",
   });
 
-  useEffect(() => {
-    supabase.from("categories").select("id, name, icon").order("sort_order").then(({ data }) => {
-      if (data) setCategories(data);
-    });
-  }, []);
+
+
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -63,14 +51,11 @@ const RegisterStoreOwner = () => {
       if (data.user) {
         await supabase.from("profiles").update({ phone: form.phone }).eq("user_id", data.user.id);
 
-        const selectedCat = categories.find((c) => c.id === form.categoryId);
-
         // Create restaurant
         await supabase.from("restaurants").insert({
           name: form.restaurantName,
           address: form.restaurantAddress,
-          category_id: form.categoryId || null,
-          category_name: selectedCat?.name || "",
+          category_name: "Geral",
           delivery_time: form.deliveryTime,
           delivery_fee: parseFloat(form.deliveryFee) || 0,
           min_order: parseFloat(form.minOrder) || 0,
@@ -162,21 +147,6 @@ const RegisterStoreOwner = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Select onValueChange={(v) => handleChange("categoryId", v)}>
-                  <SelectTrigger className="rounded-xl h-11">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="space-y-2">
                 <Label>Tempo de entrega</Label>
                 <Input placeholder="30-45 min" value={form.deliveryTime} onChange={(e) => handleChange("deliveryTime", e.target.value)} className="rounded-xl h-11" />
