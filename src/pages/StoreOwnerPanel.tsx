@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Truck, CreditCard, Ticket, MessageSquare, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
@@ -179,7 +180,8 @@ const StoreOwnerPanel = () => {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg">Painel do Lojista</h1>
+        <h1 className="font-bold text-lg flex-1">Painel do Lojista</h1>
+        <ThemeToggle />
       </header>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto space-y-4">
