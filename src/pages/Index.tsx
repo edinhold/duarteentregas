@@ -9,8 +9,6 @@ import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
 import { User, LogOut, Settings } from "lucide-react";
 import { motion } from "framer-motion";
-import CartFloatingBar from "@/components/CartFloatingBar";
-import { motion } from "framer-motion";
 
 const Index = () => {
   const navigate = useNavigate();
