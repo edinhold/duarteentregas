@@ -7,11 +7,12 @@ interface CategoryBarProps {
   onSelect: (id: string | null) => void;
 }
 
-const CategoryBar = ({ categories = [], selected, onSelect }: CategoryBarProps) => {
-  if (!categories || categories.length === 0) return null;
+const CategoryBar = ({ categories, selected, onSelect }: CategoryBarProps) => {
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  if (safeCategories.length === 0) return null;
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-1">
-      {categories.map((cat, i) => (
+      {safeCategories.map((cat, i) => (
         <motion.button
           key={cat.id}
           initial={{ opacity: 0, y: 20 }}
