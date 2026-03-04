@@ -7,12 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
 import ProductForm from "@/components/admin/ProductForm";
 import DeleteConfirm from "@/components/admin/DeleteConfirm";
+import DriversTab from "@/components/admin/DriversTab";
+import StoreOwnersTab from "@/components/admin/StoreOwnersTab";
+import FeesConfigTab from "@/components/admin/FeesConfigTab";
+import CreditsTab from "@/components/admin/CreditsTab";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const statusOptions = [
   { value: "pending", label: "Pendente" },
@@ -28,13 +33,10 @@ const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const { data: categories = [] } = useCategories();
 
-  // Restaurant state
   const [restaurantFormOpen, setRestaurantFormOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
   const [deleteRestaurant, setDeleteRestaurant] = useState<any>(null);
   const [deletingRestaurant, setDeletingRestaurant] = useState(false);
-
-  // Product state
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [deleteProduct, setDeleteProduct] = useState<any>(null);
@@ -142,11 +144,18 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="restaurants">
-          <TabsList className="w-full">
-            <TabsTrigger value="restaurants" className="flex-1">Restaurantes</TabsTrigger>
-            <TabsTrigger value="products" className="flex-1">Produtos</TabsTrigger>
-            <TabsTrigger value="orders" className="flex-1">Pedidos</TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full">
+            <TabsList className="w-max">
+              <TabsTrigger value="restaurants"><Store className="w-4 h-4 mr-1" /> Restaurantes</TabsTrigger>
+              <TabsTrigger value="products"><Package className="w-4 h-4 mr-1" /> Produtos</TabsTrigger>
+              <TabsTrigger value="orders"><ShoppingCart className="w-4 h-4 mr-1" /> Pedidos</TabsTrigger>
+              <TabsTrigger value="drivers"><Truck className="w-4 h-4 mr-1" /> Motoristas</TabsTrigger>
+              <TabsTrigger value="storeowners"><Users className="w-4 h-4 mr-1" /> Lojistas</TabsTrigger>
+              <TabsTrigger value="fees"><Settings className="w-4 h-4 mr-1" /> Taxas</TabsTrigger>
+              <TabsTrigger value="credits"><Ticket className="w-4 h-4 mr-1" /> Créditos</TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
 
           <TabsContent value="restaurants">
             <Card>
@@ -270,6 +279,11 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="drivers"><DriversTab /></TabsContent>
+          <TabsContent value="storeowners"><StoreOwnersTab /></TabsContent>
+          <TabsContent value="fees"><FeesConfigTab /></TabsContent>
+          <TabsContent value="credits"><CreditsTab /></TabsContent>
         </Tabs>
       </div>
 

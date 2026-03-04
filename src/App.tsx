@@ -13,6 +13,8 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import StoreOwnerPanel from "./pages/StoreOwnerPanel";
+import DriverPanel from "./pages/DriverPanel";
 import RegisterCustomer from "./pages/register/RegisterCustomer";
 import RegisterDriver from "./pages/register/RegisterDriver";
 import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
@@ -40,6 +42,8 @@ const AppContent = () => (
               <Route path="/cadastro/entregador" element={<RegisterDriver />} />
               <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/lojista" element={<StoreOwnerPanel />} />
+              <Route path="/entregador" element={<DriverPanel />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
