@@ -29,9 +29,11 @@ const StoreOwnersTab = () => {
       const res = await supabase.functions.invoke("delete-user", {
         body: { user_id: deleteId.ownerId },
       });
-      if (res.error) throw res.error;
+      if (res.error) throw new Error(res.error.message || "Erro na função");
+      if (res.data?.error) throw new Error(res.data.error);
       toast.success(`${deleteId.name} removido!`);
       queryClient.invalidateQueries({ queryKey: ["admin-store-owners"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-restaurants"] });
       setDeleteId(null);
     } catch (e: any) {
       toast.error(e.message || "Erro ao remover");

@@ -27,11 +27,11 @@ const DriversTab = () => {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("delete-user", {
         body: { user_id: deleteId.userId },
       });
-      if (res.error) throw res.error;
+      if (res.error) throw new Error(res.error.message || "Erro na função");
+      if (res.data?.error) throw new Error(res.data.error);
       toast.success(`${deleteId.name} removido!`);
       queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
       setDeleteId(null);
