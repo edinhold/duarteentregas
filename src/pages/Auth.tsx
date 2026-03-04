@@ -24,10 +24,26 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: loginData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
-        navigate("/");
+        
+        // Check user role and redirect accordingly
+        if (loginData.user) {
+          const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", loginData.user.id);
+          const userRoles = roles?.map(r => r.role) || [];
+          if (userRoles.includes("admin")) {
+            navigate("/admin");
+          } else if (userRoles.includes("store_owner")) {
+            navigate("/lojista");
+          } else if (userRoles.includes("driver")) {
+            navigate("/entregador");
+          } else {
+            navigate("/");
+          }
+        } else {
+          navigate("/");
+        }
       } else {
         const { error } = await supabase.auth.signUp({
           email,

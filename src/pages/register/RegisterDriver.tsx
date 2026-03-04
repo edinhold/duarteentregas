@@ -83,7 +83,7 @@ const RegisterDriver = () => {
       }
 
       toast.success("Cadastro de entregador realizado com sucesso!");
-      navigate("/");
+      navigate("/entregador");
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {

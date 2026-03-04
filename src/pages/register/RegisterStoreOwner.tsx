@@ -97,7 +97,7 @@ const RegisterStoreOwner = () => {
       }
 
       toast.success("Cadastro de lojista realizado com sucesso!");
-      navigate("/");
+      navigate("/lojista");
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {
