@@ -84,10 +84,28 @@ const Index = () => {
         )}
 
         <section>
-          <h2 className="text-lg font-bold mb-3">
-            {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
-          </h2>
-          {filtered.length === 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold">
+              {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
+            </h2>
+            {hasMapsKey && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1.5"
+                onClick={() => setShowMap(!showMap)}
+              >
+                {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
+                {showMap ? "Lista" : "Mapa"}
+              </Button>
+            )}
+          </div>
+
+          {showMap && hasMapsKey ? (
+            <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
+              <RestaurantMap restaurants={filtered} />
+            </div>
+          ) : filtered.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">Nenhum restaurante encontrado</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
