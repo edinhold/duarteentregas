@@ -4,10 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Store, Mail, Lock, Phone, User, MapPin, Image } from "lucide-react";
+import { ArrowLeft, Store, Mail, Lock, Phone, User, MapPin, ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface Category {
@@ -165,7 +164,7 @@ const RegisterStoreOwner = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select value={form.categoryId} onValueChange={(v) => handleChange("categoryId", v)}>
+                <Select onValueChange={(v) => handleChange("categoryId", v)}>
                   <SelectTrigger className="rounded-xl h-11">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -197,14 +196,14 @@ const RegisterStoreOwner = () => {
               <div className="space-y-2">
                 <Label>URL do Logo</Label>
                 <div className="relative">
-                  <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="https://..." value={form.logo} onChange={(e) => handleChange("logo", e.target.value)} className="pl-10 rounded-xl h-11" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>URL da Imagem</Label>
                 <div className="relative">
-                  <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="https://..." value={form.image} onChange={(e) => handleChange("image", e.target.value)} className="pl-10 rounded-xl h-11" />
                 </div>
               </div>
