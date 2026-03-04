@@ -23,6 +23,19 @@ const DriversTab = () => {
     },
   });
 
+  const { data: earnings = [] } = useQuery({
+    queryKey: ["admin-driver-earnings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("driver_earnings").select("*").eq("status", "pending");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const getDriverEarnings = (driverId: string) => {
+    return earnings.filter((e) => e.driver_id === driverId).reduce((sum, e) => sum + Number(e.amount), 0);
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
@@ -57,6 +70,7 @@ const DriversTab = () => {
                 <TableHead>Veículo</TableHead>
                 <TableHead>Placa</TableHead>
                 <TableHead>Zona</TableHead>
+                <TableHead>A Receber</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
@@ -69,6 +83,9 @@ const DriversTab = () => {
                   <TableCell className="capitalize">{d.vehicle_type}</TableCell>
                   <TableCell>{d.vehicle_plate || "—"}</TableCell>
                   <TableCell>{d.zone_description || `${d.zone_radius_km || 5}km`}</TableCell>
+                  <TableCell className="font-semibold text-accent">
+                    R$ {getDriverEarnings(d.id).toFixed(2)}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={d.is_active ? "default" : "secondary"}>
                       {d.is_active ? "Ativo" : "Inativo"}
