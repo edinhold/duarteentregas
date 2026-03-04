@@ -171,6 +171,34 @@ const Auth = () => {
               {isLogin ? "Cadastre-se" : "Faça login"}
             </button>
           </p>
+
+          {/* Registration type links */}
+          <div className="mt-6 pt-4 border-t border-border">
+            <p className="text-sm text-muted-foreground text-center mb-3">Cadastre-se como:</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => navigate("/cadastro/cliente")}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border hover:bg-accent transition-colors"
+              >
+                <span className="text-2xl">👤</span>
+                <span className="text-xs font-medium text-foreground">Cliente</span>
+              </button>
+              <button
+                onClick={() => navigate("/cadastro/entregador")}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border hover:bg-accent transition-colors"
+              >
+                <span className="text-2xl">🏍️</span>
+                <span className="text-xs font-medium text-foreground">Entregador</span>
+              </button>
+              <button
+                onClick={() => navigate("/cadastro/lojista")}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border hover:bg-accent transition-colors"
+              >
+                <span className="text-2xl">🏪</span>
+                <span className="text-xs font-medium text-foreground">Lojista</span>
+              </button>
+            </div>
+          </div>
         </div>
       </motion.div>
     </div>
