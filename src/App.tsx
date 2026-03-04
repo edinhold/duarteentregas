@@ -13,6 +13,9 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import RegisterCustomer from "./pages/register/RegisterCustomer";
+import RegisterDriver from "./pages/register/RegisterDriver";
+import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +36,9 @@ const AppContent = () => (
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/cadastro/cliente" element={<RegisterCustomer />} />
+              <Route path="/cadastro/entregador" element={<RegisterDriver />} />
+              <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -41,6 +41,57 @@ export type Database = {
         }
         Relationships: []
       }
+      drivers: {
+        Row: {
+          cpf: string | null
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          phone: string
+          updated_at: string
+          user_id: string
+          vehicle_plate: string | null
+          vehicle_type: string
+          zone_description: string | null
+          zone_lat: number | null
+          zone_lng: number | null
+          zone_radius_km: number | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          phone: string
+          updated_at?: string
+          user_id: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+          zone_description?: string | null
+          zone_lat?: number | null
+          zone_lng?: number | null
+          zone_radius_km?: number | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          phone?: string
+          updated_at?: string
+          user_id?: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+          zone_description?: string | null
+          zone_lat?: number | null
+          zone_lng?: number | null
+          zone_radius_km?: number | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string | null
@@ -292,7 +343,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "driver" | "store_owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -420,7 +471,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "driver", "store_owner"],
     },
   },
 } as const
