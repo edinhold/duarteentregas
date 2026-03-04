@@ -13,6 +13,7 @@ import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, 
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { GoogleMap, MarkerF, InfoWindowF } from "@react-google-maps/api";
+import { playNotificationSound } from "@/lib/notificationSound";
 import { GOOGLE_MAPS_API_KEY, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 
 const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
@@ -158,6 +159,7 @@ const DriverPanel = () => {
     const channel = supabase.channel("driver-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+        playNotificationSound();
         toast("🚀 Nova entrega disponível!", { duration: 6000 });
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification("Nova Entrega!", { body: "Uma nova solicitação de entrega está disponível.", icon: "/favicon.ico" });
@@ -171,6 +173,7 @@ const DriverPanel = () => {
         if (activeRequest) {
           queryClient.invalidateQueries({ queryKey: ["driver-chat", activeRequest.id] });
           if (payload.new?.sender_id !== user.id) {
+            playNotificationSound();
             toast("💬 Nova mensagem do lojista");
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("Nova mensagem", { body: payload.new?.message || "Mensagem recebida", icon: "/favicon.ico" });
