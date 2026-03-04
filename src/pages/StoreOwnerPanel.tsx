@@ -67,15 +67,45 @@ const StoreOwnerPanel = () => {
     enabled: !!activeRequest,
   });
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Realtime for delivery requests and chat
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel("store-owner-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_requests" }, () => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests", filter: `store_owner_id=eq.${user.id}` }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ["my-delivery-requests", user.id] });
+        if (payload.new?.status === "accepted" && payload.old?.status === "pending") {
+          toast.success("🎉 Um entregador aceitou sua entrega!", { duration: 8000 });
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Entrega Aceita!", {
+              body: "Um entregador aceitou seu pedido de entrega.",
+              icon: "/favicon.ico",
+            });
+          }
+        }
+        if (payload.new?.status === "picked_up") {
+          toast.info("📦 Entregador coletou o pedido!");
+        }
+        if (payload.new?.status === "delivered") {
+          toast.success("✅ Entrega concluída!");
+        }
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => {
-        if (activeRequest) queryClient.invalidateQueries({ queryKey: ["chat-messages", activeRequest.id] });
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload: any) => {
+        if (activeRequest) {
+          queryClient.invalidateQueries({ queryKey: ["chat-messages", activeRequest.id] });
+          if (payload.new?.sender_id !== user.id) {
+            toast("💬 Nova mensagem do entregador");
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("Nova mensagem", { body: payload.new?.message || "Mensagem recebida", icon: "/favicon.ico" });
+            }
+          }
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
