@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { playNotificationSound } from "@/lib/notificationSound";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/hooks/useData";
@@ -55,6 +56,28 @@ const AdminDashboard = () => {
     };
     checkAdmin();
   }, [navigate]);
+
+  // Realtime: notify admin on new withdrawal requests
+  useEffect(() => {
+    if (!authChecked) return;
+    const channel = supabase
+      .channel("admin-withdrawal-notifications")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "withdrawal_requests" },
+        (payload) => {
+          const w = payload.new as any;
+          playNotificationSound();
+          toast.info(`💰 Novo pedido de saque: R$ ${Number(w.amount).toFixed(2)}`, {
+            description: "Um motorista solicitou saque/antecipação.",
+            duration: 10000,
+          });
+          queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [authChecked, queryClient]);
 
   const [restaurantFormOpen, setRestaurantFormOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
