@@ -9,7 +9,7 @@ import RestaurantMap from "@/components/RestaurantMap";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Settings, Map, List, Download } from "lucide-react";
+import { User, LogOut, Map, List, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
@@ -48,14 +48,9 @@ const Index = () => {
           <div className="flex items-center gap-1">
             <ThemeToggle />
             {user ? (
-              <>
-                <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={() => navigate("/admin/login")}>
-                  <Settings className="w-5 h-5" />
-                </Button>
-                <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={signOut}>
-                  <LogOut className="w-5 h-5" />
-                </Button>
-              </>
+              <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={signOut}>
+                <LogOut className="w-5 h-5" />
+              </Button>
             ) : (
               <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={() => navigate("/auth")}>
                 <User className="w-5 h-5 mr-1" /> Entrar
@@ -108,12 +103,7 @@ const Index = () => {
               {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
             </h2>
             {hasMapsKey && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-xl gap-1.5"
-                onClick={() => setShowMap(!showMap)}
-              >
+              <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setShowMap(!showMap)}>
                 {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
                 {showMap ? "Lista" : "Mapa"}
               </Button>
