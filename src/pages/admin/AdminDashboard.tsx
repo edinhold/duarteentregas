@@ -12,6 +12,7 @@ import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Tr
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
+import ThemeToggle from "@/components/ThemeToggle";
 import ProductForm from "@/components/admin/ProductForm";
 import DeleteConfirm from "@/components/admin/DeleteConfirm";
 import DriversTab from "@/components/admin/DriversTab";
@@ -180,7 +181,8 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg">Painel Administrativo</h1>
+        <h1 className="font-bold text-lg flex-1">Painel Administrativo</h1>
+        <ThemeToggle />
       </header>
 
       <div className="p-4 max-w-5xl mx-auto space-y-6">

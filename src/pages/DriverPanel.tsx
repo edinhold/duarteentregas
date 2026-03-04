@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import { GoogleMap, MarkerF, InfoWindowF } from "@react-google-maps/api"; // keep for other uses
 import { playNotificationSound } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
+import ThemeToggle from "@/components/ThemeToggle";
 import { GOOGLE_MAPS_API_KEY, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 
 const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
@@ -325,7 +326,8 @@ const DriverPanel = () => {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg">Painel do Entregador</h1>
+        <h1 className="font-bold text-lg flex-1">Painel do Entregador</h1>
+        <ThemeToggle />
       </header>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto space-y-4">
