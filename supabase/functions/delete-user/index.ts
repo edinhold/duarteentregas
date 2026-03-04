@@ -10,27 +10,35 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
-    // Verify caller is admin
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("No auth header");
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "No auth" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Use anon client with user's auth header to verify token
+    const anonClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user: caller }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !caller) {
-      console.error("Auth error:", authError?.message);
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      console.error("Claims error:", claimsError?.message);
       return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: caller.id, _role: "admin" });
-    console.log("Caller:", caller.id, "isAdmin:", isAdmin);
+    const callerId = claimsData.claims.sub;
+
+    // Use service role client for admin operations
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Check admin role
+    const { data: isAdmin } = await adminClient.rpc("has_role", { _user_id: callerId, _role: "admin" });
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Not admin" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -41,21 +49,18 @@ Deno.serve(async (req) => {
     }
 
     // Delete related data first
-    await supabase.from("drivers").delete().eq("user_id", user_id);
-    await supabase.from("user_roles").delete().eq("user_id", user_id);
-    await supabase.from("store_credits").delete().eq("user_id", user_id);
-    await supabase.from("profiles").delete().eq("user_id", user_id);
-    
-    // Delete restaurants owned by user
-    await supabase.from("restaurants").update({ owner_id: null }).eq("owner_id", user_id);
+    await adminClient.from("drivers").delete().eq("user_id", user_id);
+    await adminClient.from("user_roles").delete().eq("user_id", user_id);
+    await adminClient.from("store_credits").delete().eq("user_id", user_id);
+    await adminClient.from("profiles").delete().eq("user_id", user_id);
+    await adminClient.from("restaurants").update({ owner_id: null }).eq("owner_id", user_id);
 
-    const { error } = await supabase.auth.admin.deleteUser(user_id);
+    const { error } = await adminClient.auth.admin.deleteUser(user_id);
     if (error) {
       console.error("Delete user error:", error.message);
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    console.log("User deleted:", user_id);
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Unexpected error:", err);
