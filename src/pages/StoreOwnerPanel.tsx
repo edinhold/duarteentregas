@@ -135,26 +135,11 @@ const StoreOwnerPanel = () => {
     }
     setCalling(true);
     try {
-      // Check credits
-      const configRes = await supabase.from("delivery_config").select("credit_cost_per_call").limit(1).single();
-      const cost = configRes.data?.credit_cost_per_call || 3;
-      const balance = credits?.balance || 0;
-      if (balance < cost) {
-        toast.error(`Créditos insuficientes. Necessário: ${cost}, Disponível: ${balance}`);
-        return;
-      }
-
-      // Deduct credits
-      await supabase.from("store_credits").update({ balance: balance - cost }).eq("user_id", user!.id);
-
-      // Create delivery request
-      const { error } = await supabase.from("delivery_requests").insert({
-        store_owner_id: user!.id,
-        restaurant_id: restaurant?.id || null,
-        pickup_address: callForm.pickup,
-        delivery_address: callForm.delivery,
-        notes: callForm.notes || null,
-        credit_cost: cost,
+      const { data, error } = await supabase.rpc("deduct_credits_for_delivery", {
+        p_pickup_address: callForm.pickup,
+        p_delivery_address: callForm.delivery,
+        p_notes: callForm.notes || null,
+        p_restaurant_id: restaurant?.id || null,
       });
       if (error) throw error;
       toast.success("Entregador chamado! Aguarde aceitação.");
