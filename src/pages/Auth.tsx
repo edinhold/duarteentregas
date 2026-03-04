@@ -38,7 +38,8 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Cadastro realizado! Verifique seu e-mail.");
+        toast.success("Cadastro realizado com sucesso!");
+        navigate("/");
       }
     } catch (error: any) {
       toast.error(error.message || "Erro na autenticação");
