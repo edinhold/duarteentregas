@@ -1,12 +1,20 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { restaurants, categories } from "@/data/mock";
+import { useAuth } from "@/contexts/AuthContext";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
+import { Button } from "@/components/ui/button";
+import { User, LogOut, Settings } from "lucide-react";
+import { motion } from "framer-motion";
+import CartFloatingBar from "@/components/CartFloatingBar";
 import { motion } from "framer-motion";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -29,9 +37,27 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <header className="bg-primary text-primary-foreground px-4 pt-10 pb-6 rounded-b-3xl">
-        <h1 className="text-2xl font-extrabold mb-4" style={{ fontFamily: "var(--font-heading)" }}>
-          🍽️ FoodExpress
-        </h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-heading)" }}>
+            🍽️ FoodExpress
+          </h1>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <>
+                <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={() => navigate("/admin")}>
+                  <Settings className="w-5 h-5" />
+                </Button>
+                <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={signOut}>
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={() => navigate("/auth")}>
+                <User className="w-5 h-5 mr-1" /> Entrar
+              </Button>
+            )}
+          </div>
+        </div>
         <SearchBar value={search} onChange={setSearch} />
       </header>
 
