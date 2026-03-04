@@ -4,17 +4,21 @@ import { useCategories, useRestaurants } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
+import RestaurantMap from "@/components/RestaurantMap";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Settings } from "lucide-react";
+import { User, LogOut, Settings, Map, List } from "lucide-react";
 import { motion } from "framer-motion";
+import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
 
   const { data: categories = [] } = useCategories();
   const { data: restaurants = [] } = useRestaurants();
@@ -80,10 +84,28 @@ const Index = () => {
         )}
 
         <section>
-          <h2 className="text-lg font-bold mb-3">
-            {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
-          </h2>
-          {filtered.length === 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold">
+              {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
+            </h2>
+            {hasMapsKey && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1.5"
+                onClick={() => setShowMap(!showMap)}
+              >
+                {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
+                {showMap ? "Lista" : "Mapa"}
+              </Button>
+            )}
+          </div>
+
+          {showMap && hasMapsKey ? (
+            <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
+              <RestaurantMap restaurants={filtered} />
+            </div>
+          ) : filtered.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">Nenhum restaurante encontrado</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

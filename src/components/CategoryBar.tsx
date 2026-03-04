@@ -7,7 +7,8 @@ interface CategoryBarProps {
   onSelect: (id: string | null) => void;
 }
 
-const CategoryBar = ({ categories, selected, onSelect }: CategoryBarProps) => {
+const CategoryBar = ({ categories = [], selected, onSelect }: CategoryBarProps) => {
+  if (!categories || categories.length === 0) return null;
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-1">
       {categories.map((cat, i) => (
