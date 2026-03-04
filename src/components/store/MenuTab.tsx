@@ -90,7 +90,7 @@ const MenuTab = ({ restaurant }: MenuTabProps) => {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          Nenhum restaurante vinculado à sua conta. Contate o administrador.
+          Cadastre sua loja na aba "Minha Loja" para começar a adicionar produtos.
         </CardContent>
       </Card>
     );

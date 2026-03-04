@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Truck, UtensilsCrossed, CreditCard } from "lucide-react";
+import { ArrowLeft, Truck, UtensilsCrossed, CreditCard, Store } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import CallDriverTab from "@/components/store/CallDriverTab";
 import MenuTab from "@/components/store/MenuTab";
 import CreditsTab from "@/components/store/CreditsTab";
+import StoreInfoTab from "@/components/store/StoreInfoTab";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
@@ -104,25 +105,32 @@ const StoreOwnerPanel = () => {
       </header>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue="driver" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="driver" className="flex items-center gap-1.5 text-xs">
-              <Truck className="w-4 h-4" /> Entregador
+        <Tabs defaultValue="store" className="w-full">
+          <TabsList className="w-full grid grid-cols-4">
+            <TabsTrigger value="store" className="flex items-center gap-1.5 text-xs">
+              <Store className="w-4 h-4" /> Loja
             </TabsTrigger>
             <TabsTrigger value="menu" className="flex items-center gap-1.5 text-xs">
               <UtensilsCrossed className="w-4 h-4" /> Cardápio
+            </TabsTrigger>
+            <TabsTrigger value="driver" className="flex items-center gap-1.5 text-xs">
+              <Truck className="w-4 h-4" /> Entregador
             </TabsTrigger>
             <TabsTrigger value="credits" className="flex items-center gap-1.5 text-xs">
               <CreditCard className="w-4 h-4" /> Recarga
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="driver" className="mt-4">
-            <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
+          <TabsContent value="store" className="mt-4">
+            <StoreInfoTab restaurant={restaurant} userId={user.id} />
           </TabsContent>
 
           <TabsContent value="menu" className="mt-4">
             <MenuTab restaurant={restaurant} />
+          </TabsContent>
+
+          <TabsContent value="driver" className="mt-4">
+            <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
           </TabsContent>
 
           <TabsContent value="credits" className="mt-4">
