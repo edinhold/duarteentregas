@@ -12,6 +12,7 @@ import RestaurantDetail from "./pages/RestaurantDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
+import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import StoreOwnerPanel from "./pages/StoreOwnerPanel";
 import DriverPanel from "./pages/DriverPanel";
@@ -41,6 +42,7 @@ const AppContent = () => (
               <Route path="/cadastro/cliente" element={<RegisterCustomer />} />
               <Route path="/cadastro/entregador" element={<RegisterDriver />} />
               <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/lojista" element={<StoreOwnerPanel />} />
               <Route path="/entregador" element={<DriverPanel />} />
