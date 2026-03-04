@@ -11,7 +11,7 @@ import { Settings } from "lucide-react";
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", credit_cost_per_call: "3" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", credit_cost_per_call: "3", early_withdrawal_fee_percent: "10" });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
@@ -28,6 +28,7 @@ const FeesConfigTab = () => {
         base_fee: String(config.base_fee),
         fee_per_km: String(config.fee_per_km),
         credit_cost_per_call: String(config.credit_cost_per_call),
+        early_withdrawal_fee_percent: String((config as any).early_withdrawal_fee_percent ?? 10),
       });
     }
   }, [config]);
@@ -40,7 +41,8 @@ const FeesConfigTab = () => {
         base_fee: parseFloat(form.base_fee) || 0,
         fee_per_km: parseFloat(form.fee_per_km) || 0,
         credit_cost_per_call: parseFloat(form.credit_cost_per_call) || 0,
-      }).eq("id", config.id);
+        early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
+      } as any).eq("id", config.id);
       if (error) throw error;
       toast.success("Configuração salva!");
       queryClient.invalidateQueries({ queryKey: ["delivery-config"] });
@@ -73,6 +75,11 @@ const FeesConfigTab = () => {
           <Label>Custo de crédito por chamada (créditos)</Label>
           <Input type="number" step="1" value={form.credit_cost_per_call} onChange={(e) => setForm(f => ({ ...f, credit_cost_per_call: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Créditos descontados do lojista ao chamar entregador</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Taxa de saque antecipado (%)</Label>
+          <Input type="number" step="1" min="0" max="100" value={form.early_withdrawal_fee_percent} onChange={(e) => setForm(f => ({ ...f, early_withdrawal_fee_percent: e.target.value }))} />
+          <p className="text-xs text-muted-foreground">Porcentagem descontada em saques antecipados do motorista</p>
         </div>
         <Button onClick={handleSave} disabled={loading} className="w-full">
           {loading ? "Salvando..." : "Salvar Configuração"}

@@ -25,6 +25,8 @@ const RegisterDriver = () => {
     vehicleType: "moto",
     vehiclePlate: "",
     zoneDescription: "",
+    pixKey: "",
+    pixKeyType: "cpf",
   });
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [selectedPos, setSelectedPos] = useState(defaultCenter);
@@ -72,6 +74,8 @@ const RegisterDriver = () => {
           zone_lng: selectedPos.lng,
           zone_radius_km: radius,
           zone_description: form.zoneDescription || null,
+          pix_key: form.pixKey || null,
+          pix_key_type: form.pixKeyType || null,
         } as any);
 
         // Assign driver role
@@ -211,6 +215,29 @@ const RegisterDriver = () => {
               <div className="space-y-2">
                 <Label>Bairro/Região</Label>
                 <Input placeholder="Ex: Centro, Zona Sul" value={form.zoneDescription} onChange={(e) => handleChange("zoneDescription", e.target.value)} className="rounded-xl h-11" />
+              </div>
+            </div>
+
+            {/* PIX Key */}
+            <h3 className="font-bold text-foreground pt-2 flex items-center gap-2">💰 Chave PIX</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de chave</Label>
+                <Select value={form.pixKeyType} onValueChange={(v) => handleChange("pixKeyType", v)}>
+                  <SelectTrigger className="rounded-xl h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpf">CPF</SelectItem>
+                    <SelectItem value="phone">Telefone</SelectItem>
+                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="random">Aleatória</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Chave PIX</Label>
+                <Input placeholder="Sua chave PIX" value={form.pixKey} onChange={(e) => handleChange("pixKey", e.target.value)} className="rounded-xl h-11" />
               </div>
             </div>
 

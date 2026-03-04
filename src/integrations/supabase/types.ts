@@ -107,6 +107,7 @@ export type Database = {
         Row: {
           base_fee: number
           credit_cost_per_call: number
+          early_withdrawal_fee_percent: number
           fee_per_km: number
           id: string
           updated_at: string
@@ -114,6 +115,7 @@ export type Database = {
         Insert: {
           base_fee?: number
           credit_cost_per_call?: number
+          early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
           updated_at?: string
@@ -121,6 +123,7 @@ export type Database = {
         Update: {
           base_fee?: number
           credit_cost_per_call?: number
+          early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
           updated_at?: string
@@ -132,6 +135,7 @@ export type Database = {
           created_at: string
           credit_cost: number
           delivery_address: string | null
+          driver_fee: number
           driver_id: string | null
           id: string
           notes: string | null
@@ -145,6 +149,7 @@ export type Database = {
           created_at?: string
           credit_cost?: number
           delivery_address?: string | null
+          driver_fee?: number
           driver_id?: string | null
           id?: string
           notes?: string | null
@@ -158,6 +163,7 @@ export type Database = {
           created_at?: string
           credit_cost?: number
           delivery_address?: string | null
+          driver_fee?: number
           driver_id?: string | null
           id?: string
           notes?: string | null
@@ -177,6 +183,41 @@ export type Database = {
           },
         ]
       }
+      driver_earnings: {
+        Row: {
+          amount: number
+          created_at: string
+          delivery_request_id: string | null
+          driver_id: string
+          id: string
+          status: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          delivery_request_id?: string | null
+          driver_id: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          delivery_request_id?: string | null
+          driver_id?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_earnings_delivery_request_id_fkey"
+            columns: ["delivery_request_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           cpf: string | null
@@ -185,6 +226,8 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string
+          pix_key: string | null
+          pix_key_type: string | null
           updated_at: string
           user_id: string
           vehicle_plate: string | null
@@ -201,6 +244,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone: string
+          pix_key?: string | null
+          pix_key_type?: string | null
           updated_at?: string
           user_id: string
           vehicle_plate?: string | null
@@ -217,6 +262,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string
+          pix_key?: string | null
+          pix_key_type?: string | null
           updated_at?: string
           user_id?: string
           vehicle_plate?: string | null
@@ -483,6 +530,51 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          driver_id: string
+          driver_user_id: string
+          fee_amount: number
+          fee_percent: number
+          id: string
+          net_amount: number
+          pix_key: string | null
+          pix_key_type: string | null
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          driver_id: string
+          driver_user_id: string
+          fee_amount?: number
+          fee_percent?: number
+          id?: string
+          net_amount?: number
+          pix_key?: string | null
+          pix_key_type?: string | null
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          driver_id?: string
+          driver_user_id?: string
+          fee_amount?: number
+          fee_percent?: number
+          id?: string
+          net_amount?: number
+          pix_key?: string | null
+          pix_key_type?: string | null
+          processed_at?: string | null
+          status?: string
         }
         Relationships: []
       }

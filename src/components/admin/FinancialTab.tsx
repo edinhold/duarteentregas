@@ -1,0 +1,237 @@
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { toast } from "sonner";
+import { DollarSign, CheckCircle, XCircle, Key } from "lucide-react";
+
+const FinancialTab = () => {
+  const queryClient = useQueryClient();
+  const [processing, setProcessing] = useState<string | null>(null);
+
+  // Get all drivers with their PIX info
+  const { data: drivers = [] } = useQuery({
+    queryKey: ["admin-drivers-financial"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("drivers")
+        .select("*")
+        .order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Get all withdrawal requests
+  const { data: withdrawals = [] } = useQuery({
+    queryKey: ["admin-withdrawals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("withdrawal_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Get all earnings
+  const { data: earnings = [] } = useQuery({
+    queryKey: ["admin-earnings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_earnings")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleWithdrawalAction = async (id: string, status: "approved" | "rejected") => {
+    setProcessing(id);
+    try {
+      const { error } = await supabase
+        .from("withdrawal_requests")
+        .update({ status, processed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success(status === "approved" ? "Saque aprovado!" : "Saque rejeitado");
+      queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const getDriverName = (driverId: string) => {
+    const driver = drivers.find((d: any) => d.id === driverId);
+    return driver?.full_name || "Desconhecido";
+  };
+
+  const getDriverByUserId = (userId: string) => {
+    return drivers.find((d: any) => d.user_id === userId);
+  };
+
+  const statusLabels: Record<string, string> = {
+    pending: "Pendente",
+    approved: "Aprovado",
+    rejected: "Rejeitado",
+  };
+
+  const pixTypeLabels: Record<string, string> = {
+    cpf: "CPF",
+    phone: "Telefone",
+    email: "E-mail",
+    random: "Aleatória",
+  };
+
+  const totalEarnings = earnings.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const pendingWithdrawals = withdrawals.filter((w: any) => w.status === "pending");
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-extrabold text-primary">R$ {totalEarnings.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Total em Ganhos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-extrabold text-orange-500">{pendingWithdrawals.length}</p>
+            <p className="text-xs text-muted-foreground">Saques Pendentes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-extrabold">{drivers.length}</p>
+            <p className="text-xs text-muted-foreground">Motoristas</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Withdrawal Requests */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="w-4 h-4" /> Solicitações de Saque
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {withdrawals.length === 0 ? (
+            <p className="text-muted-foreground text-center py-6">Nenhuma solicitação de saque</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Motorista</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Taxa</TableHead>
+                  <TableHead>Líquido</TableHead>
+                  <TableHead>PIX</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {withdrawals.map((w: any) => {
+                  const driver = getDriverByUserId(w.driver_user_id);
+                  return (
+                    <TableRow key={w.id}>
+                      <TableCell className="font-medium">{driver?.full_name || "—"}</TableCell>
+                      <TableCell>R$ {Number(w.amount).toFixed(2)}</TableCell>
+                      <TableCell>{w.fee_percent}% (R$ {Number(w.fee_amount).toFixed(2)})</TableCell>
+                      <TableCell className="font-bold">R$ {Number(w.net_amount).toFixed(2)}</TableCell>
+                      <TableCell className="text-xs">
+                        {w.pix_key ? (
+                          <span>{pixTypeLabels[w.pix_key_type] || w.pix_key_type}: {w.pix_key}</span>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={w.status === "approved" ? "default" : w.status === "rejected" ? "destructive" : "secondary"}>
+                          {statusLabels[w.status] || w.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {w.status === "pending" && (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-green-600"
+                              onClick={() => handleWithdrawalAction(w.id, "approved")}
+                              disabled={processing === w.id}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => handleWithdrawalAction(w.id, "rejected")}
+                              disabled={processing === w.id}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Drivers PIX Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Key className="w-4 h-4" /> Chaves PIX dos Motoristas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Motorista</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Tipo PIX</TableHead>
+                <TableHead>Chave PIX</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {drivers.map((d: any) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-medium">{d.full_name}</TableCell>
+                  <TableCell>{d.phone}</TableCell>
+                  <TableCell>{d.pix_key_type ? (pixTypeLabels[d.pix_key_type] || d.pix_key_type) : "—"}</TableCell>
+                  <TableCell>{d.pix_key || <span className="text-muted-foreground">Não cadastrada</span>}</TableCell>
+                  <TableCell>
+                    <Badge variant={d.is_active ? "default" : "secondary"}>
+                      {d.is_active ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default FinancialTab;
