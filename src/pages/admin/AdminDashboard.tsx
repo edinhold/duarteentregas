@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/hooks/useData";
@@ -33,6 +33,28 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: categories = [] } = useCategories();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Protect admin route
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/admin/login", { replace: true });
+        return;
+      }
+      const { data: isAdmin } = await supabase.rpc("has_role", {
+        _user_id: session.user.id,
+        _role: "admin",
+      });
+      if (!isAdmin) {
+        navigate("/admin/login", { replace: true });
+        return;
+      }
+      setAuthChecked(true);
+    };
+    checkAdmin();
+  }, [navigate]);
 
   const [restaurantFormOpen, setRestaurantFormOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<any>(null);
@@ -121,6 +143,14 @@ const AdminDashboard = () => {
     { label: "Pedidos", value: orders.length, icon: ShoppingCart, color: "text-accent" },
     { label: "Faturamento", value: `R$ ${orders.reduce((s: number, o: any) => s + Number(o.total), 0).toFixed(0)}`, icon: TrendingUp, color: "text-primary" },
   ];
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Verificando permissões...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
