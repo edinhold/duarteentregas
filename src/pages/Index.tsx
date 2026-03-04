@@ -17,6 +17,8 @@ const Index = () => {
   const { user, signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
 
   const { data: categories = [] } = useCategories();
   const { data: restaurants = [] } = useRestaurants();
