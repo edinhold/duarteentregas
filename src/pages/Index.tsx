@@ -10,6 +10,7 @@ import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
 import { User, LogOut, Settings, Map, List, Download } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
@@ -44,7 +45,8 @@ const Index = () => {
       <header className="bg-primary text-primary-foreground px-4 pt-10 pb-6 rounded-b-3xl">
         <div className="flex items-center justify-between mb-4">
           <img src={logoDuarte} alt="Duarte Delivery" className="h-10 object-contain" />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
             {user ? (
               <>
                 <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/20 rounded-full" onClick={() => navigate("/admin/login")}>
