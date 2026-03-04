@@ -80,7 +80,7 @@ const RegisterStoreOwner = () => {
         if (imageFile) imageUrl = await uploadFile(imageFile, data.user.id, "image");
 
         // Create restaurant
-        await supabase.from("restaurants").insert({
+        const { error: restError } = await supabase.from("restaurants").insert({
           name: form.restaurantName,
           address: form.restaurantAddress,
           category_name: "Geral",
@@ -91,9 +91,11 @@ const RegisterStoreOwner = () => {
           logo: logoUrl,
           image: imageUrl,
         });
+        if (restError) throw restError;
 
         // Assign store_owner role
-        await supabase.from("user_roles").insert({ user_id: data.user.id, role: "store_owner" as any });
+        const { error: roleError } = await supabase.from("user_roles").insert({ user_id: data.user.id, role: "store_owner" as any });
+        if (roleError) throw roleError;
       }
 
       toast.success("Cadastro de lojista realizado com sucesso!");
