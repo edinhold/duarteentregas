@@ -41,6 +41,142 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          created_at: string
+          delivery_request_id: string
+          id: string
+          message: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_request_id: string
+          id?: string
+          message: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          delivery_request_id?: string
+          id?: string
+          message?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_delivery_request_id_fkey"
+            columns: ["delivery_request_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_used: boolean
+          used_at: string | null
+          used_by: string | null
+          value: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_used?: boolean
+          used_at?: string | null
+          used_by?: string | null
+          value?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_used?: boolean
+          used_at?: string | null
+          used_by?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
+      delivery_config: {
+        Row: {
+          base_fee: number
+          credit_cost_per_call: number
+          fee_per_km: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          base_fee?: number
+          credit_cost_per_call?: number
+          fee_per_km?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          base_fee?: number
+          credit_cost_per_call?: number
+          fee_per_km?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_requests: {
+        Row: {
+          created_at: string
+          credit_cost: number
+          delivery_address: string | null
+          driver_id: string | null
+          id: string
+          notes: string | null
+          pickup_address: string | null
+          restaurant_id: string | null
+          status: string
+          store_owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_cost?: number
+          delivery_address?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address?: string | null
+          restaurant_id?: string | null
+          status?: string
+          store_owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_cost?: number
+          delivery_address?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address?: string | null
+          restaurant_id?: string | null
+          status?: string
+          store_owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_requests_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           cpf: string | null
@@ -311,6 +447,27 @@ export type Database = {
           },
         ]
       }
+      store_credits: {
+        Row: {
+          balance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -341,6 +498,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "driver" | "store_owner"
