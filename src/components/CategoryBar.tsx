@@ -1,12 +1,13 @@
-import { categories } from "@/data/mock";
+import { Category } from "@/types";
 import { motion } from "framer-motion";
 
 interface CategoryBarProps {
+  categories: Category[];
   selected: string | null;
   onSelect: (id: string | null) => void;
 }
 
-const CategoryBar = ({ selected, onSelect }: CategoryBarProps) => {
+const CategoryBar = ({ categories, selected, onSelect }: CategoryBarProps) => {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-1">
       {categories.map((cat, i) => (
