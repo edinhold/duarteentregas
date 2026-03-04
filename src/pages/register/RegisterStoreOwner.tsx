@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Store, Mail, Lock, Phone, User, MapPin, ImageIcon } from "lucide-react";
+import { ArrowLeft, Store, Mail, Lock, Phone, User, MapPin, ImageIcon, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 
 const RegisterStoreOwner = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -22,8 +26,6 @@ const RegisterStoreOwner = () => {
     deliveryTime: "30-45 min",
     deliveryFee: "5",
     minOrder: "15",
-    logo: "",
-    image: "",
   });
 
 
@@ -31,6 +33,26 @@ const RegisterStoreOwner = () => {
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileSelect = (type: "logo" | "image", file: File | null) => {
+    if (!file) return;
+    if (type === "logo") {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    } else {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadFile = async (file: File, userId: string, prefix: string): Promise<string | null> => {
+    const ext = file.name.split(".").pop();
+    const path = `${userId}/${prefix}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("restaurant-images").upload(path, file);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("restaurant-images").getPublicUrl(path);
+    return urlData.publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,6 +73,12 @@ const RegisterStoreOwner = () => {
       if (data.user) {
         await supabase.from("profiles").update({ phone: form.phone }).eq("user_id", data.user.id);
 
+        // Upload images
+        let logoUrl: string | null = null;
+        let imageUrl: string | null = null;
+        if (logoFile) logoUrl = await uploadFile(logoFile, data.user.id, "logo");
+        if (imageFile) imageUrl = await uploadFile(imageFile, data.user.id, "image");
+
         // Create restaurant
         await supabase.from("restaurants").insert({
           name: form.restaurantName,
@@ -60,8 +88,8 @@ const RegisterStoreOwner = () => {
           delivery_fee: parseFloat(form.deliveryFee) || 0,
           min_order: parseFloat(form.minOrder) || 0,
           owner_id: data.user.id,
-          logo: form.logo || null,
-          image: form.image || null,
+          logo: logoUrl,
+          image: imageUrl,
         });
 
         // Assign store_owner role
@@ -164,18 +192,28 @@ const RegisterStoreOwner = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>URL do Logo</Label>
-                <div className="relative">
-                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="https://..." value={form.logo} onChange={(e) => handleChange("logo", e.target.value)} className="pl-10 rounded-xl h-11" />
-                </div>
+                <Label>Logo da loja</Label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-4 cursor-pointer hover:bg-muted/50 transition">
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo preview" className="h-16 w-16 object-cover rounded-lg mb-2" />
+                  ) : (
+                    <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                  )}
+                  <span className="text-xs text-muted-foreground">{logoFile ? logoFile.name : "Clique para enviar"}</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect("logo", e.target.files?.[0] || null)} />
+                </label>
               </div>
               <div className="space-y-2">
-                <Label>URL da Imagem</Label>
-                <div className="relative">
-                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="https://..." value={form.image} onChange={(e) => handleChange("image", e.target.value)} className="pl-10 rounded-xl h-11" />
-                </div>
+                <Label>Imagem da loja</Label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-4 cursor-pointer hover:bg-muted/50 transition">
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Image preview" className="h-16 w-16 object-cover rounded-lg mb-2" />
+                  ) : (
+                    <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                  )}
+                  <span className="text-xs text-muted-foreground">{imageFile ? imageFile.name : "Clique para enviar"}</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelect("image", e.target.files?.[0] || null)} />
+                </label>
               </div>
             </div>
 
