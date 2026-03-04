@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
@@ -17,6 +17,7 @@ import DriversTab from "@/components/admin/DriversTab";
 import StoreOwnersTab from "@/components/admin/StoreOwnersTab";
 import FeesConfigTab from "@/components/admin/FeesConfigTab";
 import CreditsTab from "@/components/admin/CreditsTab";
+import FinancialTab from "@/components/admin/FinancialTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const statusOptions = [
@@ -153,6 +154,7 @@ const AdminDashboard = () => {
               <TabsTrigger value="storeowners"><Users className="w-4 h-4 mr-1" /> Lojistas</TabsTrigger>
               <TabsTrigger value="fees"><Settings className="w-4 h-4 mr-1" /> Taxas</TabsTrigger>
               <TabsTrigger value="credits"><Ticket className="w-4 h-4 mr-1" /> Créditos</TabsTrigger>
+              <TabsTrigger value="financial"><DollarSign className="w-4 h-4 mr-1" /> Financeiro</TabsTrigger>
             </TabsList>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -284,6 +286,7 @@ const AdminDashboard = () => {
           <TabsContent value="storeowners"><StoreOwnersTab /></TabsContent>
           <TabsContent value="fees"><FeesConfigTab /></TabsContent>
           <TabsContent value="credits"><CreditsTab /></TabsContent>
+          <TabsContent value="financial"><FinancialTab /></TabsContent>
         </Tabs>
       </div>
 
