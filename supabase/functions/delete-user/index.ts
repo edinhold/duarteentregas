@@ -18,24 +18,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No auth" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Use anon client with user's auth header to verify token
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      console.error("Claims error:", claimsError?.message);
-      return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const callerId = claimsData.claims.sub;
-
     // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Verify caller identity using service role getUser
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
+    if (authError || !caller) {
+      console.error("Auth error:", authError?.message);
+      return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const callerId = caller.id;
 
     // Check admin role
     const { data: isAdmin } = await adminClient.rpc("has_role", { _user_id: callerId, _role: "admin" });
