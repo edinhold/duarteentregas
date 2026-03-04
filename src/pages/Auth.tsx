@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logoDuarte from "@/assets/logo-duarte.jpeg";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -67,9 +68,7 @@ const Auth = () => {
         <button onClick={() => navigate("/")} className="mb-4">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-heading)" }}>
-          🍽️ FoodExpress
-        </h1>
+        <img src={logoDuarte} alt="Duarte Delivery" className="h-12 object-contain" />
         <p className="text-primary-foreground/80 mt-1">
           {isLogin ? "Entre na sua conta" : "Crie sua conta"}
         </p>

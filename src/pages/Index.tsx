@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import logoDuarte from "@/assets/logo-duarte.jpeg";
 import { useNavigate } from "react-router-dom";
 import { useCategories, useRestaurants } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,9 +42,7 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-24">
       <header className="bg-primary text-primary-foreground px-4 pt-10 pb-6 rounded-b-3xl">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-heading)" }}>
-            🍽️ FoodExpress
-          </h1>
+          <img src={logoDuarte} alt="Duarte Delivery" className="h-10 object-contain" />
           <div className="flex items-center gap-2">
             {user ? (
               <>
