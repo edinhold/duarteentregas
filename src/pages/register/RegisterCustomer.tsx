@@ -45,8 +45,8 @@ const RegisterCustomer = () => {
         await supabase.from("user_roles").insert({ user_id: data.user.id, role: "user" as any });
       }
 
-      toast.success("Cadastro realizado! Verifique seu e-mail para confirmar.");
-      navigate("/auth");
+      toast.success("Cadastro realizado com sucesso!");
+      navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {

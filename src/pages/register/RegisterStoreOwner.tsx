@@ -96,8 +96,8 @@ const RegisterStoreOwner = () => {
         await supabase.from("user_roles").insert({ user_id: data.user.id, role: "store_owner" as any });
       }
 
-      toast.success("Cadastro de lojista realizado! Verifique seu e-mail.");
-      navigate("/auth");
+      toast.success("Cadastro de lojista realizado com sucesso!");
+      navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {
