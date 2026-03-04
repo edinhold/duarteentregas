@@ -9,9 +9,10 @@ import RestaurantMap from "@/components/RestaurantMap";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Settings, Map, List } from "lucide-react";
+import { User, LogOut, Settings, Map, List, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
+import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -64,6 +65,23 @@ const Index = () => {
       </header>
 
       <div className="px-4 mt-5 space-y-6 max-w-2xl mx-auto">
+        {/* Install App Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-card border border-border/50 rounded-2xl p-4 flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md transition-shadow"
+          onClick={() => navigate("/instalar")}
+        >
+          <img src={logoDuarteFull} alt="Duarte Delivery" className="h-12 object-contain" />
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm">Instale o app Duarte Delivery</p>
+            <p className="text-xs text-muted-foreground">Acesse direto da tela inicial do seu celular</p>
+          </div>
+          <Button size="sm" className="rounded-xl shrink-0 gap-1">
+            <Download className="w-4 h-4" /> Instalar
+          </Button>
+        </motion.div>
+
         <section>
           <h2 className="text-lg font-bold mb-3">Categorias</h2>
           <CategoryBar categories={categories} selected={selectedCategory} onSelect={setSelectedCategory} />
