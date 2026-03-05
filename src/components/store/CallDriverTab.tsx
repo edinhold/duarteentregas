@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck } from "lucide-react";
+import { Truck, DollarSign } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 
 interface CallDriverTabProps {
@@ -24,6 +24,15 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
   const [calling, setCalling] = useState(false);
 
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["delivery-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("delivery_config").select("*").limit(1).single();
+      return data;
+    },
+  });
+
+  const creditCost = deliveryConfig?.credit_cost_per_call ?? 3;
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
@@ -75,8 +84,15 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <Label>Observações</Label>
             <Textarea value={callForm.notes} onChange={(e) => setCallForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Detalhes da entrega..." />
           </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+            <DollarSign className="w-5 h-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {creditCost.toFixed(2).replace(".", ",")}</span></p>
+              <p className="text-xs text-muted-foreground">Será debitado dos seus créditos</p>
+            </div>
+          </div>
           <Button onClick={handleCallDriver} disabled={calling} className="w-full">
-            {calling ? "Chamando..." : "📲 Chamar Entregador"}
+            {calling ? "Chamando..." : `📲 Chamar Entregador (R$ ${creditCost.toFixed(2).replace(".", ",")})`}
           </Button>
         </CardContent>
       </Card>
