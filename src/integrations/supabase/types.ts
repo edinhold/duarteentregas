@@ -111,6 +111,7 @@ export type Database = {
           fee_per_km: number
           id: string
           payment_day: number
+          recharge_url: string | null
           updated_at: string
           whatsapp_number: string | null
         }
@@ -121,6 +122,7 @@ export type Database = {
           fee_per_km?: number
           id?: string
           payment_day?: number
+          recharge_url?: string | null
           updated_at?: string
           whatsapp_number?: string | null
         }
@@ -131,6 +133,7 @@ export type Database = {
           fee_per_km?: number
           id?: string
           payment_day?: number
+          recharge_url?: string | null
           updated_at?: string
           whatsapp_number?: string | null
         }

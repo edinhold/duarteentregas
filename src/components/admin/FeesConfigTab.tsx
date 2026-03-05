@@ -11,7 +11,7 @@ import { Settings, MessageCircle } from "lucide-react";
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", whatsapp_number: "" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", whatsapp_number: "", recharge_url: "" });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
@@ -29,6 +29,7 @@ const FeesConfigTab = () => {
         fee_per_km: String(config.fee_per_km),
         early_withdrawal_fee_percent: String((config as any).early_withdrawal_fee_percent ?? 10),
         whatsapp_number: (config as any).whatsapp_number || "",
+        recharge_url: (config as any).recharge_url || "",
       });
     }
   }, [config]);
@@ -42,6 +43,7 @@ const FeesConfigTab = () => {
         fee_per_km: parseFloat(form.fee_per_km) || 0,
         early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
         whatsapp_number: form.whatsapp_number.trim(),
+        recharge_url: form.recharge_url.trim(),
       } as any).eq("id", config.id);
       if (error) throw error;
       toast.success("Configuração salva!");
@@ -80,6 +82,11 @@ const FeesConfigTab = () => {
           <Label className="flex items-center gap-2"><MessageCircle className="w-4 h-4 text-[#25D366]" /> Número do WhatsApp</Label>
           <Input placeholder="5511999999999" value={form.whatsapp_number} onChange={(e) => setForm(f => ({ ...f, whatsapp_number: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Número com código do país (ex: 5511999999999). Deixe vazio para desativar o botão flutuante.</p>
+        </div>
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">🔗 Link de Compra de Recarga</Label>
+          <Input placeholder="https://seusite.com/recargas" value={form.recharge_url} onChange={(e) => setForm(f => ({ ...f, recharge_url: e.target.value }))} />
+          <p className="text-xs text-muted-foreground">URL do site para compra de créditos. Aparecerá como botão no painel do lojista.</p>
         </div>
         <Button onClick={handleSave} disabled={loading} className="w-full">
           {loading ? "Salvando..." : "Salvar Configuração"}
