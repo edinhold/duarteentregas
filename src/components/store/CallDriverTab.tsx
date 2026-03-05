@@ -21,7 +21,7 @@ interface CallDriverTabProps {
 
 const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages }: CallDriverTabProps) => {
   const queryClient = useQueryClient();
-  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
+  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "", distance_km: "" });
   const [calling, setCalling] = useState(false);
 
   const { data: deliveryConfig } = useQuery({
@@ -32,7 +32,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     },
   });
 
-  const creditCost = deliveryConfig?.credit_cost_per_call ?? 3;
+  const baseFee = deliveryConfig?.base_fee ?? 5;
+  const feePerKm = deliveryConfig?.fee_per_km ?? 1.5;
+  const distanceKm = parseFloat(callForm.distance_km) || 0;
+  const deliveryCost = baseFee + feePerKm * distanceKm;
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
@@ -42,6 +45,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.error("Preencha endereço de coleta e entrega");
       return;
     }
+    if (distanceKm <= 0) {
+      toast.error("Informe a distância em km");
+      return;
+    }
     setCalling(true);
     try {
       const { error } = await supabase.rpc("deduct_credits_for_delivery", {
@@ -49,10 +56,11 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         p_delivery_address: callForm.delivery,
         p_notes: callForm.notes || null,
         p_restaurant_id: restaurant?.id || null,
-      });
+        p_distance_km: distanceKm,
+      } as any);
       if (error) throw error;
-      toast.success("Entregador chamado! Aguarde aceitação.");
-      setCallForm({ pickup: "", delivery: "", notes: "" });
+      toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
+      setCallForm({ pickup: "", delivery: "", notes: "", distance_km: "" });
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
@@ -84,15 +92,21 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <Label>Observações</Label>
             <Textarea value={callForm.notes} onChange={(e) => setCallForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Detalhes da entrega..." />
           </div>
+          <div className="space-y-2">
+            <Label>Distância (km) *</Label>
+            <Input type="number" step="0.1" min="0" value={callForm.distance_km} onChange={(e) => setCallForm(f => ({ ...f, distance_km: e.target.value }))} placeholder="Ex: 3.5" />
+          </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
             <DollarSign className="w-5 h-5 text-primary" />
             <div>
-              <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {creditCost.toFixed(2).replace(".", ",")}</span></p>
-              <p className="text-xs text-muted-foreground">Será debitado dos seus créditos</p>
+              <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
+              <p className="text-xs text-muted-foreground">
+                Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")}
+              </p>
             </div>
           </div>
           <Button onClick={handleCallDriver} disabled={calling} className="w-full">
-            {calling ? "Chamando..." : `📲 Chamar Entregador (R$ ${creditCost.toFixed(2).replace(".", ",")})`}
+            {calling ? "Chamando..." : `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})`}
           </Button>
         </CardContent>
       </Card>

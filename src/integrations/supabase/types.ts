@@ -638,15 +638,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      deduct_credits_for_delivery: {
-        Args: {
-          p_delivery_address: string
-          p_notes?: string
-          p_pickup_address: string
-          p_restaurant_id?: string
-        }
-        Returns: string
-      }
+      deduct_credits_for_delivery:
+        | {
+            Args: {
+              p_delivery_address: string
+              p_notes?: string
+              p_pickup_address: string
+              p_restaurant_id?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_delivery_address: string
+              p_distance_km?: number
+              p_notes?: string
+              p_pickup_address: string
+              p_restaurant_id?: string
+            }
+            Returns: string
+          }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

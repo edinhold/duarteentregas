@@ -11,7 +11,7 @@ import { Settings, MessageCircle } from "lucide-react";
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", credit_cost_per_call: "3", early_withdrawal_fee_percent: "10", whatsapp_number: "" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", whatsapp_number: "" });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
@@ -27,7 +27,6 @@ const FeesConfigTab = () => {
       setForm({
         base_fee: String(config.base_fee),
         fee_per_km: String(config.fee_per_km),
-        credit_cost_per_call: String(config.credit_cost_per_call),
         early_withdrawal_fee_percent: String((config as any).early_withdrawal_fee_percent ?? 10),
         whatsapp_number: (config as any).whatsapp_number || "",
       });
@@ -41,7 +40,6 @@ const FeesConfigTab = () => {
       const { error } = await supabase.from("delivery_config").update({
         base_fee: parseFloat(form.base_fee) || 0,
         fee_per_km: parseFloat(form.fee_per_km) || 0,
-        credit_cost_per_call: parseFloat(form.credit_cost_per_call) || 0,
         early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
         whatsapp_number: form.whatsapp_number.trim(),
       } as any).eq("id", config.id);
@@ -72,11 +70,6 @@ const FeesConfigTab = () => {
           <Label>Taxa por km (R$/km)</Label>
           <Input type="number" step="0.1" value={form.fee_per_km} onChange={(e) => setForm(f => ({ ...f, fee_per_km: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Valor adicional por quilômetro percorrido</p>
-        </div>
-        <div className="space-y-2">
-          <Label>Custo de crédito por chamada (créditos)</Label>
-          <Input type="number" step="1" value={form.credit_cost_per_call} onChange={(e) => setForm(f => ({ ...f, credit_cost_per_call: e.target.value }))} />
-          <p className="text-xs text-muted-foreground">Créditos descontados do lojista ao chamar entregador</p>
         </div>
         <div className="space-y-2">
           <Label>Taxa de saque antecipado (%)</Label>
