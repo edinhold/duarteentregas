@@ -47,7 +47,7 @@ const StoreOwnerPanel = () => {
     enabled: !!user,
   });
 
-  const activeRequest = requests.find((r: any) => r.status === "accepted");
+  const activeRequest = requests.find((r: any) => ["accepted", "picked_up"].includes(r.status));
 
   const { data: chatMessages = [] } = useQuery({
     queryKey: ["chat-messages", activeRequest?.id],
