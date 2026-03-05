@@ -260,7 +260,10 @@ const DriverPanel = () => {
 
     setWithdrawing(true);
     try {
-      const feePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+      const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
+      const today = new Date().getDate();
+      const isPaymentDay = today === paymentDay;
+      const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
       const feeAmount = (totalPending * feePercent) / 100;
       const netAmount = totalPending - feeAmount;
 
@@ -315,7 +318,10 @@ const DriverPanel = () => {
   const pendingBalance = earnings
     .filter((e: any) => e.status === "pending")
     .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-  const feePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+  const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
+  const isPaymentDay = new Date().getDate() === paymentDay;
+  const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+  const netPreview = pendingBalance - (pendingBalance * feePercent) / 100;
 
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
@@ -381,22 +387,34 @@ const DriverPanel = () => {
               <CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Solicitar Saque</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {isPaymentDay ? (
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-center">
+                  <p className="text-sm font-bold text-accent">🎉 Hoje é dia de pagamento!</p>
+                  <p className="text-xs text-muted-foreground">Saque sem taxa de antecipação</p>
+                </div>
+              ) : (
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Dia de pagamento sem taxa: <strong>dia {paymentDay}</strong>
+                  </p>
+                </div>
+              )}
               <div className="bg-muted/50 rounded-lg p-3 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>Saldo disponível</span>
                   <span className="font-bold">R$ {pendingBalance.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Taxa de saque ({feePercent}%)</span>
+                  <span>Taxa {isPaymentDay ? "(isento)" : `de antecipação (${feePercent}%)`}</span>
                   <span>- R$ {(pendingBalance * feePercent / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold border-t pt-1">
-                  <span>Valor líquido</span>
-                  <span className="text-primary">R$ {(pendingBalance - (pendingBalance * feePercent / 100)).toFixed(2)}</span>
+                  <span>Valor a receber</span>
+                  <span className="text-primary">R$ {netPreview.toFixed(2)}</span>
                 </div>
               </div>
               <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full">
-                {withdrawing ? "Solicitando..." : "💰 Solicitar Saque Antecipado"}
+                {withdrawing ? "Solicitando..." : isPaymentDay ? "💰 Solicitar Saque" : "💰 Solicitar Saque Antecipado"}
               </Button>
             </CardContent>
           </Card>

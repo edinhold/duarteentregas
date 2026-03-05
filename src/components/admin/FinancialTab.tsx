@@ -6,11 +6,44 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { DollarSign, CheckCircle, XCircle, Key } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Key, CalendarDays } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const FinancialTab = () => {
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState<string | null>(null);
+  const [savingPayDay, setSavingPayDay] = useState(false);
+
+  // Get delivery config (payment day)
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["delivery-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_config")
+        .select("*")
+        .limit(1)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handlePaymentDayChange = async (day: string) => {
+    setSavingPayDay(true);
+    try {
+      const { error } = await supabase
+        .from("delivery_config")
+        .update({ payment_day: parseInt(day) } as any)
+        .eq("id", deliveryConfig?.id || "");
+      if (error) throw error;
+      toast.success(`Dia de pagamento atualizado para dia ${day}`);
+      queryClient.invalidateQueries({ queryKey: ["delivery-config"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar");
+    } finally {
+      setSavingPayDay(false);
+    }
+  };
 
   // Get all drivers with their PIX info
   const { data: drivers = [] } = useQuery({
@@ -118,6 +151,42 @@ const FinancialTab = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment Day Config */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarDays className="w-4 h-4" /> Dia de Pagamento (sem taxa)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">
+            Defina o dia do mês em que os motoristas podem sacar sem cobrança de taxa de antecipação.
+            Saques feitos fora deste dia terão a taxa aplicada automaticamente.
+          </p>
+          <div className="flex items-center gap-3">
+            <Select
+              value={String((deliveryConfig as any)?.payment_day ?? 15)}
+              onValueChange={handlePaymentDayChange}
+              disabled={savingPayDay}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Dia" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    Dia {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="secondary">
+              Atual: Dia {(deliveryConfig as any)?.payment_day ?? 15}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Withdrawal Requests */}
       <Card>
