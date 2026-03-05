@@ -260,7 +260,10 @@ const DriverPanel = () => {
 
     setWithdrawing(true);
     try {
-      const feePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+      const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
+      const today = new Date().getDate();
+      const isPaymentDay = today === paymentDay;
+      const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
       const feeAmount = (totalPending * feePercent) / 100;
       const netAmount = totalPending - feeAmount;
 
