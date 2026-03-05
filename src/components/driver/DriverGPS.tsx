@@ -57,7 +57,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     lastSavedRef.current = now;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("driver_locations")
         .upsert({
           user_id: user.id,
