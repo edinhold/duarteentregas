@@ -106,7 +106,7 @@ const Index = () => {
             </Button>
           </div>
 
-          {showMap && hasMapsKey ? (
+          {showMap ? (
             <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
               <RestaurantMap restaurants={filtered} />
             </div>
