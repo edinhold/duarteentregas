@@ -265,6 +265,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string
+          photo_url: string | null
           pix_key: string | null
           pix_key_type: string | null
           updated_at: string
@@ -283,6 +284,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone: string
+          photo_url?: string | null
           pix_key?: string | null
           pix_key_type?: string | null
           updated_at?: string
@@ -301,6 +303,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string
+          photo_url?: string | null
           pix_key?: string | null
           pix_key_type?: string | null
           updated_at?: string
