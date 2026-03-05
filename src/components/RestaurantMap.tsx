@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
+import L from "leaflet";
 
 // Fix default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -40,35 +38,50 @@ const closedIcon = new L.Icon({
   popupAnchor: [0, -32],
 });
 
-const LocateUser = () => {
-  const map = useMap();
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], DEFAULT_ZOOM),
-        () => {} // silently fail
-      );
-    }
-  }, [map]);
-  return null;
-};
-
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
-  const markers = restaurants.filter((r) => r.latitude && r.longitude);
+  const [mapReady, setMapReady] = useState(false);
+  const [MapComponents, setMapComponents] = useState<any>(null);
 
+  // Lazy load react-leaflet to avoid SSR/initialization issues
+  useEffect(() => {
+    console.log("[RestaurantMap] Loading react-leaflet...");
+    import("react-leaflet").then((mod) => {
+      console.log("[RestaurantMap] react-leaflet loaded successfully");
+      setMapComponents({
+        MapContainer: mod.MapContainer,
+        TileLayer: mod.TileLayer,
+        Marker: mod.Marker,
+        Popup: mod.Popup,
+      });
+      setMapReady(true);
+    }).catch((err) => {
+      console.error("[RestaurantMap] Failed to load react-leaflet:", err);
+    });
+  }, []);
+
+  const markers = restaurants.filter((r) => r.latitude && r.longitude);
   const center: [number, number] = markers.length > 0
     ? [markers[0].latitude!, markers[0].longitude!]
     : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
+  if (!mapReady || !MapComponents) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-muted/30 rounded-2xl">
+        <p className="text-sm text-muted-foreground">Carregando mapa...</p>
+      </div>
+    );
+  }
+
+  const { MapContainer, TileLayer, Marker, Popup } = MapComponents;
+
   return (
     <MapContainer center={center} zoom={DEFAULT_ZOOM} style={{ width: "100%", height: "100%" }}>
-      <LocateUser />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {markers.map((r) => (
+      {markers.map((r: Restaurant) => (
         <Marker
           key={r.id}
           position={[r.latitude!, r.longitude!]}
