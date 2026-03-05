@@ -24,6 +24,15 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
   const [calling, setCalling] = useState(false);
 
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["delivery-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("delivery_config").select("*").limit(1).single();
+      return data;
+    },
+  });
+
+  const creditCost = deliveryConfig?.credit_cost_per_call ?? 3;
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
