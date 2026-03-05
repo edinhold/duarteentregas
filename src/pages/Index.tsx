@@ -9,6 +9,7 @@ import RestaurantMap from "@/components/RestaurantMap";
 import MapErrorBoundary from "@/components/MapErrorBoundary";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
+import WhatsAppButton from "@/components/WhatsAppButton";
 import { Button } from "@/components/ui/button";
 import { User, LogOut, Map, List, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -127,6 +128,7 @@ const Index = () => {
         </section>
       </div>
 
+      <WhatsAppButton />
       <CartFloatingBar />
     </div>
   );
