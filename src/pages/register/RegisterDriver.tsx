@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Bike, Mail, Lock, Phone, User, MapPin } from "lucide-react";
+import { ArrowLeft, Bike, Mail, Lock, Phone, User, MapPin, Camera, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -23,6 +23,9 @@ const defaultCenter: [number, number] = [-23.5505, -46.6333];
 const RegisterDriver = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fullName: "", email: "", phone: "", cpf: "", password: "",
     vehicleType: "moto", vehiclePlate: "", zoneDescription: "",
@@ -34,6 +37,17 @@ const RegisterDriver = () => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("A foto deve ter no máximo 5MB");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
 
   const handleChange = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -85,12 +99,28 @@ const RegisterDriver = () => {
       });
       if (error) throw error;
       if (data.user) {
+        let photoUrl: string | null = null;
+
+        // Upload photo
+        if (photoFile) {
+          const ext = photoFile.name.split(".").pop();
+          const path = `${data.user.id}/photo.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("driver-photos")
+            .upload(path, photoFile, { upsert: true });
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from("driver-photos").getPublicUrl(path);
+            photoUrl = urlData.publicUrl;
+          }
+        }
+
         await supabase.from("profiles").update({ phone: form.phone }).eq("user_id", data.user.id);
         await supabase.from("drivers").insert({
           user_id: data.user.id, full_name: form.fullName, phone: form.phone,
           cpf: form.cpf || null, vehicle_type: form.vehicleType, vehicle_plate: form.vehiclePlate || null,
           zone_lat: selectedPos[0], zone_lng: selectedPos[1], zone_radius_km: radius,
           zone_description: form.zoneDescription || null, pix_key: form.pixKey || null, pix_key_type: form.pixKeyType || null,
+          photo_url: photoUrl,
         } as any);
         await supabase.from("user_roles").insert({ user_id: data.user.id, role: "driver" as any });
       }
@@ -115,6 +145,39 @@ const RegisterDriver = () => {
         <div className="bg-card rounded-2xl p-6 shadow-lg border border-border/50">
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="font-bold text-foreground">Dados Pessoais</h3>
+
+            {/* Photo upload */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-8 h-8 text-muted-foreground" />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" className="rounded-xl gap-1" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-3 h-3" /> {photoPreview ? "Trocar foto" : "Enviar foto"}
+                </Button>
+                {photoPreview && (
+                  <Button type="button" variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}>
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Tire uma selfie ou envie uma foto (máx. 5MB)</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome completo</Label>

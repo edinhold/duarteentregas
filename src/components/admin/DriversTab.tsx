@@ -122,6 +122,12 @@ const DriversTab = () => {
           </DialogHeader>
           {viewDriver && (
             <div className="space-y-3">
+              {/* Photo */}
+              {(viewDriver as any).photo_url && (
+                <div className="flex justify-center">
+                  <img src={(viewDriver as any).photo_url} alt={viewDriver.full_name} className="w-24 h-24 rounded-full object-cover border-2 border-border" />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <InfoField label="Nome completo" value={viewDriver.full_name} />
                 <InfoField label="Telefone" value={viewDriver.phone} />
