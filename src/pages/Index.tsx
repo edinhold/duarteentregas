@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
 import RestaurantMap from "@/components/RestaurantMap";
+import MapErrorBoundary from "@/components/MapErrorBoundary";
 import SearchBar from "@/components/SearchBar";
 import CartFloatingBar from "@/components/CartFloatingBar";
 import { Button } from "@/components/ui/button";
