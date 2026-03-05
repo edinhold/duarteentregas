@@ -158,7 +158,7 @@ const DriverPanel = () => {
     const channel = supabase.channel("driver-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
-        playNotificationSound();
+        playUrgentNotification();
         toast("🚀 Nova entrega disponível!", { duration: 6000 });
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification("Nova Entrega!", { body: "Uma nova solicitação de entrega está disponível.", icon: "/favicon.ico" });
