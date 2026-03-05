@@ -111,6 +111,7 @@ export type Database = {
           fee_per_km: number
           id: string
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
           base_fee?: number
@@ -119,6 +120,7 @@ export type Database = {
           fee_per_km?: number
           id?: string
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
           base_fee?: number
@@ -127,6 +129,7 @@ export type Database = {
           fee_per_km?: number
           id?: string
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
