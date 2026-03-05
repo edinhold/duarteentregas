@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { CreditCard, Ticket } from "lucide-react";
+import { CreditCard, Ticket, ExternalLink } from "lucide-react";
 
 interface CreditsTabProps {
   credits: any;
@@ -15,6 +15,17 @@ const CreditsTab = ({ credits }: CreditsTabProps) => {
   const queryClient = useQueryClient();
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+
+  const { data: config } = useQuery({
+    queryKey: ["delivery-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("delivery_config").select("*").limit(1).single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const rechargeUrl = (config as any)?.recharge_url || "";
 
   const handleRedeem = async () => {
     if (!redeemCode.trim()) return;
@@ -51,6 +62,13 @@ const CreditsTab = ({ credits }: CreditsTabProps) => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center">Insira o código de recarga fornecido pelo administrador</p>
+          {rechargeUrl && (
+            <Button asChild variant="outline" className="w-full mt-2">
+              <a href={rechargeUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" /> Comprar Recarga
+              </a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>
