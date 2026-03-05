@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,58 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign } from "lucide-react";
+import { Truck, DollarSign, MapPin } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
+import { useDriverLocations } from "@/hooks/useDriverLocations";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+const storeIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23e53935" stroke="white" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>`
+  ),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const deliveryIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%2322c55e" stroke="white" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>`
+  ),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const driverMapIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 6v6l3 3" stroke="white" stroke-width="2" fill="none"/></svg>`
+  ),
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14],
+});
+
+// Haversine distance in km
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 interface CallDriverTabProps {
   user: any;
@@ -21,8 +71,15 @@ interface CallDriverTabProps {
 
 const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages }: CallDriverTabProps) => {
   const queryClient = useQueryClient();
-  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "", distance_km: "" });
+  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
   const [calling, setCalling] = useState(false);
+  const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
+  const { data: driverLocations = [] } = useDriverLocations();
+
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const deliveryMarkerRef = useRef<L.Marker | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null);
 
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
@@ -34,11 +91,108 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const baseFee = deliveryConfig?.base_fee ?? 5;
   const feePerKm = deliveryConfig?.fee_per_km ?? 1.5;
-  const distanceKm = parseFloat(callForm.distance_km) || 0;
+
+  const storeLat = restaurant?.latitude;
+  const storeLng = restaurant?.longitude;
+
+  const distanceKm = deliveryLatLng && storeLat && storeLng
+    ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1])
+    : 0;
   const deliveryCost = baseFee + feePerKm * distanceKm;
+
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
+
+  // Initialize map
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const center: [number, number] = storeLat && storeLng
+      ? [storeLat, storeLng]
+      : [-23.5505, -46.6333];
+
+    const map = L.map(containerRef.current).setView(center, 14);
+    mapRef.current = map;
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    // Store marker
+    if (storeLat && storeLng) {
+      L.marker([storeLat, storeLng], { icon: storeIcon })
+        .addTo(map)
+        .bindPopup(`<b>🏪 ${restaurant?.name || "Sua Loja"}</b>`);
+    }
+
+    // Click to set delivery point
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      setDeliveryLatLng([lat, lng]);
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [storeLat, storeLng]);
+
+  // Update delivery marker + route line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove old delivery marker
+    if (deliveryMarkerRef.current) {
+      map.removeLayer(deliveryMarkerRef.current);
+      deliveryMarkerRef.current = null;
+    }
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+
+    if (deliveryLatLng) {
+      deliveryMarkerRef.current = L.marker(deliveryLatLng, { icon: deliveryIcon })
+        .addTo(map)
+        .bindPopup("<b>📍 Ponto de Entrega</b>")
+        .openPopup();
+
+      if (storeLat && storeLng) {
+        routeLineRef.current = L.polyline(
+          [[storeLat, storeLng], deliveryLatLng],
+          { color: "#3b82f6", weight: 3, dashArray: "8 4", opacity: 0.7 }
+        ).addTo(map);
+      }
+    }
+  }, [deliveryLatLng, storeLat, storeLng]);
+
+  // Update driver markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove old driver markers (circles + markers with driverMapIcon class)
+    map.eachLayer((layer) => {
+      if (layer instanceof L.CircleMarker || (layer instanceof L.Marker && layer !== deliveryMarkerRef.current)) {
+        // Don't remove the store marker or delivery marker
+        const latlng = layer.getLatLng();
+        const isStore = storeLat && storeLng && Math.abs(latlng.lat - storeLat) < 0.0001 && Math.abs(latlng.lng - storeLng) < 0.0001;
+        const isDelivery = deliveryLatLng && Math.abs(latlng.lat - deliveryLatLng[0]) < 0.0001 && Math.abs(latlng.lng - deliveryLatLng[1]) < 0.0001;
+        if (!isStore && !isDelivery) {
+          map.removeLayer(layer);
+        }
+      }
+    });
+
+    // Add driver markers
+    driverLocations.forEach((d: any) => {
+      L.marker([d.latitude, d.longitude], { icon: driverMapIcon })
+        .addTo(map)
+        .bindPopup(`<b>🚴 Entregador</b><br/>${d.speed ? `${Math.round(d.speed * 3.6)} km/h` : "Parado"}`);
+    });
+  }, [driverLocations, storeLat, storeLng, deliveryLatLng]);
 
   const handleCallDriver = async () => {
     if (!callForm.pickup.trim() || !callForm.delivery.trim()) {
@@ -46,7 +200,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       return;
     }
     if (distanceKm <= 0) {
-      toast.error("Informe a distância em km");
+      toast.error("Clique no mapa para definir o ponto de entrega");
       return;
     }
     setCalling(true);
@@ -60,7 +214,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       } as any);
       if (error) throw error;
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
-      setCallForm({ pickup: "", delivery: "", notes: "", distance_km: "" });
+      setCallForm({ pickup: "", delivery: "", notes: "" });
+      setDeliveryLatLng(null);
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
@@ -70,10 +225,25 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   };
 
-  // Chat is now handled by ChatWidget
-
   return (
     <div className="space-y-4">
+      {/* Map showing drivers */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="w-4 h-4" /> Mapa — Clique para definir o ponto de entrega
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div ref={containerRef} style={{ width: "100%", height: 300, borderRadius: 8 }} />
+          <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">🔴 Sua loja</span>
+            <span className="flex items-center gap-1">🟢 Ponto de entrega</span>
+            <span className="flex items-center gap-1">🔵 Entregadores</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Call Driver */}
       <Card>
         <CardHeader className="pb-2">
@@ -92,21 +262,27 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <Label>Observações</Label>
             <Textarea value={callForm.notes} onChange={(e) => setCallForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Detalhes da entrega..." />
           </div>
-          <div className="space-y-2">
-            <Label>Distância (km) *</Label>
-            <Input type="number" step="0.1" min="0" value={callForm.distance_km} onChange={(e) => setCallForm(f => ({ ...f, distance_km: e.target.value }))} placeholder="Ex: 3.5" />
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
-            <DollarSign className="w-5 h-5 text-primary" />
-            <div>
-              <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
-              <p className="text-xs text-muted-foreground">
-                Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")}
-              </p>
+
+          {distanceKm > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+              <DollarSign className="w-5 h-5 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
+                <p className="text-xs text-muted-foreground">
+                  Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")} = R$ {(feePerKm * distanceKm).toFixed(2).replace(".", ",")}
+                </p>
+              </div>
             </div>
-          </div>
-          <Button onClick={handleCallDriver} disabled={calling} className="w-full">
-            {calling ? "Chamando..." : `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})`}
+          )}
+
+          {distanceKm <= 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              📍 Clique no mapa acima para definir o ponto de entrega e calcular o valor automaticamente
+            </p>
+          )}
+
+          <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0} className="w-full">
+            {calling ? "Chamando..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega no mapa"}
           </Button>
         </CardContent>
       </Card>
