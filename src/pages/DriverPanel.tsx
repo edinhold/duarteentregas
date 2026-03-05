@@ -18,7 +18,7 @@ import DriverGPS from "@/components/driver/DriverGPS";
 import ThemeToggle from "@/components/ThemeToggle";
 import { GOOGLE_MAPS_API_KEY, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 
-const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
+const hasMapsKey = GOOGLE_MAPS_API_KEY !== ("YOUR_GOOGLE_MAPS_API_KEY" as string);
 
 const DriverPanel = () => {
   const { user } = useAuth();
