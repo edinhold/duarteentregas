@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Settings } from "lucide-react";
+import { Settings, MessageCircle } from "lucide-react";
 
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", credit_cost_per_call: "3", early_withdrawal_fee_percent: "10" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", credit_cost_per_call: "3", early_withdrawal_fee_percent: "10", whatsapp_number: "" });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
@@ -29,6 +29,7 @@ const FeesConfigTab = () => {
         fee_per_km: String(config.fee_per_km),
         credit_cost_per_call: String(config.credit_cost_per_call),
         early_withdrawal_fee_percent: String((config as any).early_withdrawal_fee_percent ?? 10),
+        whatsapp_number: (config as any).whatsapp_number || "",
       });
     }
   }, [config]);
@@ -42,6 +43,7 @@ const FeesConfigTab = () => {
         fee_per_km: parseFloat(form.fee_per_km) || 0,
         credit_cost_per_call: parseFloat(form.credit_cost_per_call) || 0,
         early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
+        whatsapp_number: form.whatsapp_number.trim(),
       } as any).eq("id", config.id);
       if (error) throw error;
       toast.success("Configuração salva!");
@@ -80,6 +82,11 @@ const FeesConfigTab = () => {
           <Label>Taxa de saque antecipado (%)</Label>
           <Input type="number" step="1" min="0" max="100" value={form.early_withdrawal_fee_percent} onChange={(e) => setForm(f => ({ ...f, early_withdrawal_fee_percent: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Porcentagem descontada em saques antecipados do motorista</p>
+        </div>
+        <div className="border-t pt-4 mt-4 space-y-2">
+          <Label className="flex items-center gap-2"><MessageCircle className="w-4 h-4 text-[#25D366]" /> Número do WhatsApp</Label>
+          <Input placeholder="5511999999999" value={form.whatsapp_number} onChange={(e) => setForm(f => ({ ...f, whatsapp_number: e.target.value }))} />
+          <p className="text-xs text-muted-foreground">Número com código do país (ex: 5511999999999). Deixe vazio para desativar o botão flutuante.</p>
         </div>
         <Button onClick={handleSave} disabled={loading} className="w-full">
           {loading ? "Salvando..." : "Salvar Configuração"}
