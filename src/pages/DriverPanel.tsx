@@ -503,6 +503,34 @@ const DriverPanel = () => {
           onAcceptRequest={acceptRequest}
         />
 
+        {/* Earnings per delivery */}
+        {earnings.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4" /> Ganhos por Corrida</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {earnings.slice(0, 10).map((e: any) => (
+                  <div key={e.id} className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(e.created_at).toLocaleDateString("pt-BR")} às {new Date(e.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-primary">R$ {Number(e.amount).toFixed(2)}</p>
+                      <Badge variant={e.status === "paid" ? "default" : "secondary"} className="text-xs">
+                        {e.status === "paid" ? "Pago" : "Pendente"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Pending requests list */}
         <Card>
           <CardHeader>
