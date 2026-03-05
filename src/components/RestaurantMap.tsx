@@ -1,11 +1,10 @@
+import { useEffect, useRef } from "react";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
 import L from "leaflet";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -16,10 +15,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
-
-interface RestaurantMapProps {
-  restaurants: Restaurant[];
-}
 
 const openIcon = new L.Icon({
   iconUrl: "data:image/svg+xml," + encodeURIComponent(
@@ -39,44 +34,69 @@ const closedIcon = new L.Icon({
   popupAnchor: [0, -32],
 });
 
+interface RestaurantMapProps {
+  restaurants: Restaurant[];
+}
+
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const markers = restaurants.filter((r) => r.latitude && r.longitude);
   const center: [number, number] = markers.length > 0
     ? [markers[0].latitude!, markers[0].longitude!]
     : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
-  return (
-    <MapContainer center={center} zoom={DEFAULT_ZOOM} style={{ width: "100%", height: "100%" }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {markers.map((r: Restaurant) => (
-        <Marker
-          key={r.id}
-          position={[r.latitude!, r.longitude!]}
-          icon={r.is_open ? openIcon : closedIcon}
-          eventHandlers={{ click: () => navigate(`/restaurant/${r.id}`) }}
-        >
-          <Popup>
-            <div className="min-w-[160px]">
-              <h3 style={{ fontWeight: "bold", fontSize: 14, margin: 0 }}>{r.name}</h3>
-              <p style={{ fontSize: 12, color: "#666", margin: "2px 0" }}>{r.category_name}</p>
-              <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#888", marginTop: 4 }}>
-                <span>⭐ {r.rating}</span>
-                <span>🕐 {r.delivery_time}</span>
-              </div>
-              <p style={{ fontSize: 11, color: r.is_open ? "#e53935" : "#999", fontWeight: 600, marginTop: 4 }}>
-                {r.is_open ? "Aberto" : "Fechado"}
-              </p>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current).setView(center, DEFAULT_ZOOM);
+    mapRef.current = map;
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing markers
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
+
+    markers.forEach((r) => {
+      const marker = L.marker([r.latitude!, r.longitude!], {
+        icon: r.is_open ? openIcon : closedIcon,
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div style="min-width:160px">
+          <h3 style="font-weight:bold;font-size:14px;margin:0">${r.name}</h3>
+          <p style="font-size:12px;color:#666;margin:2px 0">${r.category_name}</p>
+          <div style="display:flex;gap:8px;font-size:11px;color:#888;margin-top:4px">
+            <span>⭐ ${r.rating}</span>
+            <span>🕐 ${r.delivery_time}</span>
+          </div>
+          <p style="font-size:11px;color:${r.is_open ? '#e53935' : '#999'};font-weight:600;margin-top:4px">
+            ${r.is_open ? 'Aberto' : 'Fechado'}
+          </p>
+        </div>
+      `);
+
+      marker.on("click", () => navigate(`/restaurant/${r.id}`));
+    });
+  }, [markers, navigate]);
+
+  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 };
 
 export default RestaurantMap;

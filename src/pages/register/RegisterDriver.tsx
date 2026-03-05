@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Bike, Mail, Lock, Phone, User, MapPin } from "lucide-react";
 import { motion } from "framer-motion";
-import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -21,15 +19,6 @@ delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
 
 const defaultCenter: [number, number] = [-23.5505, -46.6333];
-
-const MapClickHandler = ({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) => {
-  useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-};
 
 const RegisterDriver = () => {
   const navigate = useNavigate();
@@ -41,12 +30,50 @@ const RegisterDriver = () => {
   });
   const [selectedPos, setSelectedPos] = useState<[number, number]>(defaultCenter);
   const [radius, setRadius] = useState(5);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+  const circleRef = useRef<L.Circle | null>(null);
 
   const handleChange = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const onMapClick = useCallback((lat: number, lng: number) => {
-    setSelectedPos([lat, lng]);
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current).setView(selectedPos, 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    markerRef.current = L.marker(selectedPos).addTo(map);
+    circleRef.current = L.circle(selectedPos, {
+      radius: radius * 1000,
+      fillColor: "#10b981", fillOpacity: 0.15, color: "#10b981", weight: 2,
+    }).addTo(map);
+
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      setSelectedPos([e.latlng.lat, e.latlng.lng]);
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+      circleRef.current = null;
+    };
   }, []);
+
+  // Update marker/circle when position or radius changes
+  useEffect(() => {
+    if (markerRef.current) markerRef.current.setLatLng(selectedPos);
+    if (circleRef.current) {
+      circleRef.current.setLatLng(selectedPos);
+      circleRef.current.setRadius(radius * 1000);
+    }
+  }, [selectedPos, radius]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,12 +144,7 @@ const RegisterDriver = () => {
             <h3 className="font-bold text-foreground pt-2 flex items-center gap-2"><MapPin className="w-4 h-4" /> Zona de Entrega</h3>
             <p className="text-sm text-muted-foreground">Clique no mapa para definir o centro da sua zona de entrega</p>
             <div className="rounded-xl overflow-hidden border border-border h-64">
-              <MapContainer center={selectedPos} zoom={12} style={{ width: "100%", height: "100%" }}>
-                <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapClickHandler onMapClick={onMapClick} />
-                <Marker position={selectedPos} />
-                <Circle center={selectedPos} radius={radius * 1000} pathOptions={{ fillColor: "#10b981", fillOpacity: 0.15, color: "#10b981", weight: 2 }} />
-              </MapContainer>
+              <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

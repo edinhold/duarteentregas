@@ -1,15 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER } from "@/config/maps";
 
-// Fix default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -35,20 +33,15 @@ interface DriverGPSProps {
   onAcceptRequest?: (id: string) => void;
 }
 
-// Helper to recenter map
-const RecenterMap = ({ center }: { center: [number, number] }) => {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center);
-  }, [center[0], center[1]]);
-  return null;
-};
-
 const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: DriverGPSProps) => {
   const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [accuracy, setAccuracy] = useState<number>(0);
   const [watching, setWatching] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const driverMarkerRef = useRef<L.Marker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -108,15 +101,74 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     .filter((r: any) => r.restaurants?.latitude && r.restaurants?.longitude)
     .map((r: any) => ({ id: r.id, lat: r.restaurants.latitude, lng: r.restaurants.longitude, name: r.restaurants.name }));
 
-  const mapCenter: [number, number] = driverPosition
-    ? [driverPosition.lat, driverPosition.lng]
-    : requestMarkers[0]
-      ? [requestMarkers[0].lat, requestMarkers[0].lng]
-      : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
+  const showMap = driverPosition || requestMarkers.length > 0;
+
+  // Initialize and update map
+  useEffect(() => {
+    if (!showMap || !mapContainerRef.current) return;
+
+    if (!mapRef.current) {
+      const center: [number, number] = driverPosition
+        ? [driverPosition.lat, driverPosition.lng]
+        : requestMarkers[0]
+          ? [requestMarkers[0].lat, requestMarkers[0].lng]
+          : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
+
+      const map = L.map(mapContainerRef.current).setView(center, 14);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+      mapRef.current = map;
+    }
+
+    const map = mapRef.current;
+
+    // Update driver position
+    if (driverPosition) {
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.setLatLng([driverPosition.lat, driverPosition.lng]);
+      } else {
+        driverMarkerRef.current = L.marker([driverPosition.lat, driverPosition.lng], { icon: driverIcon })
+          .addTo(map)
+          .bindPopup("Você está aqui");
+      }
+      if (accuracyCircleRef.current) {
+        accuracyCircleRef.current.setLatLng([driverPosition.lat, driverPosition.lng]).setRadius(accuracy);
+      } else {
+        accuracyCircleRef.current = L.circle([driverPosition.lat, driverPosition.lng], {
+          radius: accuracy, fillColor: "#3b82f6", fillOpacity: 0.1, color: "#3b82f6", opacity: 0.3,
+        }).addTo(map);
+      }
+      map.setView([driverPosition.lat, driverPosition.lng]);
+    }
+
+    // Update request markers
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker && layer !== driverMarkerRef.current) {
+        map.removeLayer(layer);
+      }
+    });
+    requestMarkers.forEach((m) => {
+      L.marker([m.lat, m.lng]).addTo(map)
+        .bindPopup(m.name)
+        .on("click", () => onAcceptRequest?.(m.id));
+    });
+  }, [driverPosition, accuracy, requestMarkers.length, showMap]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        driverMarkerRef.current = null;
+        accuracyCircleRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
-      {/* GPS Status Card */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -155,7 +207,6 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         </CardContent>
       </Card>
 
-      {/* Navigation for Active Request */}
       {activeRequest && currentDestination && (
         <Card className="border-primary">
           <CardHeader className="pb-2">
@@ -177,34 +228,14 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         </Card>
       )}
 
-      {/* Live Map */}
-      {(driverPosition || requestMarkers.length > 0) && (
+      {showMap && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72 rounded-lg overflow-hidden">
-              <MapContainer center={mapCenter} zoom={14} style={{ width: "100%", height: "100%" }}>
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <RecenterMap center={mapCenter} />
-                {driverPosition && (
-                  <>
-                    <Marker position={[driverPosition.lat, driverPosition.lng]} icon={driverIcon}>
-                      <Popup>Você está aqui</Popup>
-                    </Marker>
-                    <Circle center={[driverPosition.lat, driverPosition.lng]} radius={accuracy} pathOptions={{ fillColor: "#3b82f6", fillOpacity: 0.1, color: "#3b82f6", opacity: 0.3 }} />
-                  </>
-                )}
-                {requestMarkers.map((m) => (
-                  <Marker key={m.id} position={[m.lat, m.lng]} eventHandlers={{ click: () => onAcceptRequest?.(m.id) }}>
-                    <Popup>{m.name}</Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             </div>
           </CardContent>
         </Card>
