@@ -218,6 +218,42 @@ export type Database = {
           },
         ]
       }
+      driver_locations: {
+        Row: {
+          accuracy: number | null
+          driver_id: string
+          heading: number | null
+          id: string
+          latitude: number
+          longitude: number
+          speed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          driver_id: string
+          heading?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          speed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          driver_id?: string
+          heading?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          speed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       drivers: {
         Row: {
           cpf: string | null
