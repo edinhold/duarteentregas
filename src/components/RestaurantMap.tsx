@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useState, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Restaurant } from "@/types";
@@ -40,6 +40,19 @@ const closedIcon = new L.Icon({
   popupAnchor: [0, -32],
 });
 
+const LocateUser = () => {
+  const map = useMap();
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], DEFAULT_ZOOM),
+        () => {} // silently fail
+      );
+    }
+  }, [map]);
+  return null;
+};
+
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
   const markers = restaurants.filter((r) => r.latitude && r.longitude);
@@ -50,6 +63,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
   return (
     <MapContainer center={center} zoom={DEFAULT_ZOOM} style={{ width: "100%", height: "100%" }}>
+      <LocateUser />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
