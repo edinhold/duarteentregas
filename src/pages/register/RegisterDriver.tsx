@@ -32,7 +32,7 @@ const RegisterDriver = () => {
   const [selectedPos, setSelectedPos] = useState(defaultCenter);
   const [radius, setRadius] = useState(5);
 
-  const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
+  const hasMapsKey = GOOGLE_MAPS_API_KEY !== ("YOUR_GOOGLE_MAPS_API_KEY" as string);
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
