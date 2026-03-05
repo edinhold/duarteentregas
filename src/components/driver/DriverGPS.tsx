@@ -7,7 +7,7 @@ import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero }
 import { GoogleMap, MarkerF, CircleF, DirectionsRenderer } from "@react-google-maps/api";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
-const hasMapsKey = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
+const hasMapsKey = GOOGLE_MAPS_API_KEY !== ("YOUR_GOOGLE_MAPS_API_KEY" as string);
 
 interface DriverGPSProps {
   activeRequest?: any;
