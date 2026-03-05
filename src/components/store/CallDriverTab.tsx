@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, MessageSquare, Send } from "lucide-react";
+import { Truck } from "lucide-react";
+import ChatWidget from "@/components/ChatWidget";
 
 interface CallDriverTabProps {
   user: any;
@@ -22,7 +23,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const queryClient = useQueryClient();
   const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
   const [calling, setCalling] = useState(false);
-  const [chatMessage, setChatMessage] = useState("");
 
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
@@ -53,21 +53,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   };
 
-  const sendChatMessage = async () => {
-    if (!chatMessage.trim() || !activeRequest) return;
-    try {
-      const { error } = await supabase.from("chat_messages").insert({
-        delivery_request_id: activeRequest.id,
-        sender_id: user.id,
-        message: chatMessage.trim(),
-      });
-      if (error) throw error;
-      setChatMessage("");
-      queryClient.invalidateQueries({ queryKey: ["chat-messages", activeRequest.id] });
-    } catch {
-      toast.error("Erro ao enviar mensagem");
-    }
-  };
+  // Chat is now handled by ChatWidget
 
   return (
     <div className="space-y-4">
@@ -97,27 +83,11 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       {/* Chat with driver */}
       {activeRequest && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Chat com Entregador</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="max-h-60 overflow-y-auto space-y-2 bg-muted/30 rounded-lg p-3">
-              {chatMessages.length === 0 && <p className="text-xs text-muted-foreground text-center">Nenhuma mensagem</p>}
-              {chatMessages.map((msg: any) => (
-                <div key={msg.id} className={`flex ${msg.sender_id === user.id ? "justify-end" : "justify-start"}`}>
-                  <div className={`px-3 py-2 rounded-xl max-w-[80%] text-sm ${msg.sender_id === user.id ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
-                    {msg.message}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Digite uma mensagem..." onKeyDown={(e) => e.key === "Enter" && sendChatMessage()} />
-              <Button size="icon" onClick={sendChatMessage}><Send className="w-4 h-4" /></Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ChatWidget
+          deliveryRequestId={activeRequest.id}
+          currentUserId={user.id}
+          title="Chat com Entregador"
+        />
       )}
 
       {/* Delivery History */}
