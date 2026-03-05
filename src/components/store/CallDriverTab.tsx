@@ -84,8 +84,15 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <Label>Observações</Label>
             <Textarea value={callForm.notes} onChange={(e) => setCallForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Detalhes da entrega..." />
           </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+            <DollarSign className="w-5 h-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {creditCost.toFixed(2).replace(".", ",")}</span></p>
+              <p className="text-xs text-muted-foreground">Será debitado dos seus créditos</p>
+            </div>
+          </div>
           <Button onClick={handleCallDriver} disabled={calling} className="w-full">
-            {calling ? "Chamando..." : "📲 Chamar Entregador"}
+            {calling ? "Chamando..." : `📲 Chamar Entregador (R$ ${creditCost.toFixed(2).replace(".", ",")})`}
           </Button>
         </CardContent>
       </Card>
