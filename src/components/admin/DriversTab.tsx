@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import DeleteConfirm from "./DeleteConfirm";
 
@@ -13,6 +14,7 @@ const DriversTab = () => {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<{ id: string; userId: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewDriver, setViewDriver] = useState<any>(null);
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["admin-drivers"],
@@ -72,7 +74,7 @@ const DriversTab = () => {
                 <TableHead>Zona</TableHead>
                 <TableHead>A Receber</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -92,9 +94,14 @@ const DriversTab = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteId({ id: d.id, userId: d.user_id, name: d.full_name })}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewDriver(d)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId({ id: d.id, userId: d.user_id, name: d.full_name })}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -106,8 +113,49 @@ const DriversTab = () => {
         </CardContent>
       </Card>
       <DeleteConfirm open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)} onConfirm={handleDelete} title={deleteId?.name || "motorista"} loading={deleting} />
+
+      {/* Driver detail dialog */}
+      <Dialog open={!!viewDriver} onOpenChange={(o) => !o && setViewDriver(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastro do Motorista</DialogTitle>
+          </DialogHeader>
+          {viewDriver && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <InfoField label="Nome completo" value={viewDriver.full_name} />
+                <InfoField label="Telefone" value={viewDriver.phone} />
+                <InfoField label="CPF" value={viewDriver.cpf || "Não informado"} />
+                <InfoField label="Veículo" value={viewDriver.vehicle_type} />
+                <InfoField label="Placa" value={viewDriver.vehicle_plate || "Não informada"} />
+                <InfoField label="Status" value={viewDriver.is_active ? "Ativo" : "Inativo"} />
+                <InfoField label="Zona" value={viewDriver.zone_description || `${viewDriver.zone_radius_km || 5} km`} />
+                <InfoField label="Raio" value={`${viewDriver.zone_radius_km || 5} km`} />
+                <InfoField label="Chave PIX" value={viewDriver.pix_key || "Não informada"} />
+                <InfoField label="Tipo PIX" value={viewDriver.pix_key_type || "—"} />
+              </div>
+              <div className="border-t pt-3 text-xs text-muted-foreground space-y-1">
+                <p>Cadastro: {new Date(viewDriver.created_at).toLocaleString("pt-BR")}</p>
+                <p>Atualização: {new Date(viewDriver.updated_at).toLocaleString("pt-BR")}</p>
+                <p className="font-mono text-[10px]">ID: {viewDriver.user_id}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">A Receber</p>
+                <p className="text-xl font-extrabold text-accent">R$ {getDriverEarnings(viewDriver.id).toFixed(2)}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
+
+const InfoField = ({ label, value }: { label: string; value: string }) => (
+  <div>
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-sm font-medium capitalize">{value}</p>
+  </div>
+);
 
 export default DriversTab;
