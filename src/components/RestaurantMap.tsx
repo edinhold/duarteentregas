@@ -45,7 +45,9 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
   // Lazy load react-leaflet to avoid SSR/initialization issues
   useEffect(() => {
+    console.log("[RestaurantMap] Loading react-leaflet...");
     import("react-leaflet").then((mod) => {
+      console.log("[RestaurantMap] react-leaflet loaded successfully");
       setMapComponents({
         MapContainer: mod.MapContainer,
         TileLayer: mod.TileLayer,
@@ -54,7 +56,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
       });
       setMapReady(true);
     }).catch((err) => {
-      console.error("Failed to load react-leaflet:", err);
+      console.error("[RestaurantMap] Failed to load react-leaflet:", err);
     });
   }, []);
 
