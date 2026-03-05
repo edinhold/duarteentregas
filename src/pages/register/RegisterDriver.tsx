@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Bike, Mail, Lock, Phone, User, MapPin } from "lucide-react";
+import { ArrowLeft, Bike, Mail, Lock, Phone, User, MapPin, Camera, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
