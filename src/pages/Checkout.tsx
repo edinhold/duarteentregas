@@ -30,7 +30,7 @@ const Checkout = () => {
 
     setIsProcessing(true);
     try {
-      const { error } = await supabase.from("orders").insert({
+      const { data: orderData, error } = await supabase.from("orders").insert({
         user_id: user.id,
         restaurant_id: restaurantId,
         items: items.map((i) => ({ product_id: i.product.id, name: i.product.name, price: Number(i.product.price), quantity: i.quantity })),
@@ -40,11 +40,11 @@ const Checkout = () => {
         address,
         payment_method: paymentMethod,
         status: "pending",
-      });
+      }).select("id").single();
       if (error) throw error;
       toast.success("Pedido realizado com sucesso! 🎉");
       clearCart();
-      navigate("/");
+      navigate(`/pedido/${orderData.id}/rastreio`);
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar pedido");
     } finally {

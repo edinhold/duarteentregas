@@ -316,6 +316,7 @@ export type Database = {
           address: string | null
           created_at: string
           delivery_fee: number
+          delivery_request_id: string | null
           id: string
           items: Json
           notes: string | null
@@ -331,6 +332,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           delivery_fee?: number
+          delivery_request_id?: string | null
           id?: string
           items?: Json
           notes?: string | null
@@ -346,6 +348,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           delivery_fee?: number
+          delivery_request_id?: string | null
           id?: string
           items?: Json
           notes?: string | null
@@ -358,6 +361,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_delivery_request_id_fkey"
+            columns: ["delivery_request_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_requests"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_restaurant_id_fkey"
             columns: ["restaurant_id"]
