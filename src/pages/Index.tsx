@@ -109,7 +109,9 @@ const Index = () => {
 
           {showMap ? (
             <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
-              <RestaurantMap restaurants={filtered} />
+              <MapErrorBoundary fallbackHeight="400px">
+                <RestaurantMap restaurants={filtered} />
+              </MapErrorBoundary>
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">Nenhum restaurante encontrado</p>
