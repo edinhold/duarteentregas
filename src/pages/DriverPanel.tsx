@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { playNotificationSound } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
+import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const DriverPanel = () => {
@@ -466,21 +467,12 @@ const DriverPanel = () => {
 
               {/* Chat */}
               <div className="border-t pt-3">
-                <p className="text-sm font-semibold mb-2 flex items-center gap-1"><MessageSquare className="w-4 h-4" /> Chat</p>
-                <div className="max-h-48 overflow-y-auto space-y-2 bg-muted/30 rounded-lg p-3 mb-2">
-                  {chatMessages.length === 0 && <p className="text-xs text-muted-foreground text-center">Nenhuma mensagem</p>}
-                  {chatMessages.map((msg: any) => (
-                    <div key={msg.id} className={`flex ${msg.sender_id === user.id ? "justify-end" : "justify-start"}`}>
-                      <div className={`px-3 py-2 rounded-xl max-w-[80%] text-sm ${msg.sender_id === user.id ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
-                        {msg.message}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Mensagem..." onKeyDown={(e) => e.key === "Enter" && sendMessage()} />
-                  <Button size="icon" onClick={sendMessage}><Send className="w-4 h-4" /></Button>
-                </div>
+                <ChatWidget
+                  deliveryRequestId={activeRequest.id}
+                  currentUserId={user.id}
+                  title="Chat com Lojista"
+                  maxHeight="max-h-48"
+                />
               </div>
             </CardContent>
           </Card>
