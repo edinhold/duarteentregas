@@ -188,7 +188,7 @@ const DriverPanel = () => {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, activeRequest?.id]);
+  }, [user, activeRequest?.id, driverProfile?.id]);
 
   const acceptRequest = async (requestId: string) => {
     try {
@@ -221,7 +221,7 @@ const DriverPanel = () => {
           amount: fee,
           status: "pending",
         } as any);
-        queryClient.invalidateQueries({ queryKey: ["my-earnings"] });
+        queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
       }
 
       toast.success("Status atualizado!");
