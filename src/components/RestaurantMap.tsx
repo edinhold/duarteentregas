@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
+import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -34,6 +35,15 @@ const closedIcon = new L.Icon({
   popupAnchor: [0, -32],
 });
 
+const driverMapIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 6v6l3 3" stroke="white" stroke-width="2" fill="none"/></svg>`
+  ),
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14],
+});
+
 interface RestaurantMapProps {
   restaurants: Restaurant[];
 }
@@ -42,6 +52,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { data: driverLocations = [] } = useDriverLocations();
 
   const markers = restaurants.filter((r) => r.latitude && r.longitude);
   const center: [number, number] = markers.length > 0
@@ -70,9 +81,10 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
     // Clear existing markers
     map.eachLayer((layer) => {
-      if (layer instanceof L.Marker) map.removeLayer(layer);
+      if (layer instanceof L.Marker || layer instanceof L.Circle) map.removeLayer(layer);
     });
 
+    // Restaurant markers
     markers.forEach((r) => {
       const marker = L.marker([r.latitude!, r.longitude!], {
         icon: r.is_open ? openIcon : closedIcon,
@@ -94,7 +106,38 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
       marker.on("click", () => navigate(`/restaurant/${r.id}`));
     });
-  }, [markers, navigate]);
+
+    // Driver markers
+    driverLocations.forEach((d: any) => {
+      const dMarker = L.marker([d.latitude, d.longitude], {
+        icon: driverMapIcon,
+      }).addTo(map);
+
+      const speedKmh = d.speed ? Math.round(d.speed * 3.6) : 0;
+      const accText = d.accuracy ? `±${Math.round(d.accuracy)}m` : "";
+
+      dMarker.bindPopup(`
+        <div style="min-width:120px">
+          <h3 style="font-weight:bold;font-size:13px;margin:0">🚴 Entregador</h3>
+          ${speedKmh > 0 ? `<p style="font-size:11px;color:#666;margin:2px 0">🚗 ${speedKmh} km/h</p>` : ""}
+          ${accText ? `<p style="font-size:11px;color:#888;margin:2px 0">🎯 ${accText}</p>` : ""}
+          <p style="font-size:10px;color:#3b82f6;font-weight:600;margin-top:4px">Em atividade</p>
+        </div>
+      `);
+
+      // Accuracy circle
+      if (d.accuracy && d.accuracy > 0) {
+        L.circle([d.latitude, d.longitude], {
+          radius: d.accuracy,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.05,
+          color: "#3b82f6",
+          opacity: 0.15,
+          weight: 1,
+        }).addTo(map);
+      }
+    });
+  }, [markers, navigate, driverLocations]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 };

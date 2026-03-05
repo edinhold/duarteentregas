@@ -7,6 +7,8 @@ import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero }
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER } from "@/config/maps";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -34,14 +36,62 @@ interface DriverGPSProps {
 }
 
 const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: DriverGPSProps) => {
+  const { user } = useAuth();
   const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [accuracy, setAccuracy] = useState<number>(0);
+  const [heading, setHeading] = useState<number | null>(null);
+  const [speed, setSpeed] = useState<number | null>(null);
   const [watching, setWatching] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
   const accuracyCircleRef = useRef<L.Circle | null>(null);
+  const lastSavedRef = useRef<number>(0);
+
+  // Save position to database (throttled to every 5 seconds)
+  const savePositionToDb = useCallback(async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null) => {
+    if (!user) return;
+    const now = Date.now();
+    if (now - lastSavedRef.current < 5000) return;
+    lastSavedRef.current = now;
+
+    try {
+      const { error } = await supabase
+        .from("driver_locations")
+        .upsert({
+          user_id: user.id,
+          driver_id: user.id,
+          latitude: lat,
+          longitude: lng,
+          accuracy: acc,
+          heading: hdg,
+          speed: spd,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+      if (error) console.error("Erro ao salvar posição:", error);
+    } catch (e) {
+      console.error("Erro ao salvar posição:", e);
+    }
+  }, [user]);
+
+  // Kalman filter for GPS smoothing
+  const kalmanRef = useRef<{ lat: number; lng: number; variance: number } | null>(null);
+
+  const applyKalmanFilter = useCallback((lat: number, lng: number, accuracy: number) => {
+    const processNoise = 0.00001; // movement noise
+    if (!kalmanRef.current) {
+      kalmanRef.current = { lat, lng, variance: accuracy * accuracy };
+      return { lat, lng };
+    }
+    const k = kalmanRef.current;
+    k.variance += processNoise;
+    const kalmanGain = k.variance / (k.variance + accuracy * accuracy);
+    k.lat = k.lat + kalmanGain * (lat - k.lat);
+    k.lng = k.lng + kalmanGain * (lng - k.lng);
+    k.variance = (1 - kalmanGain) * k.variance;
+    return { lat: k.lat, lng: k.lng };
+  }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -50,9 +100,13 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     }
     const id = navigator.geolocation.watchPosition(
       (pos) => {
-        setDriverPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const filtered = applyKalmanFilter(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        setDriverPosition(filtered);
         setAccuracy(pos.coords.accuracy);
+        setHeading(pos.coords.heading);
+        setSpeed(pos.coords.speed);
         setWatching(true);
+        savePositionToDb(filtered.lat, filtered.lng, pos.coords.accuracy, pos.coords.heading, pos.coords.speed);
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
@@ -62,10 +116,10 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         }
         setWatching(false);
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
     );
     setWatchId(id);
-  }, []);
+  }, [applyKalmanFilter, savePositionToDb]);
 
   const stopTracking = useCallback(() => {
     if (watchId !== null) {
@@ -123,7 +177,6 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
 
     const map = mapRef.current;
 
-    // Update driver position
     if (driverPosition) {
       if (driverMarkerRef.current) {
         driverMarkerRef.current.setLatLng([driverPosition.lat, driverPosition.lng]);
@@ -142,7 +195,6 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
       map.setView([driverPosition.lat, driverPosition.lng]);
     }
 
-    // Update request markers
     map.eachLayer((layer) => {
       if (layer instanceof L.Marker && layer !== driverMarkerRef.current) {
         map.removeLayer(layer);
@@ -189,8 +241,20 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">🎯 Precisão</span>
-                <span className={`font-bold ${accuracy <= 20 ? "text-green-600" : accuracy <= 50 ? "text-yellow-600" : "text-red-500"}`}>±{Math.round(accuracy)}m</span>
+                <span className={`font-bold ${accuracy <= 10 ? "text-green-600" : accuracy <= 30 ? "text-yellow-600" : "text-red-500"}`}>±{Math.round(accuracy)}m</span>
               </div>
+              {speed !== null && speed > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">🚗 Velocidade</span>
+                  <span className="font-bold">{Math.round(speed * 3.6)} km/h</span>
+                </div>
+              )}
+              {heading !== null && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">🧭 Direção</span>
+                  <span className="font-bold">{Math.round(heading)}°</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
