@@ -110,6 +110,7 @@ export type Database = {
           early_withdrawal_fee_percent: number
           fee_per_km: number
           id: string
+          payment_day: number
           updated_at: string
           whatsapp_number: string | null
         }
@@ -119,6 +120,7 @@ export type Database = {
           early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
+          payment_day?: number
           updated_at?: string
           whatsapp_number?: string | null
         }
@@ -128,6 +130,7 @@ export type Database = {
           early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
+          payment_day?: number
           updated_at?: string
           whatsapp_number?: string | null
         }
