@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { playNotificationSound } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
