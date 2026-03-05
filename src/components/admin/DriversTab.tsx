@@ -57,6 +57,19 @@ const DriversTab = () => {
     }
   };
 
+  // Realtime: auto-update earnings when a driver finishes a delivery
+  useEffect(() => {
+    const channel = supabase.channel("admin-earnings-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_earnings" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-driver-earnings"] });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-driver-earnings"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
   return (
     <>
       <Card>
