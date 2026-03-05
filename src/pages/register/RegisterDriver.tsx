@@ -145,6 +145,39 @@ const RegisterDriver = () => {
         <div className="bg-card rounded-2xl p-6 shadow-lg border border-border/50">
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="font-bold text-foreground">Dados Pessoais</h3>
+
+            {/* Photo upload */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-8 h-8 text-muted-foreground" />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" className="rounded-xl gap-1" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-3 h-3" /> {photoPreview ? "Trocar foto" : "Enviar foto"}
+                </Button>
+                {photoPreview && (
+                  <Button type="button" variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}>
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Tire uma selfie ou envie uma foto (máx. 5MB)</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome completo</Label>
