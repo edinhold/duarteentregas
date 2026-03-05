@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
 import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Fix default marker icon
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -40,40 +41,11 @@ const closedIcon = new L.Icon({
 
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
-  const [mapReady, setMapReady] = useState(false);
-  const [MapComponents, setMapComponents] = useState<any>(null);
-
-  // Lazy load react-leaflet to avoid SSR/initialization issues
-  useEffect(() => {
-    console.log("[RestaurantMap] Loading react-leaflet...");
-    import("react-leaflet").then((mod) => {
-      console.log("[RestaurantMap] react-leaflet loaded successfully");
-      setMapComponents({
-        MapContainer: mod.MapContainer,
-        TileLayer: mod.TileLayer,
-        Marker: mod.Marker,
-        Popup: mod.Popup,
-      });
-      setMapReady(true);
-    }).catch((err) => {
-      console.error("[RestaurantMap] Failed to load react-leaflet:", err);
-    });
-  }, []);
 
   const markers = restaurants.filter((r) => r.latitude && r.longitude);
   const center: [number, number] = markers.length > 0
     ? [markers[0].latitude!, markers[0].longitude!]
     : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
-
-  if (!mapReady || !MapComponents) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-muted/30 rounded-2xl">
-        <p className="text-sm text-muted-foreground">Carregando mapa...</p>
-      </div>
-    );
-  }
-
-  const { MapContainer, TileLayer, Marker, Popup } = MapComponents;
 
   return (
     <MapContainer center={center} zoom={DEFAULT_ZOOM} style={{ width: "100%", height: "100%" }}>
