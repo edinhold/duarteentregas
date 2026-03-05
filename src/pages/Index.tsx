@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { User, LogOut, Map, List, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
-import { GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
 
 const Index = () => {
@@ -21,7 +20,6 @@ const Index = () => {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
-  const hasMapsKey = GOOGLE_MAPS_API_KEY !== ("YOUR_GOOGLE_MAPS_API_KEY" as string);
 
   const { data: categories = [] } = useCategories();
   const { data: restaurants = [] } = useRestaurants();
@@ -102,15 +100,13 @@ const Index = () => {
             <h2 className="text-lg font-bold">
               {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
             </h2>
-            {hasMapsKey && (
-              <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setShowMap(!showMap)}>
-                {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
-                {showMap ? "Lista" : "Mapa"}
-              </Button>
-            )}
+            <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setShowMap(!showMap)}>
+              {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
+              {showMap ? "Lista" : "Mapa"}
+            </Button>
           </div>
 
-          {showMap && hasMapsKey ? (
+          {showMap ? (
             <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
               <RestaurantMap restaurants={filtered} />
             </div>
