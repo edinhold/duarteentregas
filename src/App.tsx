@@ -18,6 +18,7 @@ import RegisterCustomer from "./pages/register/RegisterCustomer";
 import RegisterDriver from "./pages/register/RegisterDriver";
 import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import Install from "./pages/Install";
+import OrderTracking from "./pages/OrderTracking";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/lojista" element={<StoreOwnerPanel />} />
               <Route path="/entregador" element={<DriverPanel />} />
+              <Route path="/pedido/:id/rastreio" element={<OrderTracking />} />
               <Route path="/instalar" element={<Install />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
