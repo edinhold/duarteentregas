@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -52,7 +52,6 @@ const driverMapIcon = new L.Icon({
   popupAnchor: [0, -14],
 });
 
-// Haversine distance in km
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -74,12 +73,18 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
   const [calling, setCalling] = useState(false);
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
+  const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
+  const [searchingAddress, setSearchingAddress] = useState(false);
   const { data: driverLocations = [] } = useDriverLocations();
 
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const storeMarkerRef = useRef<L.Marker | null>(null);
   const deliveryMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
+  const driverMarkersRef = useRef<L.Marker[]>([]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
@@ -92,8 +97,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const baseFee = deliveryConfig?.base_fee ?? 5;
   const feePerKm = deliveryConfig?.fee_per_km ?? 1.5;
 
-  const storeLat = restaurant?.latitude;
-  const storeLng = restaurant?.longitude;
+  // Use GPS or restaurant coords for store location
+  const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
+  const storeLng = storeLatLng?.[1] ?? restaurant?.longitude;
 
   const distanceKm = deliveryLatLng && storeLat && storeLng
     ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1])
@@ -103,6 +109,87 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
+
+  // Request GPS permission and get store location
+  const requestGPS = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocalização não suportada neste navegador");
+      setGpsStatus("denied");
+      return;
+    }
+    setGpsStatus("requesting");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setStoreLatLng([lat, lng]);
+        setGpsStatus("granted");
+        toast.success("📍 Localização obtida com sucesso!");
+        // Reverse geocode to fill pickup address
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.display_name) {
+              setCallForm(f => ({ ...f, pickup: data.display_name }));
+            }
+          })
+          .catch(() => {});
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        setGpsStatus("denied");
+        if (err.code === 1) {
+          toast.error("Permissão de GPS negada. Ative nas configurações do navegador.");
+        } else {
+          toast.error("Não foi possível obter sua localização");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  // Auto-request GPS on mount
+  useEffect(() => {
+    if (!storeLatLng && !restaurant?.latitude) {
+      requestGPS();
+    } else if (restaurant?.latitude && restaurant?.longitude && !storeLatLng) {
+      setStoreLatLng([restaurant.latitude, restaurant.longitude]);
+      setGpsStatus("granted");
+    }
+  }, [restaurant?.latitude, restaurant?.longitude]);
+
+  // Geocode delivery address with debounce
+  const geocodeDeliveryAddress = useCallback((address: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (address.trim().length < 5) return;
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchingAddress(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`
+        );
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          setDeliveryLatLng([lat, lng]);
+          // Pan map to show both points
+          if (mapRef.current && storeLat && storeLng) {
+            const bounds = L.latLngBounds([
+              [storeLat, storeLng],
+              [lat, lng],
+            ]);
+            mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+          }
+        }
+      } catch (err) {
+        console.error("Geocode error:", err);
+      } finally {
+        setSearchingAddress(false);
+      }
+    }, 800);
+  }, [storeLat, storeLng]);
 
   // Initialize map
   useEffect(() => {
@@ -119,31 +206,48 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    // Store marker
-    if (storeLat && storeLng) {
-      L.marker([storeLat, storeLng], { icon: storeIcon })
-        .addTo(map)
-        .bindPopup(`<b>🏪 ${restaurant?.name || "Sua Loja"}</b>`);
-    }
-
     // Click to set delivery point
     map.on("click", (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
       setDeliveryLatLng([lat, lng]);
+      // Reverse geocode to fill delivery address
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.display_name) {
+            setCallForm(f => ({ ...f, delivery: data.display_name }));
+          }
+        })
+        .catch(() => {});
     });
 
     return () => {
       map.remove();
       mapRef.current = null;
     };
-  }, [storeLat, storeLng]);
+  }, []);
+
+  // Update store marker when location changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !storeLat || !storeLng) return;
+
+    if (storeMarkerRef.current) {
+      map.removeLayer(storeMarkerRef.current);
+    }
+
+    storeMarkerRef.current = L.marker([storeLat, storeLng], { icon: storeIcon })
+      .addTo(map)
+      .bindPopup(`<b>🏪 ${restaurant?.name || "Sua Loja"}</b>`);
+
+    map.setView([storeLat, storeLng], map.getZoom());
+  }, [storeLat, storeLng, restaurant?.name]);
 
   // Update delivery marker + route line
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove old delivery marker
     if (deliveryMarkerRef.current) {
       map.removeLayer(deliveryMarkerRef.current);
       deliveryMarkerRef.current = null;
@@ -173,26 +277,23 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove old driver markers (circles + markers with driverMapIcon class)
-    map.eachLayer((layer) => {
-      if (layer instanceof L.CircleMarker || (layer instanceof L.Marker && layer !== deliveryMarkerRef.current)) {
-        // Don't remove the store marker or delivery marker
-        const latlng = layer.getLatLng();
-        const isStore = storeLat && storeLng && Math.abs(latlng.lat - storeLat) < 0.0001 && Math.abs(latlng.lng - storeLng) < 0.0001;
-        const isDelivery = deliveryLatLng && Math.abs(latlng.lat - deliveryLatLng[0]) < 0.0001 && Math.abs(latlng.lng - deliveryLatLng[1]) < 0.0001;
-        if (!isStore && !isDelivery) {
-          map.removeLayer(layer);
-        }
-      }
-    });
+    // Remove old driver markers
+    driverMarkersRef.current.forEach(m => map.removeLayer(m));
+    driverMarkersRef.current = [];
 
-    // Add driver markers
+    // Add new driver markers
     driverLocations.forEach((d: any) => {
-      L.marker([d.latitude, d.longitude], { icon: driverMapIcon })
+      const marker = L.marker([d.latitude, d.longitude], { icon: driverMapIcon })
         .addTo(map)
         .bindPopup(`<b>🚴 Entregador</b><br/>${d.speed ? `${Math.round(d.speed * 3.6)} km/h` : "Parado"}`);
+      driverMarkersRef.current.push(marker);
     });
-  }, [driverLocations, storeLat, storeLng, deliveryLatLng]);
+  }, [driverLocations]);
+
+  const handleDeliveryAddressChange = (value: string) => {
+    setCallForm(f => ({ ...f, delivery: value }));
+    geocodeDeliveryAddress(value);
+  };
 
   const handleCallDriver = async () => {
     if (!callForm.pickup.trim() || !callForm.delivery.trim()) {
@@ -200,7 +301,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       return;
     }
     if (distanceKm <= 0) {
-      toast.error("Clique no mapa para definir o ponto de entrega");
+      toast.error("Defina o ponto de entrega no mapa ou digite o endereço");
       return;
     }
     setCalling(true);
@@ -227,11 +328,29 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   return (
     <div className="space-y-4">
-      {/* Map showing drivers */}
+      {/* GPS Permission */}
+      {gpsStatus !== "granted" && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Navigation className="w-5 h-5 text-primary flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Permitir localização</p>
+              <p className="text-xs text-muted-foreground">
+                Ative o GPS para localizar sua loja automaticamente e calcular distâncias
+              </p>
+            </div>
+            <Button size="sm" onClick={requestGPS} disabled={gpsStatus === "requesting"}>
+              {gpsStatus === "requesting" ? "Obtendo..." : "Permitir GPS"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Map */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <MapPin className="w-4 h-4" /> Mapa — Clique para definir o ponto de entrega
+            <MapPin className="w-4 h-4" /> Mapa — Clique ou digite o endereço de entrega
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -244,7 +363,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         </CardContent>
       </Card>
 
-      {/* Call Driver */}
+      {/* Call Driver Form */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
@@ -252,11 +371,41 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         <CardContent className="space-y-3">
           <div className="space-y-2">
             <Label>Endereço de coleta *</Label>
-            <Input value={callForm.pickup} onChange={(e) => setCallForm(f => ({ ...f, pickup: e.target.value }))} placeholder={restaurant?.address || "Endereço da loja"} />
+            <div className="flex gap-2">
+              <Input
+                value={callForm.pickup}
+                onChange={(e) => setCallForm(f => ({ ...f, pickup: e.target.value }))}
+                placeholder={restaurant?.address || "Endereço da loja"}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={requestGPS}
+                title="Usar minha localização"
+              >
+                <Navigation className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Endereço de entrega *</Label>
-            <Input value={callForm.delivery} onChange={(e) => setCallForm(f => ({ ...f, delivery: e.target.value }))} placeholder="Endereço do cliente" />
+            <div className="relative">
+              <Input
+                value={callForm.delivery}
+                onChange={(e) => handleDeliveryAddressChange(e.target.value)}
+                placeholder="Digite o endereço do cliente..."
+              />
+              {searchingAddress && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Search className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              📍 Digite o endereço ou clique no mapa para localizar automaticamente
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Observações</Label>
@@ -277,12 +426,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
           {distanceKm <= 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">
-              📍 Clique no mapa acima para definir o ponto de entrega e calcular o valor automaticamente
+              📍 Digite o endereço de entrega ou clique no mapa para calcular o valor automaticamente
             </p>
           )}
 
           <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0} className="w-full">
-            {calling ? "Chamando..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega no mapa"}
+            {calling ? "Chamando..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
           </Button>
         </CardContent>
       </Card>
