@@ -52,6 +52,11 @@ const AdminDashboard = () => {
         _role: "admin",
       });
       if (!isAdmin) {
+        toast.error("Acesso negado. Sua conta não possui permissão de administrador.", {
+          description: `Conta: ${session.user.email}`,
+          duration: 6000,
+        });
+        await supabase.auth.signOut();
         navigate("/admin/login", { replace: true });
         return;
       }
