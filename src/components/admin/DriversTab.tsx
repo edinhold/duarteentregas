@@ -84,8 +84,6 @@ const DriversTab = () => {
                 <TableHead>Telefone</TableHead>
                 <TableHead>Veículo</TableHead>
                 <TableHead>Placa</TableHead>
-                <TableHead>Zona</TableHead>
-                <TableHead>A Receber</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
@@ -97,7 +95,6 @@ const DriversTab = () => {
                   <TableCell>{d.phone}</TableCell>
                   <TableCell className="capitalize">{d.vehicle_type}</TableCell>
                   <TableCell>{d.vehicle_plate || "—"}</TableCell>
-                  <TableCell>{d.zone_description || `${d.zone_radius_km || 5}km`}</TableCell>
                   <TableCell className="font-semibold text-accent">
                     R$ {getDriverEarnings(d.id).toFixed(2)}
                   </TableCell>
@@ -148,8 +145,6 @@ const DriversTab = () => {
                 <InfoField label="Veículo" value={viewDriver.vehicle_type} />
                 <InfoField label="Placa" value={viewDriver.vehicle_plate || "Não informada"} />
                 <InfoField label="Status" value={viewDriver.is_active ? "Ativo" : "Inativo"} />
-                <InfoField label="Zona" value={viewDriver.zone_description || `${viewDriver.zone_radius_km || 5} km`} />
-                <InfoField label="Raio" value={`${viewDriver.zone_radius_km || 5} km`} />
                 <InfoField label="Chave PIX" value={viewDriver.pix_key || "Não informada"} />
                 <InfoField label="Tipo PIX" value={viewDriver.pix_key_type || "—"} />
               </div>
