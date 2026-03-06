@@ -392,6 +392,42 @@ export type Database = {
           },
         ]
       }
+      password_reset_logs: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          failure_count: number | null
+          id: string
+          success_count: number | null
+          target_user_email: string | null
+          target_user_id: string | null
+          total_users: number | null
+        }
+        Insert: {
+          action?: string
+          admin_user_id: string
+          created_at?: string
+          failure_count?: number | null
+          id?: string
+          success_count?: number | null
+          target_user_email?: string | null
+          target_user_id?: string | null
+          total_users?: number | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          failure_count?: number | null
+          id?: string
+          success_count?: number | null
+          target_user_email?: string | null
+          target_user_id?: string | null
+          total_users?: number | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string
