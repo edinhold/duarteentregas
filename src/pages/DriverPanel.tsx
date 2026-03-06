@@ -215,7 +215,8 @@ const DriverPanel = () => {
       // If delivered, create earning record (deduct app fee)
       if (status === "delivered" && activeRequest && driverProfile) {
         const totalFee = Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5);
-        const appFee = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
+        const appFeePercent = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 10);
+        const appFee = (totalFee * appFeePercent) / 100;
         const driverAmount = Math.max(totalFee - appFee, 0);
         await supabase.from("driver_earnings").insert({
           driver_id: driverProfile.id,
