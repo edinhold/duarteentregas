@@ -34,20 +34,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email } = await req.json();
-    if (!email || typeof email !== "string") {
-      return new Response(JSON.stringify({ error: "E-mail inválido" }), {
+    const { user_id } = await req.json();
+    if (!user_id || typeof user_id !== "string") {
+      return new Response(JSON.stringify({ error: "user_id inválido" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Find user by email
-    const { data: { users }, error: listErr } = await adminClient.auth.admin.listUsers();
-    if (listErr) throw listErr;
-    const targetUser = users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase().trim());
-    if (!targetUser) {
-      return new Response(JSON.stringify({ error: "Usuário não encontrado com este e-mail" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -55,7 +45,7 @@ Deno.serve(async (req) => {
     const { data: existing } = await adminClient
       .from("user_roles")
       .select("id")
-      .eq("user_id", targetUser.id)
+      .eq("user_id", user_id)
       .eq("role", "admin")
       .maybeSingle();
 
@@ -68,10 +58,10 @@ Deno.serve(async (req) => {
     // Assign admin role
     const { error: insertErr } = await adminClient
       .from("user_roles")
-      .insert({ user_id: targetUser.id, role: "admin" });
+      .insert({ user_id, role: "admin" });
     if (insertErr) throw insertErr;
 
-    return new Response(JSON.stringify({ success: true, user_id: targetUser.id }), {
+    return new Response(JSON.stringify({ success: true, user_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {

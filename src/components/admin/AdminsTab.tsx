@@ -3,19 +3,26 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ShieldCheck, UserPlus, Trash2 } from "lucide-react";
-import { z } from "zod";
-
-const emailSchema = z.string().trim().email("E-mail inválido").max(255);
 
 const AdminsTab = () => {
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+
+  // Get all drivers to allow promotion
+  const { data: drivers = [] } = useQuery({
+    queryKey: ["all-drivers-for-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("drivers").select("id, user_id, full_name, phone");
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   // Get all admin roles with profile info
   const { data: admins = [] } = useQuery({
@@ -26,8 +33,7 @@ const AdminsTab = () => {
         .select("*")
         .eq("role", "admin");
       if (error) throw error;
-      
-      // Get profiles for each admin
+
       const enriched = await Promise.all(
         data.map(async (role: any) => {
           const { data: profile } = await supabase
@@ -42,17 +48,20 @@ const AdminsTab = () => {
     },
   });
 
+  // Filter out drivers who are already admins
+  const adminUserIds = new Set(admins.map((a: any) => a.user_id));
+  const availableDrivers = drivers.filter((d: any) => !adminUserIds.has(d.user_id));
+
   const handleAdd = async () => {
-    const result = emailSchema.safeParse(email);
-    if (!result.success) {
-      toast.error(result.error.errors[0].message);
+    if (!selectedUserId) {
+      toast.error("Selecione um motorista");
       return;
     }
 
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("assign-admin-role", {
-        body: { email: result.data },
+        body: { user_id: selectedUserId },
       });
       if (error) throw error;
       if (data?.error) {
@@ -60,7 +69,7 @@ const AdminsTab = () => {
         return;
       }
       toast.success("Administrador adicionado com sucesso!");
-      setEmail("");
+      setSelectedUserId("");
       queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao adicionar administrador");
@@ -70,7 +79,6 @@ const AdminsTab = () => {
   };
 
   const handleRemove = async (roleId: string, userId: string) => {
-    // Prevent removing yourself
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user.id === userId) {
       toast.error("Você não pode remover a si mesmo como administrador");
@@ -95,33 +103,41 @@ const AdminsTab = () => {
 
   return (
     <div className="space-y-4">
-      {/* Add new admin */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <UserPlus className="w-4 h-4" /> Adicionar Administrador
+            <UserPlus className="w-4 h-4" /> Promover Motorista a Administrador
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
-            <Input
-              placeholder="E-mail do usuário cadastrado"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-            <Button onClick={handleAdd} disabled={loading || !email.trim()}>
-              {loading ? "Adicionando..." : "Adicionar"}
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Selecione um motorista..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDrivers.map((d: any) => (
+                  <SelectItem key={d.user_id} value={d.user_id}>
+                    {d.full_name} — {d.phone}
+                  </SelectItem>
+                ))}
+                {availableDrivers.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    Nenhum motorista disponível
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleAdd} disabled={loading || !selectedUserId}>
+              {loading ? "Adicionando..." : "Promover"}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            O usuário precisa já estar cadastrado na plataforma.
+            Selecione um motorista cadastrado para promovê-lo a administrador.
           </p>
         </CardContent>
       </Card>
 
-      {/* Current admins */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
