@@ -5,16 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ShieldCheck, UserPlus, Trash2 } from "lucide-react";
+import { ShieldCheck, UserPlus, Trash2, Clock, CheckCircle, XCircle } from "lucide-react";
 
 const AdminsTab = () => {
   const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState("");
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [approving, setApproving] = useState<string | null>(null);
 
-  // Get all drivers to allow promotion
   const { data: drivers = [] } = useQuery({
     queryKey: ["all-drivers-for-admin"],
     queryFn: async () => {
@@ -24,7 +25,6 @@ const AdminsTab = () => {
     },
   });
 
-  // Get all admin roles with profile info
   const { data: admins = [] } = useQuery({
     queryKey: ["admin-roles"],
     queryFn: async () => {
@@ -48,7 +48,19 @@ const AdminsTab = () => {
     },
   });
 
-  // Filter out drivers who are already admins
+  // Pending admin requests
+  const { data: pendingRequests = [] } = useQuery({
+    queryKey: ["admin-requests"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_requests" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+  });
+
   const adminUserIds = new Set(admins.map((a: any) => a.user_id));
   const availableDrivers = drivers.filter((d: any) => !adminUserIds.has(d.user_id));
 
@@ -57,17 +69,13 @@ const AdminsTab = () => {
       toast.error("Selecione um motorista");
       return;
     }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("assign-admin-role", {
         body: { user_id: selectedUserId },
       });
       if (error) throw error;
-      if (data?.error) {
-        toast.error(data.error);
-        return;
-      }
+      if (data?.error) { toast.error(data.error); return; }
       toast.success("Administrador adicionado com sucesso!");
       setSelectedUserId("");
       queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
@@ -84,13 +92,9 @@ const AdminsTab = () => {
       toast.error("Você não pode remover a si mesmo como administrador");
       return;
     }
-
     setRemoving(roleId);
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("id", roleId);
+      const { error } = await supabase.from("user_roles").delete().eq("id", roleId);
       if (error) throw error;
       toast.success("Administrador removido");
       queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
@@ -101,8 +105,115 @@ const AdminsTab = () => {
     }
   };
 
+  const handleApproveRequest = async (request: any) => {
+    setApproving(request.id);
+    try {
+      // Assign admin role via edge function
+      const { data, error } = await supabase.functions.invoke("assign-admin-role", {
+        body: { user_id: request.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); setApproving(null); return; }
+
+      // Update request status
+      const { data: { session } } = await supabase.auth.getSession();
+      await (supabase.from("admin_requests" as any) as any)
+        .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: session?.user.id })
+        .eq("id", request.id);
+
+      toast.success(`${request.full_name} aprovado como administrador!`);
+      queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao aprovar");
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleRejectRequest = async (request: any) => {
+    setApproving(request.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await (supabase.from("admin_requests" as any) as any)
+        .update({ status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: session?.user.id })
+        .eq("id", request.id);
+
+      toast.success(`Solicitação de ${request.full_name} recusada`);
+      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao recusar");
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const pending = pendingRequests.filter((r: any) => r.status === "pending");
+  const reviewed = pendingRequests.filter((r: any) => r.status !== "pending");
+
   return (
     <div className="space-y-4">
+      {/* Pending admin requests */}
+      {pending.length > 0 && (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" /> Solicitações Pendentes ({pending.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pending.map((req: any) => (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.full_name}</TableCell>
+                    <TableCell className="text-sm">{req.email}</TableCell>
+                    <TableCell className="text-sm">{req.phone || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(req.created_at).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-8"
+                          onClick={() => handleApproveRequest(req)}
+                          disabled={approving === req.id}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Aprovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8"
+                          onClick={() => handleRejectRequest(req)}
+                          disabled={approving === req.id}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Recusar
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Promote driver */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -122,9 +233,7 @@ const AdminsTab = () => {
                   </SelectItem>
                 ))}
                 {availableDrivers.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Nenhum motorista disponível
-                  </div>
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum motorista disponível</div>
                 )}
               </SelectContent>
             </Select>
@@ -138,6 +247,7 @@ const AdminsTab = () => {
         </CardContent>
       </Card>
 
+      {/* Current admins */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -184,6 +294,43 @@ const AdminsTab = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Reviewed requests history */}
+      {reviewed.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Histórico de Solicitações</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reviewed.map((req: any) => (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.full_name}</TableCell>
+                    <TableCell className="text-sm">{req.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={req.status === "approved" ? "default" : "destructive"}>
+                        {req.status === "approved" ? "Aprovado" : "Recusado"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(req.reviewed_at || req.created_at).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
