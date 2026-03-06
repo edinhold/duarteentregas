@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Ticket, Copy } from "lucide-react";
+import { Ticket, Copy, Trash2 } from "lucide-react";
 
 const generateCode = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -56,6 +56,17 @@ const CreditsTab = () => {
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success("Código copiado!");
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from("credit_codes").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Código excluído!");
+      queryClient.invalidateQueries({ queryKey: ["admin-credit-codes"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao excluir");
+    }
   };
 
   return (
@@ -107,13 +118,18 @@ const CreditsTab = () => {
                       {c.is_used ? "Usado" : "Disponível"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    {!c.is_used && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyCode(c.code)}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {!c.is_used && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyCode(c.code)}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(c.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                 </TableRow>
               ))}
               {codes.length === 0 && (
