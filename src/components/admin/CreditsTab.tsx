@@ -118,13 +118,18 @@ const CreditsTab = () => {
                       {c.is_used ? "Usado" : "Disponível"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    {!c.is_used && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyCode(c.code)}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {!c.is_used && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyCode(c.code)}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(c.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                 </TableRow>
               ))}
               {codes.length === 0 && (
