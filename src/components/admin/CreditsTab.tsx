@@ -58,6 +58,17 @@ const CreditsTab = () => {
     toast.success("Código copiado!");
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from("credit_codes").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Código excluído!");
+      queryClient.invalidateQueries({ queryKey: ["admin-credit-codes"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao excluir");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
