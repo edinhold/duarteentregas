@@ -86,6 +86,19 @@ const FinancialTab = () => {
     },
   });
 
+  // Get delivered requests to calculate app revenue
+  const { data: deliveredRequests = [] } = useQuery({
+    queryKey: ["admin-delivered-requests"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_requests")
+        .select("driver_fee")
+        .eq("status", "delivered");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleWithdrawalAction = async (id: string, status: "approved" | "rejected") => {
     setProcessing(id);
     try {
@@ -125,17 +138,25 @@ const FinancialTab = () => {
     random: "Aleatória",
   };
 
-  const totalEarnings = earnings.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const totalDriverEarnings = earnings.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const totalDriverFees = deliveredRequests.reduce((sum: number, r: any) => sum + Number(r.driver_fee || 0), 0);
+  const appRevenue = Math.max(totalDriverFees - totalDriverEarnings, 0);
   const pendingWithdrawals = withdrawals.filter((w: any) => w.status === "pending");
 
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-extrabold text-primary">R$ {totalEarnings.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">Total em Ganhos</p>
+            <p className="text-2xl font-extrabold text-green-600">R$ {appRevenue.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Faturamento do App</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-extrabold text-primary">R$ {totalDriverEarnings.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Pago aos Motoristas</p>
           </CardContent>
         </Card>
         <Card>
