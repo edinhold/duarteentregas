@@ -76,9 +76,9 @@ const FeesConfigTab = () => {
           <p className="text-xs text-muted-foreground">Valor adicional por quilômetro percorrido</p>
         </div>
         <div className="space-y-2">
-          <Label>Taxa do app por corrida (R$)</Label>
-          <Input type="number" step="0.5" min="0" value={form.app_fee_per_delivery} onChange={(e) => setForm(f => ({ ...f, app_fee_per_delivery: e.target.value }))} />
-          <p className="text-xs text-muted-foreground">Valor fixo que o aplicativo cobra do motorista por corrida. O restante do valor da corrida fica com o motorista.</p>
+          <Label>Taxa do app por corrida (%)</Label>
+          <Input type="number" step="1" min="0" max="100" value={form.app_fee_per_delivery} onChange={(e) => setForm(f => ({ ...f, app_fee_per_delivery: e.target.value }))} />
+          <p className="text-xs text-muted-foreground">Porcentagem que o aplicativo cobra do motorista por corrida. O restante fica com o motorista.</p>
         </div>
         <div className="space-y-2">
           <Label>Taxa de saque antecipado (%)</Label>
