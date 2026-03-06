@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
@@ -22,6 +22,7 @@ import CreditsTab from "@/components/admin/CreditsTab";
 import FinancialTab from "@/components/admin/FinancialTab";
 import AdminsTab from "@/components/admin/AdminsTab";
 import ChatTab from "@/components/admin/ChatTab";
+import PasswordResetTab from "@/components/admin/PasswordResetTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const statusOptions = [
@@ -219,6 +220,7 @@ const AdminDashboard = () => {
               <TabsTrigger value="financial"><DollarSign className="w-4 h-4 mr-1" /> Financeiro</TabsTrigger>
               <TabsTrigger value="admins"><ShieldCheck className="w-4 h-4 mr-1" /> Admins</TabsTrigger>
               <TabsTrigger value="chat"><MessageSquare className="w-4 h-4 mr-1" /> Chat</TabsTrigger>
+              <TabsTrigger value="password-reset"><KeyRound className="w-4 h-4 mr-1" /> Senhas</TabsTrigger>
             </TabsList>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -353,6 +355,7 @@ const AdminDashboard = () => {
           <TabsContent value="financial"><FinancialTab /></TabsContent>
           <TabsContent value="admins"><AdminsTab /></TabsContent>
           <TabsContent value="chat"><ChatTab /></TabsContent>
+          <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
         </Tabs>
       </div>
 
