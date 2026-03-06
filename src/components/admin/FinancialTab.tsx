@@ -86,6 +86,19 @@ const FinancialTab = () => {
     },
   });
 
+  // Get delivered requests to calculate app revenue
+  const { data: deliveredRequests = [] } = useQuery({
+    queryKey: ["admin-delivered-requests"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_requests")
+        .select("driver_fee")
+        .eq("status", "delivered");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleWithdrawalAction = async (id: string, status: "approved" | "rejected") => {
     setProcessing(id);
     try {
