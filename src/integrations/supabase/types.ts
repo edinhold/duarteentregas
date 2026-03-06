@@ -105,6 +105,7 @@ export type Database = {
       }
       delivery_config: {
         Row: {
+          app_fee_per_delivery: number
           base_fee: number
           credit_cost_per_call: number
           early_withdrawal_fee_percent: number
@@ -116,6 +117,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          app_fee_per_delivery?: number
           base_fee?: number
           credit_cost_per_call?: number
           early_withdrawal_fee_percent?: number
@@ -127,6 +129,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          app_fee_per_delivery?: number
           base_fee?: number
           credit_cost_per_call?: number
           early_withdrawal_fee_percent?: number

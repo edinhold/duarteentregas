@@ -11,7 +11,7 @@ import { Settings, MessageCircle } from "lucide-react";
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", whatsapp_number: "", recharge_url: "" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", app_fee_per_delivery: "2", whatsapp_number: "", recharge_url: "" });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
@@ -28,6 +28,7 @@ const FeesConfigTab = () => {
         base_fee: String(config.base_fee),
         fee_per_km: String(config.fee_per_km),
         early_withdrawal_fee_percent: String((config as any).early_withdrawal_fee_percent ?? 10),
+        app_fee_per_delivery: String((config as any).app_fee_per_delivery ?? 2),
         whatsapp_number: (config as any).whatsapp_number || "",
         recharge_url: (config as any).recharge_url || "",
       });
@@ -42,6 +43,7 @@ const FeesConfigTab = () => {
         base_fee: parseFloat(form.base_fee) || 0,
         fee_per_km: parseFloat(form.fee_per_km) || 0,
         early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
+        app_fee_per_delivery: parseFloat(form.app_fee_per_delivery) || 2,
         whatsapp_number: form.whatsapp_number.trim(),
         recharge_url: form.recharge_url.trim(),
       } as any).eq("id", config.id);
@@ -72,6 +74,11 @@ const FeesConfigTab = () => {
           <Label>Taxa por km (R$/km)</Label>
           <Input type="number" step="0.1" value={form.fee_per_km} onChange={(e) => setForm(f => ({ ...f, fee_per_km: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Valor adicional por quilômetro percorrido</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Taxa do app por corrida (R$)</Label>
+          <Input type="number" step="0.5" min="0" value={form.app_fee_per_delivery} onChange={(e) => setForm(f => ({ ...f, app_fee_per_delivery: e.target.value }))} />
+          <p className="text-xs text-muted-foreground">Valor fixo que o aplicativo cobra do motorista por corrida. O restante do valor da corrida fica com o motorista.</p>
         </div>
         <div className="space-y-2">
           <Label>Taxa de saque antecipado (%)</Label>

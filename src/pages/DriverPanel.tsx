@@ -212,13 +212,15 @@ const DriverPanel = () => {
       const { error } = await supabase.from("delivery_requests").update({ status }).eq("id", requestId);
       if (error) throw error;
 
-      // If delivered, create earning record
+      // If delivered, create earning record (deduct app fee)
       if (status === "delivered" && activeRequest && driverProfile) {
-        const fee = Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5);
+        const totalFee = Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5);
+        const appFee = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
+        const driverAmount = Math.max(totalFee - appFee, 0);
         await supabase.from("driver_earnings").insert({
           driver_id: driverProfile.id,
           delivery_request_id: requestId,
-          amount: fee,
+          amount: driverAmount,
           status: "pending",
         } as any);
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
