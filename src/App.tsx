@@ -31,6 +31,7 @@ const App = () => (
       <AuthProvider>
         <CartProvider>
           <Toaster />
+          <SplashScreen />
           <Sonner />
           <BrowserRouter>
             <RouteRestorer />
