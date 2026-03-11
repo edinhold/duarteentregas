@@ -23,6 +23,7 @@ import FinancialTab from "@/components/admin/FinancialTab";
 import AdminsTab from "@/components/admin/AdminsTab";
 import ChatTab from "@/components/admin/ChatTab";
 import PasswordResetTab from "@/components/admin/PasswordResetTab";
+import CustomersTab from "@/components/admin/CustomersTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const statusOptions = [
