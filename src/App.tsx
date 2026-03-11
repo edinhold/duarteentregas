@@ -21,6 +21,7 @@ import Install from "./pages/Install";
 import OrderTracking from "./pages/OrderTracking";
 import NotFound from "./pages/NotFound";
 import RouteRestorer from "./components/RouteRestorer";
+import SplashScreen from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
 
