@@ -20,6 +20,7 @@ import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import Install from "./pages/Install";
 import OrderTracking from "./pages/OrderTracking";
 import NotFound from "./pages/NotFound";
+import RouteRestorer from "./components/RouteRestorer";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <RouteRestorer />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/restaurant/:id" element={<RestaurantDetail />} />
