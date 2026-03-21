@@ -477,6 +477,11 @@ const DriverPanel = () => {
                 <p className="text-xs text-muted-foreground">📍 Coleta: {activeRequest.pickup_address}</p>
                 <p className="text-xs text-muted-foreground">🏠 Entrega: {activeRequest.delivery_address}</p>
                 {activeRequest.notes && <p className="text-xs">📝 {activeRequest.notes}</p>}
+                {Number((deliveryConfig as any)?.promo_credit_percent || 0) > 0 && (
+                  <Badge variant="secondary" className="mt-1 text-xs bg-accent/20 text-accent">
+                    🎁 Promoção ativa: {(deliveryConfig as any).promo_credit_percent}% desconto para o lojista
+                  </Badge>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -559,6 +564,11 @@ const DriverPanel = () => {
                       <p className="text-xs font-bold text-primary mt-1">
                         💰 R$ {Number(deliveryConfig?.base_fee || 5).toFixed(2)}
                       </p>
+                      {Number((deliveryConfig as any)?.promo_credit_percent || 0) > 0 && (
+                        <Badge variant="secondary" className="mt-1 text-xs bg-accent/20 text-accent">
+                          🎁 Promoção: {(deliveryConfig as any).promo_credit_percent}% desconto para o lojista
+                        </Badge>
+                      )}
                     </div>
                     <Button size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
                       <Check className="w-4 h-4 mr-1" /> Aceitar
