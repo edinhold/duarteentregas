@@ -4,8 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CreditCard, Ticket, ExternalLink } from "lucide-react";
+import { CreditCard, Ticket, ExternalLink, Percent } from "lucide-react";
 
 interface CreditsTabProps {
   credits: any;
@@ -26,6 +27,7 @@ const CreditsTab = ({ credits }: CreditsTabProps) => {
   });
 
   const rechargeUrl = (config as any)?.recharge_url || "";
+  const promoPercent = (config as any)?.promo_credit_percent || 0;
 
   const handleRedeem = async () => {
     if (!redeemCode.trim()) return;
@@ -55,13 +57,28 @@ const CreditsTab = ({ credits }: CreditsTabProps) => {
             <p className="text-sm text-muted-foreground">Saldo disponível</p>
             <p className="text-4xl font-extrabold text-primary">R$ {(credits?.balance || 0).toFixed(2)}</p>
           </div>
+
+          {promoPercent > 0 && (
+            <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
+              <Percent className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium">Promoção ativa:</span>
+              <Badge variant="secondary" className="bg-accent/20 text-accent font-bold">
+                +{promoPercent}% de bônus
+              </Badge>
+              <span className="text-xs text-muted-foreground">na recarga</span>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Input placeholder="Código de recarga" value={redeemCode} onChange={(e) => setRedeemCode(e.target.value.toUpperCase())} className="font-mono" />
             <Button onClick={handleRedeem} disabled={redeeming} size="sm">
               <Ticket className="w-4 h-4 mr-1" /> {redeeming ? "..." : "Resgatar"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground text-center">Insira o código de recarga fornecido pelo administrador</p>
+          <p className="text-xs text-muted-foreground text-center">
+            Insira o código de recarga fornecido pelo administrador
+            {promoPercent > 0 && ` — Ganhe ${promoPercent}% extra!`}
+          </p>
           {rechargeUrl && (
             <Button asChild variant="outline" className="w-full mt-2">
               <a href={rechargeUrl} target="_blank" rel="noopener noreferrer">
