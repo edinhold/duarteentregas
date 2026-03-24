@@ -529,6 +529,9 @@ const DriverPanel = () => {
           onAcceptRequest={acceptRequest}
         />
 
+        {/* Notification Settings */}
+        <DriverNotificationSettings />
+
         {/* Earnings per delivery */}
         {earnings.length > 0 && (
           <Card>
