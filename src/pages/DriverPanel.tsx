@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { playNotificationSound, playUrgentNotification } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
+import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -151,6 +152,17 @@ const DriverPanel = () => {
       Notification.requestPermission();
     }
   }, []);
+
+  // Standby mode: activate when no active request, deactivate when busy
+  useEffect(() => {
+    const settings = JSON.parse(localStorage.getItem("driver-notification-settings") || "{}");
+    if (settings.standbyEnabled && !activeRequest && pendingRequests.length === 0) {
+      startStandbyMode(settings.standbyIntervalMs || 30000);
+    } else {
+      stopStandbyMode();
+    }
+    return () => stopStandbyMode();
+  }, [activeRequest, pendingRequests.length]);
 
   // Realtime
   useEffect(() => {
@@ -516,6 +528,9 @@ const DriverPanel = () => {
           pendingRequests={pendingRequests}
           onAcceptRequest={acceptRequest}
         />
+
+        {/* Notification Settings */}
+        <DriverNotificationSettings />
 
         {/* Earnings per delivery */}
         {earnings.length > 0 && (
