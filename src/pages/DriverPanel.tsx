@@ -153,6 +153,17 @@ const DriverPanel = () => {
     }
   }, []);
 
+  // Standby mode: activate when no active request, deactivate when busy
+  useEffect(() => {
+    const settings = JSON.parse(localStorage.getItem("driver-notification-settings") || "{}");
+    if (settings.standbyEnabled && !activeRequest && pendingRequests.length === 0) {
+      startStandbyMode(settings.standbyIntervalMs || 30000);
+    } else {
+      stopStandbyMode();
+    }
+    return () => stopStandbyMode();
+  }, [activeRequest, pendingRequests.length]);
+
   // Realtime
   useEffect(() => {
     if (!user) return;
