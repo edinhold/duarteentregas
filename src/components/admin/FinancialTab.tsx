@@ -166,8 +166,8 @@ const FinancialTab = () => {
       }
 
       const [r1, r2] = await Promise.all([
-        supabase.from("driver_earnings").delete().neq("id", dummyId),
-        supabase.from("withdrawal_requests").delete().neq("id", dummyId),
+        supabase.from("driver_earnings").delete().gte("created_at", "1970-01-01T00:00:00Z"),
+        supabase.from("withdrawal_requests").delete().gte("created_at", "1970-01-01T00:00:00Z"),
       ]);
       if (r1.error) throw r1.error;
       if (r2.error) throw r2.error;
