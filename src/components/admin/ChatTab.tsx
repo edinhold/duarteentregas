@@ -57,6 +57,23 @@ const ChatTab = () => {
 
   const allRequests = [...requests, ...recentRequests];
 
+  const handleDeleteAllChats = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error) throw error;
+      toast.success("Todas as mensagens do chat foram apagadas!");
+      queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat"] });
+      queryClient.invalidateQueries({ queryKey: ["chat-messages"] });
+      setSelectedRequestId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao apagar mensagens");
+    } finally {
+      setDeleting(false);
+      setShowDeleteAll(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
