@@ -393,7 +393,42 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         </CardContent>
       </Card>
 
-      {/* Call Driver Form */}
+      {/* Real-time nearest driver info */}
+      {nearestDriverInfo && activeRequest && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Entregador mais próximo</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-background rounded-lg p-2">
+                <p className="text-lg font-bold text-primary">
+                  {nearestDriverInfo.distanceKm < 1
+                    ? `${Math.round(nearestDriverInfo.distanceKm * 1000)}m`
+                    : `${nearestDriverInfo.distanceKm.toFixed(1)}km`}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Distância</p>
+              </div>
+              <div className="bg-background rounded-lg p-2">
+                <p className="text-lg font-bold text-primary">
+                  {nearestDriverInfo.etaMinutes < 1
+                    ? "<1 min"
+                    : `${Math.round(nearestDriverInfo.etaMinutes)} min`}
+                </p>
+                <p className="text-[10px] text-muted-foreground">ETA</p>
+              </div>
+              <div className="bg-background rounded-lg p-2">
+                <p className="text-lg font-bold text-primary">
+                  {nearestDriverInfo.speedKmh > 0 ? `${nearestDriverInfo.speedKmh} km/h` : "Parado"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Velocidade</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
