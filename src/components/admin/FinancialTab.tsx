@@ -150,18 +150,34 @@ const FinancialTab = () => {
     setDeleting(true);
     try {
       const dummyId = "00000000-0000-0000-0000-000000000000";
+      
+      // Check if there are records to delete
+      const [c1, c2] = await Promise.all([
+        supabase.from("driver_earnings").select("*", { count: "exact", head: true }),
+        supabase.from("withdrawal_requests").select("*", { count: "exact", head: true }),
+      ]);
+      
+      const totalRecords = (c1.count || 0) + (c2.count || 0);
+      if (totalRecords === 0) {
+        toast.info("Nenhum registro financeiro para apagar.");
+        setDeleting(false);
+        setShowDeleteAll(false);
+        return;
+      }
+
       const [r1, r2] = await Promise.all([
         supabase.from("driver_earnings").delete().neq("id", dummyId),
         supabase.from("withdrawal_requests").delete().neq("id", dummyId),
       ]);
       if (r1.error) throw r1.error;
       if (r2.error) throw r2.error;
-      toast.success("Todos os registros financeiros foram apagados!");
+      toast.success(`${totalRecords} registro(s) financeiro(s) apagados com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ["admin-earnings"] });
       queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-delivered-requests"] });
     } catch (err: any) {
-      toast.error(err.message || "Erro ao apagar registros");
+      console.error("Erro ao apagar registros financeiros:", err);
+      toast.error(err.message || "Erro ao apagar registros. Verifique suas permissões de administrador.");
     } finally {
       setDeleting(false);
       setShowDeleteAll(false);
