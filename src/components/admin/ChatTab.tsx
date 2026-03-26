@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import ChatWidget from "@/components/ChatWidget";
+import DeleteConfirm from "@/components/admin/DeleteConfirm";
 
 const statusLabels: Record<string, string> = {
   pending: "Aguardando",
