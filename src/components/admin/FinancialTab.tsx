@@ -350,6 +350,13 @@ const FinancialTab = () => {
           </Table>
         </CardContent>
       </Card>
+      <DeleteConfirm
+        open={showDeleteAll}
+        onOpenChange={setShowDeleteAll}
+        onConfirm={handleDeleteAllFinancial}
+        title="todos os registros financeiros"
+        loading={deleting}
+      />
     </div>
   );
 };
