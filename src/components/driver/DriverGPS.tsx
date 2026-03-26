@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield } from "lucide-react";
+import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER } from "@/config/maps";
@@ -28,6 +28,15 @@ const driverIcon = new L.Icon({
   iconAnchor: [12, 12],
 });
 
+const destIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23e53935" stroke="white" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>`
+  ),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
 const qualityConfig = {
   excellent: { color: "text-green-600", label: "Excelente", icon: "🟢" },
   good: { color: "text-green-500", label: "Boa", icon: "🟡" },
@@ -51,14 +60,19 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     watching,
     gpsQuality,
     sampleCount,
+    isStationary,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
+
+  const [autoFollow, setAutoFollow] = useState(true);
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
   const accuracyCircleRef = useRef<L.Circle | null>(null);
+  const destMarkerRef = useRef<L.Marker | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null);
 
   const openNavigation = (address: string, app: "google" | "waze") => {
     if (app === "waze") {
@@ -95,7 +109,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           ? [requestMarkers[0].lat, requestMarkers[0].lng]
           : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
-      const map = L.map(mapContainerRef.current).setView(center, 14);
+      const map = L.map(mapContainerRef.current).setView(center, 15);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
@@ -119,11 +133,44 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           radius: accuracy, fillColor: "#3b82f6", fillOpacity: 0.1, color: "#3b82f6", opacity: 0.3,
         }).addTo(map);
       }
-      map.setView([driverPosition.lat, driverPosition.lng]);
+
+      // Auto-follow: center on driver
+      if (autoFollow) {
+        map.setView([driverPosition.lat, driverPosition.lng], map.getZoom());
+      }
     }
 
+    // Update destination marker for active request
+    if (destMarkerRef.current) {
+      map.removeLayer(destMarkerRef.current);
+      destMarkerRef.current = null;
+    }
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+
+    // If there's a restaurant location on the active request, show it
+    if (activeRequest?.restaurants?.latitude && activeRequest?.restaurants?.longitude) {
+      const destLat = activeRequest.restaurants.latitude;
+      const destLng = activeRequest.restaurants.longitude;
+      const label = activeRequest.status === "accepted" ? "📦 Coleta" : "🏠 Entrega";
+
+      destMarkerRef.current = L.marker([destLat, destLng], { icon: destIcon })
+        .addTo(map)
+        .bindPopup(`<b>${label}</b><br/>${activeRequest.restaurants.name || ""}`);
+
+      if (driverPosition) {
+        routeLineRef.current = L.polyline(
+          [[driverPosition.lat, driverPosition.lng], [destLat, destLng]],
+          { color: "#e53935", weight: 3, dashArray: "8 4", opacity: 0.7 }
+        ).addTo(map);
+      }
+    }
+
+    // Pending request markers
     map.eachLayer((layer) => {
-      if (layer instanceof L.Marker && layer !== driverMarkerRef.current) {
+      if (layer instanceof L.Marker && layer !== driverMarkerRef.current && layer !== destMarkerRef.current) {
         map.removeLayer(layer);
       }
     });
@@ -132,7 +179,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         .bindPopup(m.name)
         .on("click", () => onAcceptRequest?.(m.id));
     });
-  }, [driverPosition, accuracy, requestMarkers.length, showMap]);
+  }, [driverPosition, accuracy, requestMarkers.length, showMap, autoFollow, activeRequest?.id, activeRequest?.status]);
 
   // Cleanup
   useEffect(() => {
@@ -142,6 +189,8 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         mapRef.current = null;
         driverMarkerRef.current = null;
         accuracyCircleRef.current = null;
+        destMarkerRef.current = null;
+        routeLineRef.current = null;
       }
     };
   }, []);
@@ -152,6 +201,9 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Navigation className="w-4 h-4" /> GPS em Tempo Real
+            {isStationary && watching && (
+              <Badge variant="outline" className="gap-1 text-xs ml-1"><Pause className="w-3 h-3" /> Parado</Badge>
+            )}
             {watching ? (
               <Badge variant="default" className="ml-auto gap-1 text-xs"><Signal className="w-3 h-3" /> Ativo</Badge>
             ) : (
@@ -232,7 +284,18 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
       {showMap && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
+              <Button
+                variant={autoFollow ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAutoFollow(!autoFollow)}
+                className="gap-1 text-xs h-7"
+              >
+                <Crosshair className="w-3 h-3" />
+                {autoFollow ? "Seguindo" : "Seguir"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-72 rounded-lg overflow-hidden">
