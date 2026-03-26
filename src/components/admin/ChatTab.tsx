@@ -77,10 +77,13 @@ const ChatTab = () => {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="w-4 h-4" /> Conversas de Entregas
           </CardTitle>
+          <Button variant="destructive" size="sm" onClick={() => setShowDeleteAll(true)} disabled={allRequests.length === 0}>
+            <Trash2 className="w-4 h-4 mr-1" /> Apagar Tudo
+          </Button>
         </CardHeader>
         <CardContent>
           {allRequests.length === 0 ? (
