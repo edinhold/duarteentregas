@@ -60,14 +60,35 @@ const ChatTab = () => {
   const handleDeleteAllChats = async () => {
     setDeleting(true);
     try {
-      const { error } = await supabase.from("chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      // First check how many messages exist
+      const { count, error: countError } = await supabase
+        .from("chat_messages")
+        .select("*", { count: "exact", head: true });
+      
+      if (countError) throw countError;
+      
+      if (!count || count === 0) {
+        toast.info("Nenhuma mensagem para apagar.");
+        setDeleting(false);
+        setShowDeleteAll(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("chat_messages")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      
       if (error) throw error;
-      toast.success("Todas as mensagens do chat foram apagadas!");
+      
+      toast.success(`${count} mensagem(ns) do chat apagadas com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat-recent"] });
       queryClient.invalidateQueries({ queryKey: ["chat-messages"] });
       setSelectedRequestId(null);
     } catch (err: any) {
-      toast.error(err.message || "Erro ao apagar mensagens");
+      console.error("Erro ao apagar mensagens:", err);
+      toast.error(err.message || "Erro ao apagar mensagens. Verifique suas permissões de administrador.");
     } finally {
       setDeleting(false);
       setShowDeleteAll(false);
