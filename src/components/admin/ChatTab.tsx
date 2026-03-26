@@ -20,7 +20,10 @@ const statusLabels: Record<string, string> = {
 
 const ChatTab = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Get all active delivery requests (admin can see all)
   const { data: requests = [] } = useQuery({
