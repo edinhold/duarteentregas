@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { DollarSign, CheckCircle, XCircle, Key, CalendarDays } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import DeleteConfirm from "@/components/admin/DeleteConfirm";
 
 const FinancialTab = () => {
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState<string | null>(null);
   const [savingPayDay, setSavingPayDay] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Get delivery config (payment day)
   const { data: deliveryConfig } = useQuery({

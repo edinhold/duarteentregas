@@ -129,6 +129,13 @@ const ChatTab = () => {
           maxHeight="max-h-80"
         />
       )}
+      <DeleteConfirm
+        open={showDeleteAll}
+        onOpenChange={setShowDeleteAll}
+        onConfirm={handleDeleteAllChats}
+        title="todas as mensagens do chat"
+        loading={deleting}
+      />
     </div>
   );
 };
