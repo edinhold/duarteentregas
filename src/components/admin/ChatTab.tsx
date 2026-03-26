@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import ChatWidget from "@/components/ChatWidget";
+import DeleteConfirm from "@/components/admin/DeleteConfirm";
 
 const statusLabels: Record<string, string> = {
   pending: "Aguardando",
@@ -17,7 +20,10 @@ const statusLabels: Record<string, string> = {
 
 const ChatTab = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Get all active delivery requests (admin can see all)
   const { data: requests = [] } = useQuery({
@@ -51,13 +57,33 @@ const ChatTab = () => {
 
   const allRequests = [...requests, ...recentRequests];
 
+  const handleDeleteAllChats = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error) throw error;
+      toast.success("Todas as mensagens do chat foram apagadas!");
+      queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat"] });
+      queryClient.invalidateQueries({ queryKey: ["chat-messages"] });
+      setSelectedRequestId(null);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao apagar mensagens");
+    } finally {
+      setDeleting(false);
+      setShowDeleteAll(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="w-4 h-4" /> Conversas de Entregas
           </CardTitle>
+          <Button variant="destructive" size="sm" onClick={() => setShowDeleteAll(true)} disabled={allRequests.length === 0}>
+            <Trash2 className="w-4 h-4 mr-1" /> Apagar Tudo
+          </Button>
         </CardHeader>
         <CardContent>
           {allRequests.length === 0 ? (
@@ -103,6 +129,13 @@ const ChatTab = () => {
           maxHeight="max-h-80"
         />
       )}
+      <DeleteConfirm
+        open={showDeleteAll}
+        onOpenChange={setShowDeleteAll}
+        onConfirm={handleDeleteAllChats}
+        title="todas as mensagens do chat"
+        loading={deleting}
+      />
     </div>
   );
 };

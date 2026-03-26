@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { DollarSign, CheckCircle, XCircle, Key, CalendarDays } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import DeleteConfirm from "@/components/admin/DeleteConfirm";
 
 const FinancialTab = () => {
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState<string | null>(null);
   const [savingPayDay, setSavingPayDay] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Get delivery config (payment day)
   const { data: deliveryConfig } = useQuery({
@@ -143,8 +146,35 @@ const FinancialTab = () => {
   const appRevenue = Math.max(totalDriverFees - totalDriverEarnings, 0);
   const pendingWithdrawals = withdrawals.filter((w: any) => w.status === "pending");
 
+  const handleDeleteAllFinancial = async () => {
+    setDeleting(true);
+    try {
+      const dummyId = "00000000-0000-0000-0000-000000000000";
+      const [r1, r2] = await Promise.all([
+        supabase.from("driver_earnings").delete().neq("id", dummyId),
+        supabase.from("withdrawal_requests").delete().neq("id", dummyId),
+      ]);
+      if (r1.error) throw r1.error;
+      if (r2.error) throw r2.error;
+      toast.success("Todos os registros financeiros foram apagados!");
+      queryClient.invalidateQueries({ queryKey: ["admin-earnings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-delivered-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao apagar registros");
+    } finally {
+      setDeleting(false);
+      setShowDeleteAll(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="destructive" size="sm" onClick={() => setShowDeleteAll(true)}>
+          <Trash2 className="w-4 h-4 mr-1" /> Apagar Tudo
+        </Button>
+      </div>
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
@@ -320,6 +350,13 @@ const FinancialTab = () => {
           </Table>
         </CardContent>
       </Card>
+      <DeleteConfirm
+        open={showDeleteAll}
+        onOpenChange={setShowDeleteAll}
+        onConfirm={handleDeleteAllFinancial}
+        title="todos os registros financeiros"
+        loading={deleting}
+      />
     </div>
   );
 };
