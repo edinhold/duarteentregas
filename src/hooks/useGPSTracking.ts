@@ -18,9 +18,11 @@ interface KalmanState {
 
 interface GPSTrackingOptions {
   userId?: string;
-  saveInterval?: number; // ms between DB saves
-  maxAcceptableAccuracy?: number; // meters — readings worse than this are discarded
-  outlierThresholdKmh?: number; // max plausible speed to reject teleport spikes
+  saveIntervalMoving?: number;   // ms between DB saves when moving
+  saveIntervalStationary?: number; // ms between DB saves when stationary
+  maxAcceptableAccuracy?: number;
+  outlierThresholdKmh?: number;
+  stationarySpeedThreshold?: number; // m/s — below this = stationary
 }
 
 // Haversine distance in meters
@@ -35,12 +37,18 @@ const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+// Validate coordinates are within valid ranges
+const isValidCoord = (lat: number, lng: number): boolean =>
+  lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && lat !== 0 && lng !== 0;
+
 export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const {
     userId,
-    saveInterval = 5000,
-    maxAcceptableAccuracy = 100, // discard readings > 100m accuracy
-    outlierThresholdKmh = 200, // max 200 km/h — beyond = outlier
+    saveIntervalMoving = 3000,
+    saveIntervalStationary = 15000,
+    maxAcceptableAccuracy = 100,
+    outlierThresholdKmh = 200,
+    stationarySpeedThreshold = 0.5, // ~1.8 km/h
   } = options;
 
   const [position, setPosition] = useState<GPSPosition | null>(null);
@@ -50,12 +58,15 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const [watching, setWatching] = useState(false);
   const [gpsQuality, setGpsQuality] = useState<"excellent" | "good" | "fair" | "poor">("poor");
   const [sampleCount, setSampleCount] = useState(0);
+  const [isStationary, setIsStationary] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const lastSavedRef = useRef(0);
   const kalmanRef = useRef<KalmanState | null>(null);
   const historyRef = useRef<Array<{ lat: number; lng: number; acc: number; ts: number }>>([]);
   const discardedCountRef = useRef(0);
+  const stationaryCountRef = useRef(0);
+  const lastMovingPosRef = useRef<GPSPosition | null>(null);
 
   // ---------- Quality classification ----------
   const classifyQuality = useCallback((acc: number) => {
@@ -68,17 +79,14 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   // ---------- Enhanced 2D Kalman Filter ----------
   const applyKalman = useCallback(
     (lat: number, lng: number, acc: number, ts: number, rawSpeed: number | null): GPSPosition => {
-      // Adaptive process noise based on speed
-      const speedMs = rawSpeed && rawSpeed > 0 ? rawSpeed : 1.4; // default ~5 km/h walking
-      // Convert speed to degrees/s approximation
+      const speedMs = rawSpeed && rawSpeed > 0 ? rawSpeed : 1.4;
       const speedDeg = speedMs / 111_320;
       const dt = kalmanRef.current ? (ts - kalmanRef.current.timestamp) / 1000 : 1;
-      const processNoise = speedDeg * speedDeg * dt; // bigger when moving fast
+      const processNoise = speedDeg * speedDeg * dt;
 
       if (!kalmanRef.current) {
         kalmanRef.current = {
-          lat,
-          lng,
+          lat, lng,
           varLat: acc * acc * 0.0000001,
           varLng: acc * acc * 0.0000001,
           speed: speedMs,
@@ -88,15 +96,10 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       }
 
       const k = kalmanRef.current;
-
-      // Predict step
       k.varLat += processNoise;
       k.varLng += processNoise;
 
-      // Measurement noise from accuracy (convert meters to ~degrees)
       const measNoise = (acc / 111_320) ** 2;
-
-      // Update step
       const gainLat = k.varLat / (k.varLat + measNoise);
       const gainLng = k.varLng / (k.varLng + measNoise);
 
@@ -129,12 +132,11 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     [outlierThresholdKmh]
   );
 
-  // ---------- Weighted average of recent samples (sliding window) ----------
+  // ---------- Weighted average of recent samples ----------
   const weightedAverage = useCallback((samples: typeof historyRef.current): GPSPosition | null => {
     if (samples.length === 0) return null;
     if (samples.length === 1) return { lat: samples[0].lat, lng: samples[0].lng };
 
-    // Weight inversely proportional to accuracy (better accuracy = higher weight)
     let totalWeight = 0;
     let wLat = 0;
     let wLng = 0;
@@ -149,12 +151,13 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return { lat: wLat / totalWeight, lng: wLng / totalWeight };
   }, []);
 
-  // ---------- Save to DB ----------
+  // ---------- Save to DB (adaptive interval) ----------
   const savePositionToDb = useCallback(
-    async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null) => {
+    async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       if (!userId) return;
       const now = Date.now();
-      if (now - lastSavedRef.current < saveInterval) return;
+      const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
+      if (now - lastSavedRef.current < interval) return;
       lastSavedRef.current = now;
 
       try {
@@ -175,7 +178,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         console.error("Erro ao salvar posição:", e);
       }
     },
-    [userId, saveInterval]
+    [userId, saveIntervalMoving, saveIntervalStationary]
   );
 
   // ---------- Process raw GPS reading ----------
@@ -184,13 +187,19 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       const { latitude, longitude, accuracy: acc, heading: hdg, speed: spd } = pos.coords;
       const ts = pos.timestamp || Date.now();
 
-      // 1. Discard readings with very poor accuracy
+      // 1. Validate coordinates (anti-spoofing basic check)
+      if (!isValidCoord(latitude, longitude)) {
+        discardedCountRef.current++;
+        return;
+      }
+
+      // 2. Discard readings with very poor accuracy
       if (acc > maxAcceptableAccuracy) {
         discardedCountRef.current++;
         return;
       }
 
-      // 2. Outlier rejection (teleport detection)
+      // 3. Outlier rejection (teleport detection / spoofing)
       if (isOutlier(latitude, longitude, ts)) {
         discardedCountRef.current++;
         return;
@@ -200,17 +209,16 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       historyRef.current.push({ lat: latitude, lng: longitude, acc, ts });
       if (historyRef.current.length > 5) historyRef.current.shift();
 
-      // 4. Apply Kalman filter
+      // 5. Apply Kalman filter
       const kalmanPos = applyKalman(latitude, longitude, acc, ts, spd);
 
-      // 5. If we have 3+ recent samples within 10s, blend Kalman with weighted average
+      // 6. Blend with weighted average for extra smoothness
       const recentSamples = historyRef.current.filter((s) => ts - s.ts < 10_000);
       let finalPos = kalmanPos;
 
       if (recentSamples.length >= 3) {
         const weighted = weightedAverage(recentSamples);
         if (weighted) {
-          // Blend: 70% Kalman + 30% weighted average for extra smoothness
           finalPos = {
             lat: kalmanPos.lat * 0.7 + weighted.lat * 0.3,
             lng: kalmanPos.lng * 0.7 + weighted.lng * 0.3,
@@ -218,6 +226,22 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         }
       }
 
+      // 7. Detect stationary state (battery optimization)
+      const currentSpeed = spd ?? 0;
+      const stationary = currentSpeed < stationarySpeedThreshold;
+
+      if (stationary) {
+        stationaryCountRef.current++;
+        // When stationary for 5+ readings, lock position to reduce drift
+        if (stationaryCountRef.current >= 5 && lastMovingPosRef.current) {
+          finalPos = lastMovingPosRef.current;
+        }
+      } else {
+        stationaryCountRef.current = 0;
+        lastMovingPosRef.current = finalPos;
+      }
+
+      setIsStationary(stationary);
       setSampleCount((c) => c + 1);
       setPosition(finalPos);
       setAccuracy(acc);
@@ -226,9 +250,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       setGpsQuality(classifyQuality(acc));
       setWatching(true);
 
-      savePositionToDb(finalPos.lat, finalPos.lng, acc, hdg, spd);
+      savePositionToDb(finalPos.lat, finalPos.lng, acc, hdg, spd, stationary);
     },
-    [applyKalman, isOutlier, weightedAverage, classifyQuality, savePositionToDb, maxAcceptableAccuracy]
+    [applyKalman, isOutlier, weightedAverage, classifyQuality, savePositionToDb, maxAcceptableAccuracy, stationarySpeedThreshold]
   );
 
   // ---------- Start / Stop ----------
@@ -238,10 +262,11 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       return;
     }
 
-    // Reset state
     kalmanRef.current = null;
     historyRef.current = [];
     discardedCountRef.current = 0;
+    stationaryCountRef.current = 0;
+    lastMovingPosRef.current = null;
     setSampleCount(0);
 
     const id = navigator.geolocation.watchPosition(
@@ -249,6 +274,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           toast.error("Permissão de localização negada.");
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          toast.error("Localização indisponível. Verifique se o GPS está ativado.");
         } else {
           toast.error("Erro ao obter localização");
         }
@@ -256,7 +283,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 1000, // stricter: only 1s cache
+        maximumAge: 1000,
         timeout: 8000,
       }
     );
@@ -291,6 +318,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     watching,
     gpsQuality,
     sampleCount,
+    isStationary,
     discardedCount: discardedCountRef.current,
     startTracking,
     stopTracking,
