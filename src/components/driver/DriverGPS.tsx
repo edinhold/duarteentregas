@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero } from "lucide-react";
+import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER } from "@/config/maps";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGPSTracking } from "@/hooks/useGPSTracking";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -29,6 +28,13 @@ const driverIcon = new L.Icon({
   iconAnchor: [12, 12],
 });
 
+const qualityConfig = {
+  excellent: { color: "text-green-600", label: "Excelente", icon: "🟢" },
+  good: { color: "text-green-500", label: "Boa", icon: "🟡" },
+  fair: { color: "text-yellow-600", label: "Regular", icon: "🟠" },
+  poor: { color: "text-red-500", label: "Fraca", icon: "🔴" },
+};
+
 interface DriverGPSProps {
   activeRequest?: any;
   pendingRequests?: any[];
@@ -37,102 +43,22 @@ interface DriverGPSProps {
 
 const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: DriverGPSProps) => {
   const { user } = useAuth();
-  const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const [accuracy, setAccuracy] = useState<number>(0);
-  const [heading, setHeading] = useState<number | null>(null);
-  const [speed, setSpeed] = useState<number | null>(null);
-  const [watching, setWatching] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  const {
+    position: driverPosition,
+    accuracy,
+    heading,
+    speed,
+    watching,
+    gpsQuality,
+    sampleCount,
+    startTracking,
+    stopTracking,
+  } = useGPSTracking({ userId: user?.id });
+
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
   const accuracyCircleRef = useRef<L.Circle | null>(null);
-  const lastSavedRef = useRef<number>(0);
-
-  // Save position to database (throttled to every 5 seconds)
-  const savePositionToDb = useCallback(async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null) => {
-    if (!user) return;
-    const now = Date.now();
-    if (now - lastSavedRef.current < 5000) return;
-    lastSavedRef.current = now;
-
-    try {
-      const { error } = await (supabase as any)
-        .from("driver_locations")
-        .upsert({
-          user_id: user.id,
-          driver_id: user.id,
-          latitude: lat,
-          longitude: lng,
-          accuracy: acc,
-          heading: hdg,
-          speed: spd,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-      if (error) console.error("Erro ao salvar posição:", error);
-    } catch (e) {
-      console.error("Erro ao salvar posição:", e);
-    }
-  }, [user]);
-
-  // Kalman filter for GPS smoothing
-  const kalmanRef = useRef<{ lat: number; lng: number; variance: number } | null>(null);
-
-  const applyKalmanFilter = useCallback((lat: number, lng: number, accuracy: number) => {
-    const processNoise = 0.00001; // movement noise
-    if (!kalmanRef.current) {
-      kalmanRef.current = { lat, lng, variance: accuracy * accuracy };
-      return { lat, lng };
-    }
-    const k = kalmanRef.current;
-    k.variance += processNoise;
-    const kalmanGain = k.variance / (k.variance + accuracy * accuracy);
-    k.lat = k.lat + kalmanGain * (lat - k.lat);
-    k.lng = k.lng + kalmanGain * (lng - k.lng);
-    k.variance = (1 - kalmanGain) * k.variance;
-    return { lat: k.lat, lng: k.lng };
-  }, []);
-
-  const startTracking = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error("GPS não suportado neste dispositivo");
-      return;
-    }
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const filtered = applyKalmanFilter(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-        setDriverPosition(filtered);
-        setAccuracy(pos.coords.accuracy);
-        setHeading(pos.coords.heading);
-        setSpeed(pos.coords.speed);
-        setWatching(true);
-        savePositionToDb(filtered.lat, filtered.lng, pos.coords.accuracy, pos.coords.heading, pos.coords.speed);
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          toast.error("Permissão de localização negada.");
-        } else {
-          toast.error("Erro ao obter localização");
-        }
-        setWatching(false);
-      },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
-    );
-    setWatchId(id);
-  }, [applyKalmanFilter, savePositionToDb]);
-
-  const stopTracking = useCallback(() => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-      setWatching(false);
-    }
-  }, [watchId]);
-
-  useEffect(() => {
-    startTracking();
-    return () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); };
-  }, []);
 
   const openNavigation = (address: string, app: "google" | "waze") => {
     if (app === "waze") {
@@ -156,6 +82,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     .map((r: any) => ({ id: r.id, lat: r.restaurants.latitude, lng: r.restaurants.longitude, name: r.restaurants.name }));
 
   const showMap = driverPosition || requestMarkers.length > 0;
+  const qc = qualityConfig[gpsQuality];
 
   // Initialize and update map
   useEffect(() => {
@@ -243,6 +170,10 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                 <span className="text-muted-foreground">🎯 Precisão</span>
                 <span className={`font-bold ${accuracy <= 10 ? "text-green-600" : accuracy <= 30 ? "text-yellow-600" : "text-red-500"}`}>±{Math.round(accuracy)}m</span>
               </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground"><Shield className="w-3 h-3 inline mr-1" />Qualidade</span>
+                <span className={`font-bold ${qc.color}`}>{qc.icon} {qc.label}</span>
+              </div>
               {speed !== null && speed > 0 && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">🚗 Velocidade</span>
@@ -253,6 +184,12 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">🧭 Direção</span>
                   <span className="font-bold">{Math.round(heading)}°</span>
+                </div>
+              )}
+              {sampleCount > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">📊 Amostras</span>
+                  <span className="text-xs text-muted-foreground">{sampleCount} válidas</span>
                 </div>
               )}
             </div>
