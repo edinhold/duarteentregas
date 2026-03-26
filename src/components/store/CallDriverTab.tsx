@@ -272,7 +272,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   }, [deliveryLatLng, storeLat, storeLng]);
 
-  // Update driver markers
+  // Update driver markers + compute nearest driver distance
+  const [nearestDriverInfo, setNearestDriverInfo] = useState<{
+    distanceKm: number;
+    etaMinutes: number;
+    speedKmh: number;
+  } | null>(null);
+  const proximityAlertRef = useRef(false);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -281,14 +288,37 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     driverMarkersRef.current.forEach(m => map.removeLayer(m));
     driverMarkersRef.current = [];
 
-    // Add new driver markers
+    let nearest: typeof nearestDriverInfo = null;
+
+    // Add new driver markers and find nearest
     driverLocations.forEach((d: any) => {
+      const speedKmh = d.speed ? Math.round(d.speed * 3.6) : 0;
       const marker = L.marker([d.latitude, d.longitude], { icon: driverMapIcon })
         .addTo(map)
-        .bindPopup(`<b>🚴 Entregador</b><br/>${d.speed ? `${Math.round(d.speed * 3.6)} km/h` : "Parado"}`);
+        .bindPopup(`<b>🚴 Entregador</b><br/>${speedKmh > 0 ? `${speedKmh} km/h` : "Parado"}`);
       driverMarkersRef.current.push(marker);
+
+      // Calculate distance from driver to store
+      if (storeLat && storeLng) {
+        const dist = haversineKm(storeLat, storeLng, d.latitude, d.longitude);
+        const avgSpeed = speedKmh > 3 ? speedKmh : 25; // fallback 25 km/h
+        const eta = (dist / avgSpeed) * 60; // minutes
+        if (!nearest || dist < nearest.distanceKm) {
+          nearest = { distanceKm: dist, etaMinutes: eta, speedKmh };
+        }
+      }
     });
-  }, [driverLocations]);
+
+    setNearestDriverInfo(nearest);
+
+    // Proximity alert: driver within 500m
+    if (nearest && nearest.distanceKm <= 0.5 && !proximityAlertRef.current) {
+      proximityAlertRef.current = true;
+      toast.info("🚴 Entregador está a menos de 500m!", { duration: 5000 });
+    } else if (!nearest || nearest.distanceKm > 0.5) {
+      proximityAlertRef.current = false;
+    }
+  }, [driverLocations, storeLat, storeLng]);
 
   const handleDeliveryAddressChange = (value: string) => {
     setCallForm(f => ({ ...f, delivery: value }));
