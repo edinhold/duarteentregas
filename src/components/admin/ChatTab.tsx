@@ -114,8 +114,8 @@ const ChatTab = () => {
           <CardTitle className="text-base flex items-center gap-2">
             <MessageSquare className="w-4 h-4" /> Conversas de Entregas
           </CardTitle>
-          <Button variant="destructive" size="sm" onClick={() => setShowDeleteAll(true)}>
-            <Trash2 className="w-4 h-4 mr-1" /> Apagar Tudo
+          <Button variant="destructive" size="sm" onClick={() => setShowDeleteAll(true)} disabled={messageCount === 0}>
+            <Trash2 className="w-4 h-4 mr-1" /> Apagar Tudo {messageCount > 0 && `(${messageCount})`}
           </Button>
         </CardHeader>
         <CardContent>
