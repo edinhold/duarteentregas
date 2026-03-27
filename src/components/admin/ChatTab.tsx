@@ -25,6 +25,18 @@ const ChatTab = () => {
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Count total chat messages
+  const { data: messageCount = 0 } = useQuery({
+    queryKey: ["admin-chat-message-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("chat_messages")
+        .select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
   // Get all active delivery requests (admin can see all)
   const { data: requests = [] } = useQuery({
     queryKey: ["admin-delivery-requests-chat"],
