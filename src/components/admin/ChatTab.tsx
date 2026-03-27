@@ -97,6 +97,7 @@ const ChatTab = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat"] });
       queryClient.invalidateQueries({ queryKey: ["admin-delivery-requests-chat-recent"] });
       queryClient.invalidateQueries({ queryKey: ["chat-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-chat-message-count"] });
       setSelectedRequestId(null);
     } catch (err: any) {
       console.error("Erro ao apagar mensagens:", err);
