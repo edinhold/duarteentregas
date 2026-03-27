@@ -61,6 +61,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     gpsQuality,
     sampleCount,
     isStationary,
+    totalDistance,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
