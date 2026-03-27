@@ -18,11 +18,11 @@ interface KalmanState {
 
 interface GPSTrackingOptions {
   userId?: string;
-  saveIntervalMoving?: number;   // ms between DB saves when moving
-  saveIntervalStationary?: number; // ms between DB saves when stationary
+  saveIntervalMoving?: number;
+  saveIntervalStationary?: number;
   maxAcceptableAccuracy?: number;
   outlierThresholdKmh?: number;
-  stationarySpeedThreshold?: number; // m/s — below this = stationary
+  stationarySpeedThreshold?: number;
 }
 
 // Haversine distance in meters
@@ -37,18 +37,17 @@ const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-// Validate coordinates are within valid ranges
 const isValidCoord = (lat: number, lng: number): boolean =>
   lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && lat !== 0 && lng !== 0;
 
 export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const {
     userId,
-    saveIntervalMoving = 3000,
+    saveIntervalMoving = 2000,
     saveIntervalStationary = 15000,
-    maxAcceptableAccuracy = 100,
+    maxAcceptableAccuracy = 150,       // raised from 100 — urban areas often 100-150m
     outlierThresholdKmh = 200,
-    stationarySpeedThreshold = 0.5, // ~1.8 km/h
+    stationarySpeedThreshold = 0.2,    // lowered from 0.5 — ~0.7 km/h, only truly stopped
   } = options;
 
   const [position, setPosition] = useState<GPSPosition | null>(null);
@@ -59,6 +58,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const [gpsQuality, setGpsQuality] = useState<"excellent" | "good" | "fair" | "poor">("poor");
   const [sampleCount, setSampleCount] = useState(0);
   const [isStationary, setIsStationary] = useState(false);
+  const [totalDistance, setTotalDistance] = useState(0); // cumulative meters
 
   const watchIdRef = useRef<number | null>(null);
   const lastSavedRef = useRef(0);
@@ -67,8 +67,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const discardedCountRef = useRef(0);
   const stationaryCountRef = useRef(0);
   const lastMovingPosRef = useRef<GPSPosition | null>(null);
+  const lastAcceptedPosRef = useRef<GPSPosition | null>(null);
+  const totalDistanceRef = useRef(0);
 
-  // ---------- Quality classification ----------
   const classifyQuality = useCallback((acc: number) => {
     if (acc <= 5) return "excellent";
     if (acc <= 15) return "good";
@@ -76,13 +77,15 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return "poor";
   }, []);
 
-  // ---------- Enhanced 2D Kalman Filter ----------
+  // ---------- Adaptive Kalman Filter ----------
+  // Key fix: reduce over-smoothing by using speed-adaptive gain
   const applyKalman = useCallback(
     (lat: number, lng: number, acc: number, ts: number, rawSpeed: number | null): GPSPosition => {
       const speedMs = rawSpeed && rawSpeed > 0 ? rawSpeed : 1.4;
       const speedDeg = speedMs / 111_320;
       const dt = kalmanRef.current ? (ts - kalmanRef.current.timestamp) / 1000 : 1;
-      const processNoise = speedDeg * speedDeg * dt;
+      // Higher process noise when moving fast = trust measurements more
+      const processNoise = speedDeg * speedDeg * dt * (speedMs > 2 ? 2.0 : 1.0);
 
       if (!kalmanRef.current) {
         kalmanRef.current = {
@@ -132,7 +135,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     [outlierThresholdKmh]
   );
 
-  // ---------- Weighted average of recent samples ----------
+  // ---------- Weighted average (reduced influence) ----------
   const weightedAverage = useCallback((samples: typeof historyRef.current): GPSPosition | null => {
     if (samples.length === 0) return null;
     if (samples.length === 1) return { lat: samples[0].lat, lng: samples[0].lng };
@@ -151,7 +154,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return { lat: wLat / totalWeight, lng: wLng / totalWeight };
   }, []);
 
-  // ---------- Save to DB (adaptive interval) ----------
+  // ---------- Save to DB ----------
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       if (!userId) return;
@@ -187,19 +190,19 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       const { latitude, longitude, accuracy: acc, heading: hdg, speed: spd } = pos.coords;
       const ts = pos.timestamp || Date.now();
 
-      // 1. Validate coordinates (anti-spoofing basic check)
+      // 1. Validate coordinates
       if (!isValidCoord(latitude, longitude)) {
         discardedCountRef.current++;
         return;
       }
 
-      // 2. Discard readings with very poor accuracy
+      // 2. Discard very poor accuracy
       if (acc > maxAcceptableAccuracy) {
         discardedCountRef.current++;
         return;
       }
 
-      // 3. Outlier rejection (teleport detection / spoofing)
+      // 3. Outlier rejection
       if (isOutlier(latitude, longitude, ts)) {
         discardedCountRef.current++;
         return;
@@ -212,34 +215,50 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       // 5. Apply Kalman filter
       const kalmanPos = applyKalman(latitude, longitude, acc, ts, spd);
 
-      // 6. Blend with weighted average for extra smoothness
-      const recentSamples = historyRef.current.filter((s) => ts - s.ts < 10_000);
+      // 6. Reduced blending — only 15% weighted avg (was 30%) to preserve real path
+      const recentSamples = historyRef.current.filter((s) => ts - s.ts < 8_000);
       let finalPos = kalmanPos;
 
       if (recentSamples.length >= 3) {
         const weighted = weightedAverage(recentSamples);
         if (weighted) {
           finalPos = {
-            lat: kalmanPos.lat * 0.7 + weighted.lat * 0.3,
-            lng: kalmanPos.lng * 0.7 + weighted.lng * 0.3,
+            lat: kalmanPos.lat * 0.85 + weighted.lat * 0.15,
+            lng: kalmanPos.lng * 0.85 + weighted.lng * 0.15,
           };
         }
       }
 
-      // 7. Detect stationary state (battery optimization)
+      // 7. Detect stationary state
       const currentSpeed = spd ?? 0;
       const stationary = currentSpeed < stationarySpeedThreshold;
 
       if (stationary) {
         stationaryCountRef.current++;
-        // When stationary for 5+ readings, lock position to reduce drift
-        if (stationaryCountRef.current >= 5 && lastMovingPosRef.current) {
+        // Only lock after 10 consecutive stationary readings (was 5)
+        if (stationaryCountRef.current >= 10 && lastMovingPosRef.current) {
           finalPos = lastMovingPosRef.current;
         }
       } else {
         stationaryCountRef.current = 0;
         lastMovingPosRef.current = finalPos;
       }
+
+      // 8. Accumulate distance — only when actually moving and accuracy is reasonable
+      if (lastAcceptedPosRef.current && !stationary && acc <= 80) {
+        const segmentM = haversineM(
+          lastAcceptedPosRef.current.lat,
+          lastAcceptedPosRef.current.lng,
+          finalPos.lat,
+          finalPos.lng
+        );
+        // Only count segments > 1m (noise filter) and < 500m (anti-teleport)
+        if (segmentM > 1 && segmentM < 500) {
+          totalDistanceRef.current += segmentM;
+          setTotalDistance(totalDistanceRef.current);
+        }
+      }
+      lastAcceptedPosRef.current = finalPos;
 
       setIsStationary(stationary);
       setSampleCount((c) => c + 1);
@@ -267,6 +286,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     discardedCountRef.current = 0;
     stationaryCountRef.current = 0;
     lastMovingPosRef.current = null;
+    lastAcceptedPosRef.current = null;
+    totalDistanceRef.current = 0;
+    setTotalDistance(0);
     setSampleCount(0);
 
     const id = navigator.geolocation.watchPosition(
@@ -283,8 +305,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 8000,
+        maximumAge: 500,    // reduced from 1000 — fresher data
+        timeout: 10000,     // increased from 8000 — more tolerance
       }
     );
 
@@ -319,6 +341,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     gpsQuality,
     sampleCount,
     isStationary,
+    totalDistance,
     discardedCount: discardedCountRef.current,
     startTracking,
     stopTracking,

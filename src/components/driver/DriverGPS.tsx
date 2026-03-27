@@ -61,6 +61,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     gpsQuality,
     sampleCount,
     isStationary,
+    totalDistance,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
@@ -236,6 +237,14 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">🧭 Direção</span>
                   <span className="font-bold">{Math.round(heading)}°</span>
+                </div>
+              )}
+              {totalDistance > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">📏 Distância</span>
+                  <span className="font-bold text-primary">
+                    {totalDistance >= 1000 ? `${(totalDistance / 1000).toFixed(2)} km` : `${Math.round(totalDistance)} m`}
+                  </span>
                 </div>
               )}
               {sampleCount > 0 && (
