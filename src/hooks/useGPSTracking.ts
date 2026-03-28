@@ -229,14 +229,18 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         }
       }
 
-      // 7. Detect stationary state
-      const currentSpeed = spd ?? 0;
-      const stationary = currentSpeed < stationarySpeedThreshold;
+      // 7. Detect stationary state — use both speed AND position change
+      const currentSpeed = spd ?? -1; // -1 means GPS didn't report speed
+      const hasMovement = lastAcceptedPosRef.current
+        ? haversineM(lastAcceptedPosRef.current.lat, lastAcceptedPosRef.current.lng, finalPos.lat, finalPos.lng) > 2
+        : true;
+      // Only consider stationary if speed is explicitly low AND position didn't change
+      const stationary = currentSpeed >= 0 && currentSpeed < stationarySpeedThreshold && !hasMovement;
 
       if (stationary) {
         stationaryCountRef.current++;
-        // Only lock after 10 consecutive stationary readings (was 5)
-        if (stationaryCountRef.current >= 10 && lastMovingPosRef.current) {
+        // Only lock after 15 consecutive stationary readings to avoid premature locking
+        if (stationaryCountRef.current >= 15 && lastMovingPosRef.current) {
           finalPos = lastMovingPosRef.current;
         }
       } else {
