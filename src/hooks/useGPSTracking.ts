@@ -248,16 +248,18 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         lastMovingPosRef.current = finalPos;
       }
 
-      // 8. Accumulate distance — only when actually moving and accuracy is reasonable
-      if (lastAcceptedPosRef.current && !stationary && acc <= 80) {
+      // 8. Accumulate distance — count when not locked-stationary and accuracy is acceptable
+      if (lastAcceptedPosRef.current && !stationary) {
         const segmentM = haversineM(
           lastAcceptedPosRef.current.lat,
           lastAcceptedPosRef.current.lng,
           finalPos.lat,
           finalPos.lng
         );
-        // Only count segments > 1m (noise filter) and < 500m (anti-teleport)
-        if (segmentM > 1 && segmentM < 500) {
+        // Adaptive max segment based on speed: at 60 km/h with 2s interval ≈ 33m, allow up to 10x
+        const maxSegmentM = Math.max(1000, (currentSpeed > 0 ? currentSpeed : 15) * 30);
+        // Only count segments > 0.5m (noise) and below adaptive max (anti-teleport)
+        if (segmentM > 0.5 && segmentM < maxSegmentM) {
           totalDistanceRef.current += segmentM;
           setTotalDistance(totalDistanceRef.current);
         }
