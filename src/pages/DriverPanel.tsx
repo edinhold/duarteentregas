@@ -204,11 +204,20 @@ const DriverPanel = () => {
 
   const acceptRequest = async (requestId: string) => {
     try {
-      const driverFee = Number(deliveryConfig?.base_fee || 5);
+      // First get the existing driver_fee that was calculated by the RPC (base + per_km * distance)
+      const { data: requestData, error: fetchError } = await supabase
+        .from("delivery_requests")
+        .select("driver_fee")
+        .eq("id", requestId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const driverFee = Number(requestData?.driver_fee || deliveryConfig?.base_fee || 5);
+
+      // Accept without overwriting driver_fee - it was already set correctly
       const { error } = await supabase.from("delivery_requests").update({
         driver_id: user!.id,
         status: "accepted",
-        driver_fee: driverFee,
       } as any).eq("id", requestId).eq("status", "pending");
       if (error) throw error;
       toast.success(`Entrega aceita! Você ganhará R$ ${driverFee.toFixed(2)}`);
