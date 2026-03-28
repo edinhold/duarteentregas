@@ -489,7 +489,25 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   return (
     <div className="space-y-4">
-      {/* GPS Permission */}
+      {/* GPS Status Bar */}
+      {gpsStatus === "granted" && gpsAccuracy !== null && (
+        <Card className={`border ${gpsAccuracy <= 15 ? "border-green-500/40 bg-green-500/5" : gpsAccuracy <= 50 ? "border-yellow-500/40 bg-yellow-500/5" : "border-orange-500/40 bg-orange-500/5"}`}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <Navigation className={`w-4 h-4 ${gpsAccuracy <= 15 ? "text-green-500" : gpsAccuracy <= 50 ? "text-yellow-500" : "text-orange-500"}`} />
+            <div className="flex-1">
+              <p className="text-xs font-medium">
+                📍 Localização ativa — Precisão: {Math.round(gpsAccuracy)}m
+                {gpsAccuracy <= 15 ? " (Excelente)" : gpsAccuracy <= 50 ? " (Boa)" : " (Baixa)"}
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={requestGPS}>
+              <RotateCcw className="w-3 h-3 mr-1" /> Atualizar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* GPS Permission — only when not granted */}
       {gpsStatus !== "granted" && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex items-center gap-3">
@@ -497,7 +515,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <div className="flex-1">
               <p className="text-sm font-medium">Permitir localização</p>
               <p className="text-xs text-muted-foreground">
-                Ative o GPS para localizar sua loja automaticamente e calcular distâncias
+                Ative o GPS para localizar sua loja automaticamente
               </p>
             </div>
             <Button size="sm" onClick={requestGPS} disabled={gpsStatus === "requesting"}>
@@ -616,25 +634,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Auto-detected pickup address (read-only) */}
           <div className="space-y-2">
-            <Label>Endereço de coleta *</Label>
+            <Label className="flex items-center gap-1.5">
+              <Navigation className="w-3.5 h-3.5 text-green-500" />
+              Endereço de coleta (automático)
+            </Label>
             <div className="flex gap-2">
               <Input
                 value={callForm.pickup}
-                onChange={(e) => setCallForm(f => ({ ...f, pickup: e.target.value }))}
-                placeholder={restaurant?.address || "Endereço da loja"}
-                className="flex-1"
+                readOnly
+                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Aguardando GPS..."}
+                className="flex-1 bg-muted/30 cursor-default"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 onClick={requestGPS}
-                title="Usar minha localização"
+                title="Atualizar localização"
               >
                 <Navigation className="w-4 h-4" />
               </Button>
             </div>
+            {callForm.pickup && (
+              <p className="text-[10px] text-green-600 dark:text-green-400">✓ Localização detectada automaticamente</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Endereço de entrega *</Label>
