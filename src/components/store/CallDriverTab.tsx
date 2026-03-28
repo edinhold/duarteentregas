@@ -109,8 +109,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
   const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const { data: driverLocations = [] } = useDriverLocations();
+  const gpsWatchRef = useRef<number | null>(null);
 
   // Route profile & road distance state
   const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
