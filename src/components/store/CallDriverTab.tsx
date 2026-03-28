@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -61,12 +61,22 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type RouteProfile = "driving" | "cycling" | "walking";
+
+const PROFILE_CONFIG: Record<RouteProfile, { label: string; icon: typeof Car; osrmProfile: string }> = {
+  driving: { label: "Carro/Moto", icon: Car, osrmProfile: "driving" },
+  cycling: { label: "Bicicleta", icon: Bike, osrmProfile: "bike" },
+  walking: { label: "A pé", icon: Footprints, osrmProfile: "foot" },
+};
+
 // OSRM route fetcher — returns road distance (km), duration (min), and route geometry
 async function fetchOSRMRoute(
-  fromLat: number, fromLng: number, toLat: number, toLng: number
+  fromLat: number, fromLng: number, toLat: number, toLng: number,
+  profile: RouteProfile = "driving"
 ): Promise<{ distanceKm: number; durationMin: number; geometry: [number, number][] } | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+    const osrmProfile = PROFILE_CONFIG[profile].osrmProfile;
+    const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&alternatives=false`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.code === "Ok" && data.routes?.[0]) {
@@ -102,11 +112,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [searchingAddress, setSearchingAddress] = useState(false);
   const { data: driverLocations = [] } = useDriverLocations();
 
-  // Road distance state (from OSRM)
+  // Route profile & road distance state
+  const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
   const [roadDistanceKm, setRoadDistanceKm] = useState(0);
   const [roadDurationMin, setRoadDurationMin] = useState(0);
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
   const [loadingRoute, setLoadingRoute] = useState(false);
+
+  // Manual distance override
+  const [manualDistanceEnabled, setManualDistanceEnabled] = useState(false);
+  const [manualDistanceKm, setManualDistanceKm] = useState("");
 
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,17 +145,26 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
   const storeLng = storeLatLng?.[1] ?? restaurant?.longitude;
 
-  // Use road distance for cost; fallback to Haversine if OSRM failed
-  const distanceKm = roadDistanceKm > 0
+  // Distance logic: manual override > OSRM road > Haversine fallback
+  const autoDistanceKm = roadDistanceKm > 0
     ? roadDistanceKm
     : (deliveryLatLng && storeLat && storeLng ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1]) : 0);
+
+  const distanceKm = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
+    ? parseFloat(manualDistanceKm)
+    : autoDistanceKm;
+
   const deliveryCost = baseFee + feePerKm * distanceKm;
+
+  const distanceSource = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
+    ? "manual"
+    : roadDistanceKm > 0 ? "osrm" : (autoDistanceKm > 0 ? "haversine" : "none");
 
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
 
-  // Fetch OSRM route when both points are set
+  // Fetch OSRM route when both points are set or profile changes
   useEffect(() => {
     if (!storeLat || !storeLng || !deliveryLatLng) {
       setRoadDistanceKm(0);
@@ -152,14 +176,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     let cancelled = false;
     setLoadingRoute(true);
 
-    fetchOSRMRoute(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1]).then((result) => {
+    fetchOSRMRoute(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1], routeProfile).then((result) => {
       if (cancelled) return;
       if (result) {
         setRoadDistanceKm(result.distanceKm);
         setRoadDurationMin(result.durationMin);
         setRouteCoords(result.geometry);
       } else {
-        // Fallback — clear road data, Haversine will be used
         setRoadDistanceKm(0);
         setRoadDurationMin(0);
         setRouteCoords([]);
@@ -168,7 +191,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     });
 
     return () => { cancelled = true; };
-  }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1]]);
+  }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1], routeProfile]);
 
   const requestGPS = useCallback(() => {
     if (!navigator.geolocation) {
@@ -256,11 +279,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
     }).addTo(map);
 
     map.on("click", (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
       setDeliveryLatLng([lat, lng]);
+      setManualDistanceEnabled(false);
       fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
         .then(r => r.json())
         .then(data => {
@@ -291,7 +316,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     map.setView([storeLat, storeLng], map.getZoom());
   }, [storeLat, storeLng, restaurant?.name]);
 
-  // Update delivery marker + route line (now uses OSRM road geometry)
+  // Update delivery marker + route line
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -312,24 +337,28 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         .openPopup();
 
       if (storeLat && storeLng) {
-        // Use OSRM road geometry if available, otherwise straight line
         const lineCoords = routeCoords.length > 0
           ? routeCoords
           : [[storeLat, storeLng] as [number, number], deliveryLatLng];
 
+        const profileColors: Record<RouteProfile, string> = {
+          driving: "hsl(var(--primary))",
+          cycling: "#22c55e",
+          walking: "#f59e0b",
+        };
+
         routeLineRef.current = L.polyline(lineCoords, {
-          color: routeCoords.length > 0 ? "#3b82f6" : "#94a3b8",
-          weight: routeCoords.length > 0 ? 4 : 3,
+          color: routeCoords.length > 0 ? profileColors[routeProfile] : "#94a3b8",
+          weight: routeCoords.length > 0 ? 5 : 3,
           dashArray: routeCoords.length > 0 ? undefined : "8 4",
-          opacity: 0.8,
+          opacity: 0.85,
         }).addTo(map);
 
-        // Fit map to route bounds
         const bounds = routeLineRef.current.getBounds();
         map.fitBounds(bounds, { padding: [40, 40] });
       }
     }
-  }, [deliveryLatLng, storeLat, storeLng, routeCoords]);
+  }, [deliveryLatLng, storeLat, storeLng, routeCoords, routeProfile]);
 
   // Driver markers + nearest
   const [nearestDriverInfo, setNearestDriverInfo] = useState<{
@@ -377,6 +406,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const handleDeliveryAddressChange = (value: string) => {
     setCallForm(f => ({ ...f, delivery: value }));
+    setManualDistanceEnabled(false);
     geocodeDeliveryAddress(value);
   };
 
@@ -405,6 +435,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setRoadDistanceKm(0);
       setRoadDurationMin(0);
       setRouteCoords([]);
+      setManualDistanceEnabled(false);
+      setManualDistanceKm("");
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
@@ -441,13 +473,64 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <MapPin className="w-4 h-4" /> Mapa — Clique ou digite o endereço de entrega
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div ref={containerRef} style={{ width: "100%", height: 300, borderRadius: 8 }} />
-          <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+        <CardContent className="space-y-3">
+          <div ref={containerRef} style={{ width: "100%", height: 320, borderRadius: 8 }} className="border border-border" />
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">🔴 Sua loja</span>
             <span className="flex items-center gap-1">🟢 Ponto de entrega</span>
             <span className="flex items-center gap-1">🔵 Entregadores</span>
           </div>
+
+          {/* Route Profile Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Modo:</span>
+            {(Object.keys(PROFILE_CONFIG) as RouteProfile[]).map((p) => {
+              const config = PROFILE_CONFIG[p];
+              const Icon = config.icon;
+              const active = routeProfile === p;
+              return (
+                <Button
+                  key={p}
+                  variant={active ? "default" : "outline"}
+                  size="sm"
+                  className={`h-8 gap-1.5 text-xs ${active ? "" : "text-muted-foreground"}`}
+                  onClick={() => setRouteProfile(p)}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {config.label}
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* Route summary when route exists */}
+          {distanceKm > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+                <Route className="w-4 h-4 mx-auto mb-1 text-primary" />
+                <p className="text-sm font-bold">{distanceKm.toFixed(1)} km</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {distanceSource === "osrm" ? "Por rota" : distanceSource === "manual" ? "Manual" : "Aprox."}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+                <Clock className="w-4 h-4 mx-auto mb-1 text-primary" />
+                <p className="text-sm font-bold">
+                  {roadDurationMin > 0 ? `~${Math.round(roadDurationMin)} min` : "—"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Tempo estimado</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+                <DollarSign className="w-4 h-4 mx-auto mb-1 text-primary" />
+                <p className="text-sm font-bold">R$ {deliveryCost.toFixed(2).replace(".", ",")}</p>
+                <p className="text-[10px] text-muted-foreground">Custo total</p>
+              </div>
+            </div>
+          )}
+
+          {loadingRoute && (
+            <p className="text-xs text-muted-foreground animate-pulse text-center">🔄 Calculando rota...</p>
+          )}
         </CardContent>
       </Card>
 
@@ -535,6 +618,50 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <Textarea value={callForm.notes} onChange={(e) => setCallForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Detalhes da entrega..." />
           </div>
 
+          {/* Manual distance adjustment */}
+          {distanceKm > 0 && (
+            <div className="space-y-2">
+              {!manualDistanceEnabled ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-muted-foreground"
+                  onClick={() => {
+                    setManualDistanceEnabled(true);
+                    setManualDistanceKm(autoDistanceKm.toFixed(1));
+                  }}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Ajustar distância manualmente
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs whitespace-nowrap">Distância (km):</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={manualDistanceKm}
+                    onChange={(e) => setManualDistanceKm(e.target.value)}
+                    className="w-24 h-8 text-sm"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => {
+                      setManualDistanceEnabled(false);
+                      setManualDistanceKm("");
+                    }}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Usar automático
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {distanceKm > 0 && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
               <DollarSign className="w-5 h-5 text-primary" />
@@ -546,17 +673,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 <div className="flex items-center gap-2 mt-1">
                   <Route className="w-3 h-3 text-muted-foreground" />
                   <span className="text-[10px] text-muted-foreground">
-                    {roadDistanceKm > 0
-                      ? `Distância por rota • ETA: ~${Math.round(roadDurationMin)} min`
-                      : "Distância em linha reta (aproximada)"}
+                    {distanceSource === "osrm" && `Distância por rota (${PROFILE_CONFIG[routeProfile].label}) • ETA: ~${Math.round(roadDurationMin)} min`}
+                    {distanceSource === "manual" && "Distância ajustada manualmente"}
+                    {distanceSource === "haversine" && "Distância em linha reta (aproximada)"}
                   </span>
-                  {loadingRoute && <span className="text-[10px] text-muted-foreground animate-pulse">Calculando rota...</span>}
                 </div>
               </div>
             </div>
           )}
 
-          {distanceKm <= 0 && (
+          {distanceKm <= 0 && !loadingRoute && (
             <p className="text-xs text-muted-foreground text-center py-2">
               📍 Digite o endereço de entrega ou clique no mapa para calcular o valor automaticamente
             </p>
