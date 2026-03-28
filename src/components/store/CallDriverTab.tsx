@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -52,12 +52,36 @@ const driverMapIcon = new L.Icon({
   popupAnchor: [0, -14],
 });
 
+// Haversine as fallback only
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// OSRM route fetcher — returns road distance (km), duration (min), and route geometry
+async function fetchOSRMRoute(
+  fromLat: number, fromLng: number, toLat: number, toLng: number
+): Promise<{ distanceKm: number; durationMin: number; geometry: [number, number][] } | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code === "Ok" && data.routes?.[0]) {
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+      return {
+        distanceKm: route.distance / 1000,
+        durationMin: route.duration / 60,
+        geometry: coords,
+      };
+    }
+  } catch (err) {
+    console.error("OSRM route error:", err);
+  }
+  return null;
 }
 
 interface CallDriverTabProps {
@@ -78,6 +102,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [searchingAddress, setSearchingAddress] = useState(false);
   const { data: driverLocations = [] } = useDriverLocations();
 
+  // Road distance state (from OSRM)
+  const [roadDistanceKm, setRoadDistanceKm] = useState(0);
+  const [roadDurationMin, setRoadDurationMin] = useState(0);
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const storeMarkerRef = useRef<L.Marker | null>(null);
@@ -97,20 +127,49 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const baseFee = deliveryConfig?.base_fee ?? 5;
   const feePerKm = deliveryConfig?.fee_per_km ?? 1.5;
 
-  // Use GPS or restaurant coords for store location
   const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
   const storeLng = storeLatLng?.[1] ?? restaurant?.longitude;
 
-  const distanceKm = deliveryLatLng && storeLat && storeLng
-    ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1])
-    : 0;
+  // Use road distance for cost; fallback to Haversine if OSRM failed
+  const distanceKm = roadDistanceKm > 0
+    ? roadDistanceKm
+    : (deliveryLatLng && storeLat && storeLng ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1]) : 0);
   const deliveryCost = baseFee + feePerKm * distanceKm;
 
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Entregue", cancelled: "Cancelado",
   };
 
-  // Request GPS permission and get store location
+  // Fetch OSRM route when both points are set
+  useEffect(() => {
+    if (!storeLat || !storeLng || !deliveryLatLng) {
+      setRoadDistanceKm(0);
+      setRoadDurationMin(0);
+      setRouteCoords([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingRoute(true);
+
+    fetchOSRMRoute(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1]).then((result) => {
+      if (cancelled) return;
+      if (result) {
+        setRoadDistanceKm(result.distanceKm);
+        setRoadDurationMin(result.durationMin);
+        setRouteCoords(result.geometry);
+      } else {
+        // Fallback — clear road data, Haversine will be used
+        setRoadDistanceKm(0);
+        setRoadDurationMin(0);
+        setRouteCoords([]);
+      }
+      setLoadingRoute(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1]]);
+
   const requestGPS = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocalização não suportada neste navegador");
@@ -125,7 +184,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         setStoreLatLng([lat, lng]);
         setGpsStatus("granted");
         toast.success("📍 Localização obtida com sucesso!");
-        // Reverse geocode to fill pickup address
         fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
           .then(r => r.json())
           .then(data => {
@@ -148,7 +206,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     );
   }, []);
 
-  // Auto-request GPS on mount
   useEffect(() => {
     if (!storeLatLng && !restaurant?.latitude) {
       requestGPS();
@@ -158,7 +215,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   }, [restaurant?.latitude, restaurant?.longitude]);
 
-  // Geocode delivery address with debounce
   const geocodeDeliveryAddress = useCallback((address: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (address.trim().length < 5) return;
@@ -174,12 +230,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           const lat = parseFloat(data[0].lat);
           const lng = parseFloat(data[0].lon);
           setDeliveryLatLng([lat, lng]);
-          // Pan map to show both points
           if (mapRef.current && storeLat && storeLng) {
-            const bounds = L.latLngBounds([
-              [storeLat, storeLng],
-              [lat, lng],
-            ]);
+            const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
             mapRef.current.fitBounds(bounds, { padding: [40, 40] });
           }
         }
@@ -206,11 +258,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    // Click to set delivery point
     map.on("click", (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
       setDeliveryLatLng([lat, lng]);
-      // Reverse geocode to fill delivery address
       fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
         .then(r => r.json())
         .then(data => {
@@ -227,14 +277,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     };
   }, []);
 
-  // Update store marker when location changes
+  // Update store marker
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !storeLat || !storeLng) return;
 
-    if (storeMarkerRef.current) {
-      map.removeLayer(storeMarkerRef.current);
-    }
+    if (storeMarkerRef.current) map.removeLayer(storeMarkerRef.current);
 
     storeMarkerRef.current = L.marker([storeLat, storeLng], { icon: storeIcon })
       .addTo(map)
@@ -243,7 +291,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     map.setView([storeLat, storeLng], map.getZoom());
   }, [storeLat, storeLng, restaurant?.name]);
 
-  // Update delivery marker + route line
+  // Update delivery marker + route line (now uses OSRM road geometry)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -264,15 +312,26 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         .openPopup();
 
       if (storeLat && storeLng) {
-        routeLineRef.current = L.polyline(
-          [[storeLat, storeLng], deliveryLatLng],
-          { color: "#3b82f6", weight: 3, dashArray: "8 4", opacity: 0.7 }
-        ).addTo(map);
+        // Use OSRM road geometry if available, otherwise straight line
+        const lineCoords = routeCoords.length > 0
+          ? routeCoords
+          : [[storeLat, storeLng] as [number, number], deliveryLatLng];
+
+        routeLineRef.current = L.polyline(lineCoords, {
+          color: routeCoords.length > 0 ? "#3b82f6" : "#94a3b8",
+          weight: routeCoords.length > 0 ? 4 : 3,
+          dashArray: routeCoords.length > 0 ? undefined : "8 4",
+          opacity: 0.8,
+        }).addTo(map);
+
+        // Fit map to route bounds
+        const bounds = routeLineRef.current.getBounds();
+        map.fitBounds(bounds, { padding: [40, 40] });
       }
     }
-  }, [deliveryLatLng, storeLat, storeLng]);
+  }, [deliveryLatLng, storeLat, storeLng, routeCoords]);
 
-  // Update driver markers + compute nearest driver distance
+  // Driver markers + nearest
   const [nearestDriverInfo, setNearestDriverInfo] = useState<{
     distanceKm: number;
     etaMinutes: number;
@@ -284,13 +343,11 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove old driver markers
     driverMarkersRef.current.forEach(m => map.removeLayer(m));
     driverMarkersRef.current = [];
 
     let nearest: typeof nearestDriverInfo = null;
 
-    // Add new driver markers and find nearest
     driverLocations.forEach((d: any) => {
       const speedKmh = d.speed ? Math.round(d.speed * 3.6) : 0;
       const marker = L.marker([d.latitude, d.longitude], { icon: driverMapIcon })
@@ -298,11 +355,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         .bindPopup(`<b>🚴 Entregador</b><br/>${speedKmh > 0 ? `${speedKmh} km/h` : "Parado"}`);
       driverMarkersRef.current.push(marker);
 
-      // Calculate distance from driver to store
       if (storeLat && storeLng) {
         const dist = haversineKm(storeLat, storeLng, d.latitude, d.longitude);
-        const avgSpeed = speedKmh > 3 ? speedKmh : 25; // fallback 25 km/h
-        const eta = (dist / avgSpeed) * 60; // minutes
+        const avgSpeed = speedKmh > 3 ? speedKmh : 25;
+        const eta = (dist / avgSpeed) * 60;
         if (!nearest || dist < nearest.distanceKm) {
           nearest = { distanceKm: dist, etaMinutes: eta, speedKmh };
         }
@@ -311,7 +367,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     setNearestDriverInfo(nearest);
 
-    // Proximity alert: driver within 500m
     if (nearest && nearest.distanceKm <= 0.5 && !proximityAlertRef.current) {
       proximityAlertRef.current = true;
       toast.info("🚴 Entregador está a menos de 500m!", { duration: 5000 });
@@ -347,6 +402,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
       setCallForm({ pickup: "", delivery: "", notes: "" });
       setDeliveryLatLng(null);
+      setRoadDistanceKm(0);
+      setRoadDurationMin(0);
+      setRouteCoords([]);
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
@@ -480,11 +538,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           {distanceKm > 0 && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
               <DollarSign className="w-5 h-5 text-primary" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
                 <p className="text-xs text-muted-foreground">
                   Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")} = R$ {(feePerKm * distanceKm).toFixed(2).replace(".", ",")}
                 </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Route className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground">
+                    {roadDistanceKm > 0
+                      ? `Distância por rota • ETA: ~${Math.round(roadDurationMin)} min`
+                      : "Distância em linha reta (aproximada)"}
+                  </span>
+                  {loadingRoute && <span className="text-[10px] text-muted-foreground animate-pulse">Calculando rota...</span>}
+                </div>
               </div>
             </div>
           )}
@@ -495,8 +562,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             </p>
           )}
 
-          <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0} className="w-full">
-            {calling ? "Chamando..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
+          <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0 || loadingRoute} className="w-full">
+            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
           </Button>
         </CardContent>
       </Card>
