@@ -109,8 +109,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
   const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const { data: driverLocations = [] } = useDriverLocations();
+  const gpsWatchRef = useRef<number | null>(null);
 
   // Route profile & road distance state
   const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
@@ -193,28 +195,42 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return () => { cancelled = true; };
   }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1], routeProfile]);
 
-  const requestGPS = useCallback(() => {
+  const reverseGeocode = useCallback((lat: number, lng: number) => {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.display_name) {
+          setCallForm(f => ({ ...f, pickup: data.display_name }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const startGPSWatch = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocalização não suportada neste navegador");
       setGpsStatus("denied");
       return;
     }
+    if (gpsWatchRef.current !== null) return; // already watching
+
     setGpsStatus("requesting");
-    navigator.geolocation.getCurrentPosition(
+
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
+        const acc = pos.coords.accuracy;
+        const prev = storeLatLng;
+
+        setGpsAccuracy(acc);
         setStoreLatLng([lat, lng]);
         setGpsStatus("granted");
-        toast.success("📍 Localização obtida com sucesso!");
-        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
-          .then(r => r.json())
-          .then(data => {
-            if (data?.display_name) {
-              setCallForm(f => ({ ...f, pickup: data.display_name }));
-            }
-          })
-          .catch(() => {});
+
+        // Only reverse-geocode if position changed significantly (>50m) or first time
+        if (!prev || haversineKm(prev[0], prev[1], lat, lng) > 0.05) {
+          reverseGeocode(lat, lng);
+        }
       },
       (err) => {
         console.error("GPS error:", err);
@@ -225,18 +241,43 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           toast.error("Não foi possível obter sua localização");
         }
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
+
+    gpsWatchRef.current = watchId;
+  }, [reverseGeocode, storeLatLng]);
+
+  const stopGPSWatch = useCallback(() => {
+    if (gpsWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(gpsWatchRef.current);
+      gpsWatchRef.current = null;
+    }
   }, []);
 
+  // Auto-start GPS or use restaurant coords
   useEffect(() => {
-    if (!storeLatLng && !restaurant?.latitude) {
-      requestGPS();
-    } else if (restaurant?.latitude && restaurant?.longitude && !storeLatLng) {
+    if (restaurant?.latitude && restaurant?.longitude) {
       setStoreLatLng([restaurant.latitude, restaurant.longitude]);
       setGpsStatus("granted");
+      if (restaurant.address) {
+        setCallForm(f => ({ ...f, pickup: restaurant.address }));
+      } else {
+        reverseGeocode(restaurant.latitude, restaurant.longitude);
+      }
+    } else {
+      startGPSWatch();
     }
+
+    return () => stopGPSWatch();
   }, [restaurant?.latitude, restaurant?.longitude]);
+
+  // Request GPS manually (button)
+  const requestGPS = useCallback(() => {
+    stopGPSWatch();
+    gpsWatchRef.current = null;
+    startGPSWatch();
+    toast.info("📡 Buscando localização em tempo real...");
+  }, [startGPSWatch, stopGPSWatch]);
 
   const geocodeDeliveryAddress = useCallback((address: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -448,7 +489,25 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   return (
     <div className="space-y-4">
-      {/* GPS Permission */}
+      {/* GPS Status Bar */}
+      {gpsStatus === "granted" && gpsAccuracy !== null && (
+        <Card className={`border ${gpsAccuracy <= 15 ? "border-green-500/40 bg-green-500/5" : gpsAccuracy <= 50 ? "border-yellow-500/40 bg-yellow-500/5" : "border-orange-500/40 bg-orange-500/5"}`}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <Navigation className={`w-4 h-4 ${gpsAccuracy <= 15 ? "text-green-500" : gpsAccuracy <= 50 ? "text-yellow-500" : "text-orange-500"}`} />
+            <div className="flex-1">
+              <p className="text-xs font-medium">
+                📍 Localização ativa — Precisão: {Math.round(gpsAccuracy)}m
+                {gpsAccuracy <= 15 ? " (Excelente)" : gpsAccuracy <= 50 ? " (Boa)" : " (Baixa)"}
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={requestGPS}>
+              <RotateCcw className="w-3 h-3 mr-1" /> Atualizar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* GPS Permission — only when not granted */}
       {gpsStatus !== "granted" && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex items-center gap-3">
@@ -456,7 +515,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <div className="flex-1">
               <p className="text-sm font-medium">Permitir localização</p>
               <p className="text-xs text-muted-foreground">
-                Ative o GPS para localizar sua loja automaticamente e calcular distâncias
+                Ative o GPS para localizar sua loja automaticamente
               </p>
             </div>
             <Button size="sm" onClick={requestGPS} disabled={gpsStatus === "requesting"}>
@@ -575,25 +634,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Auto-detected pickup address (read-only) */}
           <div className="space-y-2">
-            <Label>Endereço de coleta *</Label>
+            <Label className="flex items-center gap-1.5">
+              <Navigation className="w-3.5 h-3.5 text-green-500" />
+              Endereço de coleta (automático)
+            </Label>
             <div className="flex gap-2">
               <Input
                 value={callForm.pickup}
-                onChange={(e) => setCallForm(f => ({ ...f, pickup: e.target.value }))}
-                placeholder={restaurant?.address || "Endereço da loja"}
-                className="flex-1"
+                readOnly
+                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Aguardando GPS..."}
+                className="flex-1 bg-muted/30 cursor-default"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 onClick={requestGPS}
-                title="Usar minha localização"
+                title="Atualizar localização"
               >
                 <Navigation className="w-4 h-4" />
               </Button>
             </div>
+            {callForm.pickup && (
+              <p className="text-[10px] text-green-600 dark:text-green-400">✓ Localização detectada automaticamente</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Endereço de entrega *</Label>
