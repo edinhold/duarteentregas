@@ -195,16 +195,37 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return () => { cancelled = true; };
   }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1], routeProfile]);
 
+  const formatAddress = useCallback((data: any): string => {
+    if (!data?.address) return data?.display_name ?? "";
+    const a = data.address;
+    const parts: string[] = [];
+    // Street + number
+    const road = a.road || a.pedestrian || a.footway || a.street || "";
+    if (road) {
+      parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
+    }
+    // Neighborhood
+    const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
+    if (neighborhood) parts.push(neighborhood);
+    // City
+    const city = a.city || a.town || a.village || a.municipality || "";
+    if (city) parts.push(city);
+    // State
+    if (a.state) parts.push(a.state);
+    return parts.length > 0 ? parts.join(", ") : data.display_name;
+  }, []);
+
   const reverseGeocode = useCallback((lat: number, lng: number) => {
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
       .then(r => r.json())
       .then(data => {
-        if (data?.display_name) {
-          setCallForm(f => ({ ...f, pickup: data.display_name }));
+        if (data) {
+          const formatted = formatAddress(data);
+          setCallForm(f => ({ ...f, pickup: formatted }));
         }
       })
       .catch(() => {});
-  }, []);
+  }, [formatAddress]);
 
   const startGPSWatch = useCallback(() => {
     if (!navigator.geolocation) {
