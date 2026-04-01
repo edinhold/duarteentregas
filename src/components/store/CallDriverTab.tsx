@@ -307,14 +307,38 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=br`
-        );
+        // Build search URL with geographic bias from store location
+        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
+        
+        // Add viewbox bias centered on store location (±0.15° ≈ 15km radius)
+        if (storeLat && storeLng) {
+          const delta = 0.15;
+          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=0`;
+        }
+        
+        const res = await fetch(searchUrl);
         const data = await res.json();
         if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lng = parseFloat(data[0].lon);
+          // Pick the closest result to the store when multiple results exist
+          let best = data[0];
+          if (data.length > 1 && storeLat && storeLng) {
+            let bestDist = Infinity;
+            for (const item of data) {
+              const d = haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon));
+              if (d < bestDist) {
+                bestDist = d;
+                best = item;
+              }
+            }
+          }
+          const lat = parseFloat(best.lat);
+          const lng = parseFloat(best.lon);
           setDeliveryLatLng([lat, lng]);
+          
+          // Update delivery address with formatted result
+          const formatted = formatAddress(best);
+          setCallForm(f => ({ ...f, delivery: formatted }));
+          
           if (mapRef.current && storeLat && storeLng) {
             const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
             mapRef.current.fitBounds(bounds, { padding: [40, 40] });
