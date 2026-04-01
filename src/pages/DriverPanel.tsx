@@ -529,9 +529,18 @@ const DriverPanel = () => {
 
               <div className="flex gap-2">
                 {activeRequest.status === "accepted" && (
-                  <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
-                    📦 Coletei
-                  </Button>
+                  <>
+                    <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
+                      📦 Coletei
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setCancelRequestId(activeRequest.id)}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" /> Cancelar
+                    </Button>
+                  </>
                 )}
                 {activeRequest.status === "picked_up" && (
                   <Button onClick={() => updateStatus(activeRequest.id, "delivered")} className="flex-1" size="sm">
