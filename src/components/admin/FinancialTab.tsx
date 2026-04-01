@@ -182,10 +182,10 @@ const FinancialTab = () => {
 
       const promises: Promise<any>[] = [];
       if (earningIds.length > 0) {
-        promises.push(supabase.from("driver_earnings").delete().in("id", earningIds));
+        promises.push(supabase.from("driver_earnings").delete().in("id", earningIds).then());
       }
       if (withdrawalIds.length > 0) {
-        promises.push(supabase.from("withdrawal_requests").delete().in("id", withdrawalIds));
+        promises.push(supabase.from("withdrawal_requests").delete().in("id", withdrawalIds).then());
       }
 
       const results = await Promise.all(promises);
