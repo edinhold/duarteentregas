@@ -42,13 +42,27 @@ const FeesConfigTab = () => {
     if (!config) return;
     setLoading(true);
     try {
+      const baseFeeVal = Math.max(0, parseFloat(form.base_fee) || 0);
+      const feePerKmVal = Math.max(0, parseFloat(form.fee_per_km) || 0);
+      const minKmVal = Math.max(0, parseFloat(form.min_km) || 0);
+      const maxKmVal = Math.max(0, parseFloat(form.max_km) || 0);
+      
+      if (maxKmVal > 0 && minKmVal > maxKmVal) {
+        toast.error("Km mínimo não pode ser maior que o máximo");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.from("delivery_config").update({
-        base_fee: parseFloat(form.base_fee) || 0,
-        fee_per_km: parseFloat(form.fee_per_km) || 0,
+        base_fee: baseFeeVal,
+        fee_per_km: feePerKmVal,
         early_withdrawal_fee_percent: parseFloat(form.early_withdrawal_fee_percent) || 10,
         app_fee_per_delivery: parseFloat(form.app_fee_per_delivery) || 2,
         whatsapp_number: form.whatsapp_number.trim(),
         recharge_url: form.recharge_url.trim(),
+        min_km: minKmVal,
+        max_km: maxKmVal,
+        round_km_up: form.round_km_up,
       } as any).eq("id", config.id);
       if (error) throw error;
       toast.success("Configuração salva!");
