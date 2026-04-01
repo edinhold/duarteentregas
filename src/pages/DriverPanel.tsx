@@ -336,6 +336,25 @@ const DriverPanel = () => {
     }
   };
 
+  const cancelRequest = async (requestId: string) => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase.from("delivery_requests").update({
+        driver_id: null,
+        status: "pending",
+      } as any).eq("id", requestId);
+      if (error) throw error;
+      toast.success("Entrega cancelada e devolvida para disponíveis");
+      queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cancelar");
+    } finally {
+      setCancelling(false);
+      setCancelRequestId(null);
+    }
+  };
+
   const mapMarkers = pendingRequests
     .filter((r: any) => r.restaurants?.latitude && r.restaurants?.longitude)
     .map((r: any) => ({
