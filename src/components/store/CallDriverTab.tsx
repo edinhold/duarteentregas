@@ -262,7 +262,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           toast.error("Não foi possível obter sua localização");
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 1000 }
     );
 
     gpsWatchRef.current = watchId;
