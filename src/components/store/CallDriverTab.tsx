@@ -111,6 +111,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [searchingAddress, setSearchingAddress] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const { data: driverLocations = [] } = useDriverLocations();
   const gpsWatchRef = useRef<number | null>(null);
 
