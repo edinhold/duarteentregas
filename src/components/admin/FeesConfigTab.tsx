@@ -31,6 +31,9 @@ const FeesConfigTab = () => {
         app_fee_per_delivery: String((config as any).app_fee_per_delivery ?? 2),
         whatsapp_number: (config as any).whatsapp_number || "",
         recharge_url: (config as any).recharge_url || "",
+        min_km: String((config as any).min_km ?? 0),
+        max_km: String((config as any).max_km ?? 0),
+        round_km_up: !!(config as any).round_km_up,
       });
     }
   }, [config]);
