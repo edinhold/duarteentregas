@@ -372,11 +372,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       const { lat, lng } = e.latlng;
       setDeliveryLatLng([lat, lng]);
       setManualDistanceEnabled(false);
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`)
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
         .then(r => r.json())
         .then(data => {
-          if (data?.display_name) {
-            setCallForm(f => ({ ...f, delivery: data.display_name }));
+          if (data) {
+            const formatted = formatAddress(data);
+            setCallForm(f => ({ ...f, delivery: formatted }));
           }
         })
         .catch(() => {});
