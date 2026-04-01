@@ -111,6 +111,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [searchingAddress, setSearchingAddress] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const { data: driverLocations = [] } = useDriverLocations();
   const gpsWatchRef = useRef<number | null>(null);
 
@@ -312,15 +315,17 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const geocodeDeliveryAddress = useCallback((address: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (address.trim().length < 5) return;
+    if (address.trim().length < 5) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        // Build search URL with geographic bias from store location
         let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
         
-        // Add viewbox bias centered on store location (±0.15° ≈ 15km radius)
         if (storeLat && storeLng) {
           const delta = 0.15;
           searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=0`;
@@ -329,30 +334,19 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         const res = await fetch(searchUrl);
         const data = await res.json();
         if (data && data.length > 0) {
-          // Pick the closest result to the store when multiple results exist
-          let best = data[0];
-          if (data.length > 1 && storeLat && storeLng) {
-            let bestDist = Infinity;
-            for (const item of data) {
-              const d = haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon));
-              if (d < bestDist) {
-                bestDist = d;
-                best = item;
-              }
-            }
+          // Sort by proximity to store
+          if (storeLat && storeLng) {
+            data.sort((a: any, b: any) => {
+              const da = haversineKm(storeLat, storeLng, parseFloat(a.lat), parseFloat(a.lon));
+              const db = haversineKm(storeLat, storeLng, parseFloat(b.lat), parseFloat(b.lon));
+              return da - db;
+            });
           }
-          const lat = parseFloat(best.lat);
-          const lng = parseFloat(best.lon);
-          setDeliveryLatLng([lat, lng]);
-          
-          // Update delivery address with formatted result
-          const formatted = formatAddress(best);
-          setCallForm(f => ({ ...f, delivery: formatted }));
-          
-          if (mapRef.current && storeLat && storeLng) {
-            const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
-            mapRef.current.fitBounds(bounds, { padding: [40, 40] });
-          }
+          setAddressSuggestions(data);
+          setShowSuggestions(true);
+        } else {
+          setAddressSuggestions([]);
+          setShowSuggestions(false);
         }
       } catch (err) {
         console.error("Geocode error:", err);
@@ -361,6 +355,33 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       }
     }, 800);
   }, [storeLat, storeLng]);
+
+  const selectSuggestion = useCallback((item: any) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    setDeliveryLatLng([lat, lng]);
+    const formatted = formatAddress(item);
+    setCallForm(f => ({ ...f, delivery: formatted }));
+    setAddressSuggestions([]);
+    setShowSuggestions(false);
+    setManualDistanceEnabled(false);
+
+    if (mapRef.current && storeLat && storeLng) {
+      const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
+      mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [storeLat, storeLng, formatAddress]);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -428,10 +449,28 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
 
     if (deliveryLatLng) {
-      deliveryMarkerRef.current = L.marker(deliveryLatLng, { icon: deliveryIcon })
+      deliveryMarkerRef.current = L.marker(deliveryLatLng, { icon: deliveryIcon, draggable: true })
         .addTo(map)
-        .bindPopup("<b>📍 Ponto de Entrega</b>")
+        .bindPopup("<b>📍 Ponto de Entrega</b><br><small>Arraste para ajustar</small>")
         .openPopup();
+
+      // Reverse geocode on drag end
+      deliveryMarkerRef.current.on("dragend", () => {
+        const pos = deliveryMarkerRef.current?.getLatLng();
+        if (pos) {
+          setDeliveryLatLng([pos.lat, pos.lng]);
+          setManualDistanceEnabled(false);
+          fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
+            .then(r => r.json())
+            .then(data => {
+              if (data) {
+                const formatted = formatAddress(data);
+                setCallForm(f => ({ ...f, delivery: formatted }));
+              }
+            })
+            .catch(() => {});
+        }
+      });
 
       if (storeLat && storeLng) {
         const lineCoords = routeCoords.length > 0
@@ -505,6 +544,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     setCallForm(f => ({ ...f, delivery: value }));
     setManualDistanceEnabled(false);
     geocodeDeliveryAddress(value);
+    if (value.trim().length < 5) {
+      setShowSuggestions(false);
+    }
   };
 
   const handleCallDriver = async () => {
@@ -719,10 +761,11 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           </div>
           <div className="space-y-2">
             <Label>Endereço de entrega *</Label>
-            <div className="relative">
+            <div className="relative" ref={suggestionsRef}>
               <Input
                 value={callForm.delivery}
                 onChange={(e) => handleDeliveryAddressChange(e.target.value)}
+                onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
                 placeholder="Digite o endereço do cliente..."
               />
               {searchingAddress && (
@@ -730,9 +773,35 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                   <Search className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               )}
+              {/* Autocomplete dropdown */}
+              {showSuggestions && addressSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                  {addressSuggestions.map((item: any, idx: number) => {
+                    const formatted = formatAddress(item);
+                    const dist = storeLat && storeLng
+                      ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
+                      : null;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
+                        onClick={() => selectSuggestion(item)}
+                      >
+                        <p className="text-sm font-medium leading-tight">{formatted}</p>
+                        {dist !== null && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
-              📍 Digite o endereço ou clique no mapa para localizar automaticamente
+              📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
             </p>
           </div>
           <div className="space-y-2">
