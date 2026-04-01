@@ -544,6 +544,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     setCallForm(f => ({ ...f, delivery: value }));
     setManualDistanceEnabled(false);
     geocodeDeliveryAddress(value);
+    if (value.trim().length < 5) {
+      setShowSuggestions(false);
+    }
   };
 
   const handleCallDriver = async () => {
