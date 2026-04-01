@@ -287,7 +287,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
                   const lng = parseFloat(form.longitude);
                   if (!isNaN(lat) && !isNaN(lng)) updateMarkerPosition(lat, lng);
                 }}
-                placeholder="-23.5505"
+                placeholder="-15.5454"
                 className="text-xs"
               />
             </div>
