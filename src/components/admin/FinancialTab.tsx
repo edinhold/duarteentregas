@@ -180,12 +180,16 @@ const FinancialTab = () => {
       const earningIds = Array.from(selectedEarnings);
       const withdrawalIds = Array.from(selectedWithdrawals);
 
-      const promises: Promise<any>[] = [];
+      const promises: Array<Promise<any>> = [];
       if (earningIds.length > 0) {
-        promises.push(supabase.from("driver_earnings").delete().in("id", earningIds).then());
+        promises.push(
+          supabase.from("driver_earnings").delete().in("id", earningIds).then(res => { if (res.error) throw res.error; })
+        );
       }
       if (withdrawalIds.length > 0) {
-        promises.push(supabase.from("withdrawal_requests").delete().in("id", withdrawalIds).then());
+        promises.push(
+          supabase.from("withdrawal_requests").delete().in("id", withdrawalIds).then(res => { if (res.error) throw res.error; })
+        );
       }
 
       const results = await Promise.all(promises);
