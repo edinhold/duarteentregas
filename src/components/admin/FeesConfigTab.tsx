@@ -11,7 +11,7 @@ import { Settings, MessageCircle } from "lucide-react";
 const FeesConfigTab = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", app_fee_per_delivery: "2", whatsapp_number: "", recharge_url: "" });
+  const [form, setForm] = useState({ base_fee: "5", fee_per_km: "1.5", early_withdrawal_fee_percent: "10", app_fee_per_delivery: "2", whatsapp_number: "", recharge_url: "", min_km: "0", max_km: "0", round_km_up: false });
 
   const { data: config } = useQuery({
     queryKey: ["delivery-config"],
