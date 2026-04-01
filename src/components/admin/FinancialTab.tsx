@@ -180,21 +180,13 @@ const FinancialTab = () => {
       const earningIds = Array.from(selectedEarnings);
       const withdrawalIds = Array.from(selectedWithdrawals);
 
-      const promises: Array<Promise<any>> = [];
       if (earningIds.length > 0) {
-        promises.push(
-          supabase.from("driver_earnings").delete().in("id", earningIds).then(res => { if (res.error) throw res.error; })
-        );
+        const { error } = await supabase.from("driver_earnings").delete().in("id", earningIds);
+        if (error) throw error;
       }
       if (withdrawalIds.length > 0) {
-        promises.push(
-          supabase.from("withdrawal_requests").delete().in("id", withdrawalIds).then(res => { if (res.error) throw res.error; })
-        );
-      }
-
-      const results = await Promise.all(promises);
-      for (const r of results) {
-        if (r.error) throw r.error;
+        const { error } = await supabase.from("withdrawal_requests").delete().in("id", withdrawalIds);
+        if (error) throw error;
       }
 
       toast.success(`${totalSelected} registro(s) excluído(s) com sucesso!`);
