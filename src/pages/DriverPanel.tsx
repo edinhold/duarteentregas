@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode } from "@/lib/notificationSound";
@@ -28,6 +29,8 @@ const DriverPanel = () => {
   const [pixKeyType, setPixKeyType] = useState("cpf");
   const [savingPix, setSavingPix] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Get driver profile
   const { data: driverProfile } = useQuery({
@@ -333,6 +336,25 @@ const DriverPanel = () => {
     }
   };
 
+  const cancelRequest = async (requestId: string) => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase.from("delivery_requests").update({
+        driver_id: null,
+        status: "pending",
+      } as any).eq("id", requestId);
+      if (error) throw error;
+      toast.success("Entrega cancelada e devolvida para disponíveis");
+      queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cancelar");
+    } finally {
+      setCancelling(false);
+      setCancelRequestId(null);
+    }
+  };
+
   const mapMarkers = pendingRequests
     .filter((r: any) => r.restaurants?.latitude && r.restaurants?.longitude)
     .map((r: any) => ({
@@ -507,9 +529,18 @@ const DriverPanel = () => {
 
               <div className="flex gap-2">
                 {activeRequest.status === "accepted" && (
-                  <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
-                    📦 Coletei
-                  </Button>
+                  <>
+                    <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
+                      📦 Coletei
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setCancelRequestId(activeRequest.id)}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" /> Cancelar
+                    </Button>
+                  </>
                 )}
                 {activeRequest.status === "picked_up" && (
                   <Button onClick={() => updateStatus(activeRequest.id, "delivered")} className="flex-1" size="sm">
@@ -604,6 +635,27 @@ const DriverPanel = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      <AlertDialog open={!!cancelRequestId} onOpenChange={(open) => !open && setCancelRequestId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar entrega?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O pedido voltará para a lista de entregas disponíveis e outro motorista poderá aceitá-lo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelRequestId && cancelRequest(cancelRequestId)}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling ? "Cancelando..." : "Sim, cancelar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
