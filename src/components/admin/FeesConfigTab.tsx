@@ -93,6 +93,29 @@ const FeesConfigTab = () => {
           <Input type="number" step="0.1" value={form.fee_per_km} onChange={(e) => setForm(f => ({ ...f, fee_per_km: e.target.value }))} />
           <p className="text-xs text-muted-foreground">Valor adicional por quilômetro percorrido</p>
         </div>
+        <div className="border-t pt-4 mt-4 space-y-2">
+          <Label className="flex items-center gap-2"><Ruler className="w-4 h-4" /> Regras de Quilometragem</Label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Km mínimo</Label>
+            <Input type="number" step="0.5" min="0" value={form.min_km} onChange={(e) => setForm(f => ({ ...f, min_km: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">0 = sem mínimo</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Km máximo</Label>
+            <Input type="number" step="0.5" min="0" value={form.max_km} onChange={(e) => setForm(f => ({ ...f, max_km: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">0 = sem limite</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Arredondar km para cima</Label>
+            <p className="text-xs text-muted-foreground">Cobrar apenas quilômetros cheios (ex: 3.2km → 4km)</p>
+          </div>
+          <Switch checked={form.round_km_up} onCheckedChange={(v) => setForm(f => ({ ...f, round_km_up: v }))} />
+        </div>
+        </div>
         <div className="space-y-2">
           <Label>Taxa do app por corrida (%)</Label>
           <Input type="number" step="1" min="0" max="100" value={form.app_fee_per_delivery} onChange={(e) => setForm(f => ({ ...f, app_fee_per_delivery: e.target.value }))} />
