@@ -389,7 +389,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     const center: [number, number] = storeLat && storeLng
       ? [storeLat, storeLng]
-      : [-23.5505, -46.6333];
+      : [-15.5454, -54.2958];
 
     const map = L.map(containerRef.current).setView(center, 14);
     mapRef.current = map;

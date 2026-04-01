@@ -117,8 +117,8 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const lat = parseFloat(form.latitude) || -23.5505;
-    const lng = parseFloat(form.longitude) || -46.6333;
+    const lat = parseFloat(form.latitude) || -15.5454;
+    const lng = parseFloat(form.longitude) || -54.2958;
 
     const map = L.map(mapContainerRef.current).setView([lat, lng], form.latitude ? 17 : 12);
     mapRef.current = map;
@@ -287,7 +287,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
                   const lng = parseFloat(form.longitude);
                   if (!isNaN(lat) && !isNaN(lng)) updateMarkerPosition(lat, lng);
                 }}
-                placeholder="-23.5505"
+                placeholder="-15.5454"
                 className="text-xs"
               />
             </div>
