@@ -115,7 +115,6 @@ const FeesConfigTab = () => {
           </div>
           <Switch checked={form.round_km_up} onCheckedChange={(v) => setForm(f => ({ ...f, round_km_up: v }))} />
         </div>
-        </div>
         <div className="space-y-2">
           <Label>Taxa do app por corrida (%)</Label>
           <Input type="number" step="1" min="0" max="100" value={form.app_fee_per_delivery} onChange={(e) => setForm(f => ({ ...f, app_fee_per_delivery: e.target.value }))} />
