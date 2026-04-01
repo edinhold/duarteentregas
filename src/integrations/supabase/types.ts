@@ -147,9 +147,12 @@ export type Database = {
           early_withdrawal_fee_percent: number
           fee_per_km: number
           id: string
+          max_km: number
+          min_km: number
           payment_day: number
           promo_credit_percent: number
           recharge_url: string | null
+          round_km_up: boolean
           updated_at: string
           whatsapp_number: string | null
         }
@@ -160,9 +163,12 @@ export type Database = {
           early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
+          max_km?: number
+          min_km?: number
           payment_day?: number
           promo_credit_percent?: number
           recharge_url?: string | null
+          round_km_up?: boolean
           updated_at?: string
           whatsapp_number?: string | null
         }
@@ -173,9 +179,12 @@ export type Database = {
           early_withdrawal_fee_percent?: number
           fee_per_km?: number
           id?: string
+          max_km?: number
+          min_km?: number
           payment_day?: number
           promo_credit_percent?: number
           recharge_url?: string | null
+          round_km_up?: boolean
           updated_at?: string
           whatsapp_number?: string | null
         }
