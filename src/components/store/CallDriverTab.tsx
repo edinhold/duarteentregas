@@ -449,10 +449,28 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
 
     if (deliveryLatLng) {
-      deliveryMarkerRef.current = L.marker(deliveryLatLng, { icon: deliveryIcon })
+      deliveryMarkerRef.current = L.marker(deliveryLatLng, { icon: deliveryIcon, draggable: true })
         .addTo(map)
-        .bindPopup("<b>📍 Ponto de Entrega</b>")
+        .bindPopup("<b>📍 Ponto de Entrega</b><br><small>Arraste para ajustar</small>")
         .openPopup();
+
+      // Reverse geocode on drag end
+      deliveryMarkerRef.current.on("dragend", () => {
+        const pos = deliveryMarkerRef.current?.getLatLng();
+        if (pos) {
+          setDeliveryLatLng([pos.lat, pos.lng]);
+          setManualDistanceEnabled(false);
+          fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
+            .then(r => r.json())
+            .then(data => {
+              if (data) {
+                const formatted = formatAddress(data);
+                setCallForm(f => ({ ...f, delivery: formatted }));
+              }
+            })
+            .catch(() => {});
+        }
+      });
 
       if (storeLat && storeLng) {
         const lineCoords = routeCoords.length > 0
