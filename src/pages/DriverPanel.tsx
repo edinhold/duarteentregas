@@ -29,6 +29,8 @@ const DriverPanel = () => {
   const [pixKeyType, setPixKeyType] = useState("cpf");
   const [savingPix, setSavingPix] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Get driver profile
   const { data: driverProfile } = useQuery({
