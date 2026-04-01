@@ -315,15 +315,17 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const geocodeDeliveryAddress = useCallback((address: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (address.trim().length < 5) return;
+    if (address.trim().length < 5) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        // Build search URL with geographic bias from store location
         let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
         
-        // Add viewbox bias centered on store location (±0.15° ≈ 15km radius)
         if (storeLat && storeLng) {
           const delta = 0.15;
           searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=0`;
@@ -332,30 +334,19 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         const res = await fetch(searchUrl);
         const data = await res.json();
         if (data && data.length > 0) {
-          // Pick the closest result to the store when multiple results exist
-          let best = data[0];
-          if (data.length > 1 && storeLat && storeLng) {
-            let bestDist = Infinity;
-            for (const item of data) {
-              const d = haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon));
-              if (d < bestDist) {
-                bestDist = d;
-                best = item;
-              }
-            }
+          // Sort by proximity to store
+          if (storeLat && storeLng) {
+            data.sort((a: any, b: any) => {
+              const da = haversineKm(storeLat, storeLng, parseFloat(a.lat), parseFloat(a.lon));
+              const db = haversineKm(storeLat, storeLng, parseFloat(b.lat), parseFloat(b.lon));
+              return da - db;
+            });
           }
-          const lat = parseFloat(best.lat);
-          const lng = parseFloat(best.lon);
-          setDeliveryLatLng([lat, lng]);
-          
-          // Update delivery address with formatted result
-          const formatted = formatAddress(best);
-          setCallForm(f => ({ ...f, delivery: formatted }));
-          
-          if (mapRef.current && storeLat && storeLng) {
-            const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
-            mapRef.current.fitBounds(bounds, { padding: [40, 40] });
-          }
+          setAddressSuggestions(data);
+          setShowSuggestions(true);
+        } else {
+          setAddressSuggestions([]);
+          setShowSuggestions(false);
         }
       } catch (err) {
         console.error("Geocode error:", err);
@@ -364,6 +355,33 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       }
     }, 800);
   }, [storeLat, storeLng]);
+
+  const selectSuggestion = useCallback((item: any) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    setDeliveryLatLng([lat, lng]);
+    const formatted = formatAddress(item);
+    setCallForm(f => ({ ...f, delivery: formatted }));
+    setAddressSuggestions([]);
+    setShowSuggestions(false);
+    setManualDistanceEnabled(false);
+
+    if (mapRef.current && storeLat && storeLng) {
+      const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
+      mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [storeLat, storeLng, formatAddress]);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Initialize map
   useEffect(() => {
