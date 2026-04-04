@@ -82,6 +82,23 @@ const DriverPanel = () => {
     enabled: !!user,
   });
 
+  // Get my completed (delivered) requests
+  const { data: completedRequests = [] } = useQuery({
+    queryKey: ["driver-completed-requests", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_requests")
+        .select("*, restaurants(name, address, logo, latitude, longitude)")
+        .eq("driver_id", user!.id)
+        .eq("status", "delivered")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const activeRequest = myRequests[0];
 
   // Chat messages
