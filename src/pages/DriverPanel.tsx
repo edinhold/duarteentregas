@@ -199,6 +199,7 @@ const DriverPanel = () => {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
         queryClient.invalidateQueries({ queryKey: ["driver-my-requests", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["driver-completed-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_earnings" }, () => {
