@@ -82,6 +82,23 @@ const DriverPanel = () => {
     enabled: !!user,
   });
 
+  // Get my completed (delivered) requests
+  const { data: completedRequests = [] } = useQuery({
+    queryKey: ["driver-completed-requests", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_requests")
+        .select("*, restaurants(name, address, logo, latitude, longitude)")
+        .eq("driver_id", user!.id)
+        .eq("status", "delivered")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const activeRequest = myRequests[0];
 
   // Chat messages
@@ -182,6 +199,7 @@ const DriverPanel = () => {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
         queryClient.invalidateQueries({ queryKey: ["driver-my-requests", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["driver-completed-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_earnings" }, () => {
@@ -600,6 +618,36 @@ const DriverPanel = () => {
           </Card>
         )}
 
+        {/* Completed deliveries */}
+        {completedRequests.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-500" /> Entregas Finalizadas ({completedRequests.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {completedRequests.map((r: any) => (
+                  <div key={r.id} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm">{r.restaurants?.name || "Loja"}</p>
+                      <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
+                      {r.notes && <p className="text-xs">📝 {r.notes}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(r.updated_at).toLocaleDateString("pt-BR")} às {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                      ✅ Finalizado
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Pending requests list */}
         <Card>
           <CardHeader>
@@ -617,7 +665,7 @@ const DriverPanel = () => {
                       <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
                       {r.notes && <p className="text-xs">📝 {r.notes}</p>}
                       <p className="text-xs font-bold text-primary mt-1">
-                        💰 R$ {Number(deliveryConfig?.base_fee || 5).toFixed(2)}
+                        💰 R$ {Number(r.driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}
                       </p>
                       {Number((deliveryConfig as any)?.promo_credit_percent || 0) > 0 && (
                         <Badge variant="secondary" className="mt-1 text-xs bg-accent/20 text-accent">
