@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ReportLocationButton from "@/components/ReportLocationButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair } from "lucide-react";
