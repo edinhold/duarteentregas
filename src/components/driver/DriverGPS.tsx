@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ReportLocationButton from "@/components/ReportLocationButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair } from "lucide-react";
@@ -266,6 +267,13 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
             )}
           </div>
+          {driverPosition && user?.id && (
+            <ReportLocationButton
+              latitude={driverPosition.lat}
+              longitude={driverPosition.lng}
+              userId={user.id}
+            />
+          )}
         </CardContent>
       </Card>
 

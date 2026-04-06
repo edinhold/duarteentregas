@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle } from "lucide-react";
+import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -347,6 +348,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         } else {
           setAddressSuggestions([]);
           setShowSuggestions(false);
+          toast.info("Endereço não encontrado. Toque no mapa para marcar a localização manualmente.", { duration: 5000 });
         }
       } catch (err) {
         console.error("Geocode error:", err);
@@ -800,9 +802,19 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
+              </p>
+              {deliveryLatLng && user?.id && (
+                <ReportLocationButton
+                  latitude={deliveryLatLng[0]}
+                  longitude={deliveryLatLng[1]}
+                  address={callForm.delivery}
+                  userId={user.id}
+                />
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Observações</Label>

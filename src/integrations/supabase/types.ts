@@ -374,6 +374,42 @@ export type Database = {
         }
         Relationships: []
       }
+      location_reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          latitude: number
+          longitude: number
+          reported_address: string | null
+          reporter_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          latitude: number
+          longitude: number
+          reported_address?: string | null
+          reporter_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          reported_address?: string | null
+          reporter_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string | null
