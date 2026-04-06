@@ -267,6 +267,13 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
             )}
           </div>
+          {driverPosition && user?.id && (
+            <ReportLocationButton
+              latitude={driverPosition.lat}
+              longitude={driverPosition.lng}
+              userId={user.id}
+            />
+          )}
         </CardContent>
       </Card>
 
