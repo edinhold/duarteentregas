@@ -802,9 +802,19 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
+              </p>
+              {deliveryLatLng && user?.id && (
+                <ReportLocationButton
+                  latitude={deliveryLatLng[0]}
+                  longitude={deliveryLatLng[1]}
+                  address={callForm.delivery}
+                  userId={user.id}
+                />
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Observações</Label>
