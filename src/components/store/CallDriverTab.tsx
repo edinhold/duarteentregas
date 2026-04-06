@@ -348,6 +348,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         } else {
           setAddressSuggestions([]);
           setShowSuggestions(false);
+          toast.info("Endereço não encontrado. Toque no mapa para marcar a localização manualmente.", { duration: 5000 });
         }
       } catch (err) {
         console.error("Geocode error:", err);
