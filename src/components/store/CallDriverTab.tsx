@@ -571,7 +571,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       } as any);
       if (error) throw error;
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
-      setCallForm({ pickup: "", delivery: "", notes: "" });
+      const pickupAddr = restaurant?.address || callForm.pickup;
+      setCallForm({ pickup: pickupAddr, delivery: "", notes: "" });
       setDeliveryLatLng(null);
       setRoadDistanceKm(0);
       setRoadDurationMin(0);
