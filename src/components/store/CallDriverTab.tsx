@@ -295,7 +295,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setStoreLatLng([restaurant.latitude, restaurant.longitude]);
       setGpsStatus("granted");
       if (restaurant.address) {
-        setCallForm(f => ({ ...f, pickup: restaurant.address }));
+        setCallForm(f => f.pickup ? f : { ...f, pickup: restaurant.address });
       } else {
         reverseGeocode(restaurant.latitude, restaurant.longitude);
       }
