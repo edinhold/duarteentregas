@@ -295,7 +295,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setStoreLatLng([restaurant.latitude, restaurant.longitude]);
       setGpsStatus("granted");
       if (restaurant.address) {
-        setCallForm(f => ({ ...f, pickup: restaurant.address }));
+        setCallForm(f => f.pickup ? f : { ...f, pickup: restaurant.address });
       } else {
         reverseGeocode(restaurant.latitude, restaurant.longitude);
       }
@@ -571,7 +571,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       } as any);
       if (error) throw error;
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
-      setCallForm({ pickup: "", delivery: "", notes: "" });
+      const pickupAddr = restaurant?.address || callForm.pickup;
+      setCallForm({ pickup: pickupAddr, delivery: "", notes: "" });
       setDeliveryLatLng(null);
       setRoadDistanceKm(0);
       setRoadDurationMin(0);
