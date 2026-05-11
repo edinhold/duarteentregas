@@ -650,9 +650,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       {/* Map */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MapPin className="w-4 h-4" /> Mapa — Clique ou digite o endereço de entrega
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> Mapa de Entrega
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+              className="gap-1 text-xs h-7"
+            >
+              <Layers className="w-3 h-3" />
+              {mapType === "streets" ? "Satélite" : "Mapa"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div ref={containerRef} style={{ width: "100%", height: 320, borderRadius: 8 }} className="border border-border" />
