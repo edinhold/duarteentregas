@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers } from "lucide-react";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { MAP_LAYERS } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -130,7 +131,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [manualDistanceKm, setManualDistanceKm] = useState("");
 
   const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
   const storeMarkerRef = useRef<L.Marker | null>(null);
   const deliveryMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
@@ -328,8 +331,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
         
         if (storeLat && storeLng) {
-          const delta = 0.15;
-          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=0`;
+          const delta = 0.25; // Increased delta for better coverage
+          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`; // bounded=1 to prefer local results
         }
         
         const res = await fetch(searchUrl);
@@ -395,10 +398,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     const map = L.map(containerRef.current).setView(center, 14);
     mapRef.current = map;
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
+    
+    tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
+      attribution: MAP_LAYERS[mapType].attribution,
+      maxZoom: mapType === "satellite" ? 18 : 19,
     }).addTo(map);
 
     map.on("click", (e: L.LeafletMouseEvent) => {
@@ -422,6 +425,21 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     };
   }, []);
 
+  // Update tile layer if mapType changed
+  useEffect(() => {
+    const map = mapRef.current;
+    if (tileLayerRef.current && map) {
+      const currentUrl = MAP_LAYERS[mapType].url;
+      if ((tileLayerRef.current as any)._url !== currentUrl) {
+        map.removeLayer(tileLayerRef.current);
+        tileLayerRef.current = L.tileLayer(currentUrl, {
+          attribution: MAP_LAYERS[mapType].attribution,
+          maxZoom: mapType === "satellite" ? 18 : 19,
+        }).addTo(map);
+      }
+    }
+  }, [mapType]);
+
   // Update store marker
   useEffect(() => {
     const map = mapRef.current;
@@ -433,7 +451,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       .addTo(map)
       .bindPopup(`<b>🏪 ${restaurant?.name || "Sua Loja"}</b>`);
 
-    map.setView([storeLat, storeLng], map.getZoom());
+    // Only set view if not manual dragging or searching
+    if (!deliveryLatLng && !searchingAddress) {
+      map.setView([storeLat, storeLng], map.getZoom());
+    }
   }, [storeLat, storeLng, restaurant?.name]);
 
   // Update delivery marker + route line
