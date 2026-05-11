@@ -225,7 +225,21 @@ const DriverPanel = () => {
 
   const acceptRequest = async (requestId: string) => {
     try {
-      // First get the existing driver_fee that was calculated by the RPC (base + per_km * distance)
+      // First check if it's still pending and not already taken or finished
+      const { data: currentReq, error: checkError } = await supabase
+        .from("delivery_requests")
+        .select("status")
+        .eq("id", requestId)
+        .single();
+      
+      if (checkError || !currentReq) throw new Error("Pedido não encontrado");
+      if (currentReq.status !== "pending") {
+        toast.error("Este pedido já foi aceito ou finalizado por outro entregador");
+        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+        return;
+      }
+
+      // Get the existing driver_fee
       const { data: requestData, error: fetchError } = await supabase
         .from("delivery_requests")
         .select("driver_fee")
@@ -235,7 +249,6 @@ const DriverPanel = () => {
 
       const driverFee = Number(requestData?.driver_fee || deliveryConfig?.base_fee || 5);
 
-      // Accept without overwriting driver_fee - it was already set correctly
       const { error } = await supabase.from("delivery_requests").update({
         driver_id: user!.id,
         status: "accepted",
