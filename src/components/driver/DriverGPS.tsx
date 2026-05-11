@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair } from "lucide-react";
+import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { DEFAULT_CENTER } from "@/config/maps";
+import { DEFAULT_CENTER, MAP_LAYERS } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 
@@ -68,8 +68,10 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
   } = useGPSTracking({ userId: user?.id });
 
   const [autoFollow, setAutoFollow] = useState(true);
+  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
 
   const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
   const accuracyCircleRef = useRef<L.Circle | null>(null);
@@ -112,13 +114,26 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
       const map = L.map(mapContainerRef.current).setView(center, 15);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
+        attribution: MAP_LAYERS[mapType].attribution,
+        maxZoom: mapType === "satellite" ? 18 : 19,
       }).addTo(map);
       mapRef.current = map;
     }
 
     const map = mapRef.current;
+
+    // Update tile layer if mapType changed
+    if (tileLayerRef.current && map) {
+      const currentUrl = MAP_LAYERS[mapType].url;
+      if ((tileLayerRef.current as any)._url !== currentUrl) {
+        map.removeLayer(tileLayerRef.current);
+        tileLayerRef.current = L.tileLayer(currentUrl, {
+          attribution: MAP_LAYERS[mapType].attribution,
+          maxZoom: mapType === "satellite" ? 18 : 19,
+        }).addTo(map);
+      }
+    }
 
     if (driverPosition) {
       if (driverMarkerRef.current) {
@@ -181,7 +196,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         .bindPopup(m.name)
         .on("click", () => onAcceptRequest?.(m.id));
     });
-  }, [driverPosition, accuracy, requestMarkers.length, showMap, autoFollow, activeRequest?.id, activeRequest?.status]);
+  }, [driverPosition, accuracy, requestMarkers.length, showMap, autoFollow, activeRequest?.id, activeRequest?.status, mapType]);
 
   // Cleanup
   useEffect(() => {
@@ -303,15 +318,26 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
-              <Button
-                variant={autoFollow ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAutoFollow(!autoFollow)}
-                className="gap-1 text-xs h-7"
-              >
-                <Crosshair className="w-3 h-3" />
-                {autoFollow ? "Seguindo" : "Seguir"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+                  className="gap-1 text-xs h-7"
+                >
+                  <Layers className="w-3 h-3" />
+                  {mapType === "streets" ? "Satélite" : "Mapa"}
+                </Button>
+                <Button
+                  variant={autoFollow ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAutoFollow(!autoFollow)}
+                  className="gap-1 text-xs h-7"
+                >
+                  <Crosshair className="w-3 h-3" />
+                  {autoFollow ? "Seguindo" : "Seguir"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
