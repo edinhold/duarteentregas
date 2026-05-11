@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Store, Save, MapPin, Navigation, RotateCcw } from "lucide-react";
+import { Store, Save, MapPin, Navigation, RotateCcw, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { MAP_LAYERS } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -53,6 +54,8 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
   const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
@@ -123,9 +126,9 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
     const map = L.map(mapContainerRef.current).setView([lat, lng], form.latitude ? 17 : 12);
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
+    tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
+      attribution: MAP_LAYERS[mapType].attribution,
+      maxZoom: mapType === "satellite" ? 18 : 19,
     }).addTo(map);
 
     // If we already have coordinates, place the marker
@@ -154,6 +157,21 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
       markerRef.current = null;
     };
   }, []);
+
+  // Update tile layer if mapType changed
+  useEffect(() => {
+    const map = mapRef.current;
+    if (tileLayerRef.current && map) {
+      const currentUrl = MAP_LAYERS[mapType].url;
+      if ((tileLayerRef.current as any)._url !== currentUrl) {
+        map.removeLayer(tileLayerRef.current);
+        tileLayerRef.current = L.tileLayer(currentUrl, {
+          attribution: MAP_LAYERS[mapType].attribution,
+          maxZoom: mapType === "satellite" ? 18 : 19,
+        }).addTo(map);
+      }
+    }
+  }, [mapType]);
 
   // Sync marker when form coords change from restaurant load
   useEffect(() => {
@@ -260,9 +278,20 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
 
         {/* Location Map */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" /> Localização no Mapa
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> Localização no Mapa
+            </Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+              className="gap-1 text-xs h-7"
+            >
+              <Layers className="w-3 h-3" />
+              {mapType === "streets" ? "Satélite" : "Mapa"}
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
             Clique no mapa ou arraste o marcador para definir a posição exata da sua loja. Isso garante precisão no Google Maps e Waze.
           </p>
