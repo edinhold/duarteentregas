@@ -68,7 +68,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
   } = useGPSTracking({ userId: user?.id });
 
   const [autoFollow, setAutoFollow] = useState(true);
-  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
 
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
