@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { DEFAULT_CENTER, MAP_LAYERS } from "@/config/maps";
+import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 
