@@ -322,11 +322,15 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+                  onClick={() => {
+                    const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                    const next = types[(types.indexOf(mapType) + 1) % types.length];
+                    setMapType(next);
+                  }}
                   className="gap-1 text-xs h-7"
                 >
                   <Layers className="w-3 h-3" />
-                  {mapType === "streets" ? "Satélite" : "Mapa"}
+                  {mapType === "google" ? "Google Maps" : mapType === "googleHybrid" ? "Google Satélite" : mapType === "streets" ? "OpenStreet" : "Esri Satélite"}
                 </Button>
                 <Button
                   variant={autoFollow ? "default" : "outline"}
