@@ -187,13 +187,40 @@ const DriverPanel = () => {
   // Realtime
   useEffect(() => {
     if (!user) return;
+    
+    // Unlock audio context on first user interaction in the panel
+    const handleFirstInteraction = () => {
+      resumeAudioContext();
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
+    window.addEventListener('click', handleFirstInteraction);
+    window.addEventListener('touchstart', handleFirstInteraction);
+
     const channel = supabase.channel("driver-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, (payload) => {
+        console.log("New delivery request received:", payload);
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
-        playUrgentNotification();
-        toast("🚀 Nova entrega disponível!", { duration: 6000 });
+        
+        // Use a timeout to ensure audio is ready and played clearly
+        setTimeout(() => {
+          playUrgentNotification();
+          toast("🚀 Nova entrega disponível!", { 
+            duration: 10000,
+            action: {
+              label: "Ver",
+              onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' })
+            }
+          });
+        }, 500);
+
         if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Nova Entrega!", { body: "Uma nova solicitação de entrega está disponível.", icon: "/favicon.ico" });
+          new Notification("Nova Entrega!", { 
+            body: "Uma nova solicitação de entrega está disponível.", 
+            icon: "/favicon.ico",
+            tag: "new-delivery",
+            renotify: true
+          });
         }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
@@ -219,8 +246,22 @@ const DriverPanel = () => {
           }
         }
       })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log("Realtime subscribed successfully");
+        }
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.error("Realtime connection issues:", status);
+          toast.error("Conexão perdida. Recarregando...");
+          setTimeout(() => window.location.reload(), 3000);
+        }
+      });
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
   }, [user, activeRequest?.id, driverProfile?.id]);
 
   const acceptRequest = async (requestId: string) => {
