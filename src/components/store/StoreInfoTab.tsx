@@ -179,7 +179,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
         map.removeLayer(tileLayerRef.current);
         tileLayerRef.current = L.tileLayer(currentUrl, {
           attribution: MAP_LAYERS[mapType].attribution,
-          maxZoom: mapType === "satellite" ? 18 : 19,
+          maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
         }).addTo(map);
       }
     }
