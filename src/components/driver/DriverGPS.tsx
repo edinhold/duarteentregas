@@ -278,7 +278,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           )}
           <div className="flex gap-2">
             {!watching ? (
-              <Button onClick={startTracking} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
+              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
             ) : (
               <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
             )}
