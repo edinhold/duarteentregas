@@ -232,17 +232,29 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return parts.length > 0 ? parts.join(", ") : data.display_name;
   }, []);
 
-  const reverseGeocode = useCallback((lat: number, lng: number) => {
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
-      .then(r => r.json())
-      .then(data => {
-        if (data) {
-          const formatted = formatAddress(data);
-          setCallForm(f => ({ ...f, pickup: formatted }));
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      // Try Google Geocoding first if key is available
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
+          return;
         }
-      })
-      .catch(() => {});
-  }, [formatAddress]);
+      }
+
+      // Fallback to Nominatim
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
+      if (data) {
+        const formatted = formatAddress(data);
+        setCallForm(f => ({ ...f, pickup: formatted }));
+      }
+    } catch (err) {
+      console.error("Reverse geocode error:", err);
+    }
+  }, [formatAddress, GOOGLE_MAPS_API_KEY]);
 
   const startGPSWatch = useCallback(() => {
     if (!navigator.geolocation) {
