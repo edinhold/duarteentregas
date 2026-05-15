@@ -55,7 +55,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
   const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
