@@ -48,12 +48,13 @@ export const playNotificationSound = () => {
   }
 };
 
-// Urgent alarm: loud sirene-style with 4 rounds of ascending beeps + heavy vibration
+// Urgent alarm: loud sirene-style with multiple rounds of ascending beeps + heavy vibration
 export const playUrgentNotification = () => {
   // Strong vibration pattern
   try {
     if ("vibrate" in navigator) {
-      navigator.vibrate([400, 100, 400, 100, 400, 200, 600]);
+      // Repeat vibration pattern
+      navigator.vibrate([500, 200, 500, 200, 500, 200, 800, 200, 800]);
     }
   } catch {}
 
@@ -62,40 +63,60 @@ export const playUrgentNotification = () => {
     if (!AudioContext) return;
 
     const ctx = new AudioContext();
-    const frequencies = [660, 880, 1100, 1320];
-    const rounds = 4;
-    const vol = Math.max(globalVolume, 0.7); // Minimum 70% volume for urgent
+    const frequencies = [660, 880, 1100, 1320, 1500, 1700];
+    const rounds = 6; // Increased rounds
+    const vol = Math.max(globalVolume, 0.85); // Minimum 85% volume for urgent
 
+    // Multiple oscillators for a richer, louder sound
     for (let r = 0; r < rounds; r++) {
       for (let i = 0; i < frequencies.length; i++) {
-        const startTime = ctx.currentTime + r * 0.55 + i * 0.12;
+        const startTime = ctx.currentTime + r * 0.6 + i * 0.1;
+        
+        // Main oscillator
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
+        
+        // Secondary harmonic oscillator for "loudness"
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
         osc.frequency.value = frequencies[i];
+        osc2.frequency.value = frequencies[i] * 1.01; // Slight detune for chorus effect
+        
         osc.type = r % 2 === 0 ? "square" : "sawtooth";
-        gain.gain.setValueAtTime(0.4 * vol, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+        osc2.type = "sine";
+
+        gain.gain.setValueAtTime(0.5 * vol, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+        
+        gain2.gain.setValueAtTime(0.2 * vol, startTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+
         osc.start(startTime);
-        osc.stop(startTime + 0.1);
+        osc.stop(startTime + 0.15);
+        osc2.start(startTime);
+        osc2.stop(startTime + 0.15);
       }
     }
 
-    // Final long alert tone
-    const finalStart = ctx.currentTime + rounds * 0.55;
+    // Final long high-pitched alert tone
+    const finalStart = ctx.currentTime + rounds * 0.6;
     const oscFinal = ctx.createOscillator();
     const gainFinal = ctx.createGain();
     oscFinal.connect(gainFinal);
     gainFinal.connect(ctx.destination);
-    oscFinal.frequency.value = 1500;
-    oscFinal.type = "sine";
-    gainFinal.gain.setValueAtTime(0.5 * vol, finalStart);
-    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 0.5);
+    oscFinal.frequency.value = 1800;
+    oscFinal.type = "square"; // More aggressive
+    gainFinal.gain.setValueAtTime(0.6 * vol, finalStart);
+    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 1.0);
     oscFinal.start(finalStart);
-    oscFinal.stop(finalStart + 0.5);
+    oscFinal.stop(finalStart + 1.0);
 
-    setTimeout(() => ctx.close(), 4000);
+    setTimeout(() => ctx.close(), 6000);
   } catch {}
 };
 
