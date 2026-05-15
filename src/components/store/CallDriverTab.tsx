@@ -14,7 +14,7 @@ import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS } from "@/config/maps";
+import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
