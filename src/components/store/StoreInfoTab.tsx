@@ -140,7 +140,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
 
     tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
       attribution: MAP_LAYERS[mapType].attribution,
-      maxZoom: mapType === "satellite" ? 18 : 19,
+      maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
     }).addTo(map);
 
     // If we already have coordinates, place the marker
