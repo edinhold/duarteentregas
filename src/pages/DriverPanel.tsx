@@ -13,7 +13,7 @@ import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
