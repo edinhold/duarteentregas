@@ -645,21 +645,60 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.error("Preencha endereço de coleta e entrega");
       return;
     }
-    if (distanceKm <= 0) {
-      toast.error("Defina o ponto de entrega no mapa ou digite o endereço");
+
+    let finalDistance = distanceKm;
+    let finalLatLng = deliveryLatLng;
+
+    // If no coordinates yet, try to use the first suggestion if available
+    if (!finalLatLng && addressSuggestions.length > 0) {
+      const first = addressSuggestions[0];
+      const lat = parseFloat(first.lat);
+      const lng = parseFloat(first.lon);
+      finalLatLng = [lat, lng];
+      setDeliveryLatLng(finalLatLng);
+      
+      // Re-calculate distance with the new coordinates
+      if (storeLat && storeLng) {
+        finalDistance = haversineKm(storeLat, storeLng, lat, lng);
+      }
+    }
+
+    if (finalDistance <= 0 || !finalLatLng) {
+      toast.error("Localização de entrega não definida. Selecione um endereço da lista ou clique no mapa.");
       return;
     }
+
     setCalling(true);
     try {
-      const { error } = await supabase.rpc("deduct_credits_for_delivery", {
+      const { data: requestId, error } = await supabase.rpc("deduct_credits_for_delivery", {
         p_pickup_address: callForm.pickup,
         p_delivery_address: callForm.delivery,
         p_notes: callForm.notes || null,
         p_restaurant_id: restaurant?.id || null,
-        p_distance_km: distanceKm,
+        p_distance_km: finalDistance,
       } as any);
+
       if (error) throw error;
+
+      // Play a confirmation sound for the store owner
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.2);
+        }
+      } catch (e) {}
+
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
+      
       const pickupAddr = restaurant?.address || callForm.pickup;
       setCallForm({ pickup: pickupAddr, delivery: "", notes: "" });
       setDeliveryLatLng(null);
@@ -668,10 +707,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setRouteCoords([]);
       setManualDistanceEnabled(false);
       setManualDistanceKm("");
+      
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
-      toast.error(err.message || "Erro ao chamar entregador");
+      console.error("Call driver error:", err);
+      toast.error(err.message || "Erro ao chamar entregador. Verifique seus créditos.");
     } finally {
       setCalling(false);
     }

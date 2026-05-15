@@ -1,4 +1,5 @@
 // Notification sound utility with volume control and standby support
+import { toast } from "sonner";
 
 // Global volume setting (0-1)
 let globalVolume = 1.0;
@@ -6,19 +7,46 @@ let standbyInterval: ReturnType<typeof setInterval> | null = null;
 let standbyEnabled = false;
 let standbyIntervalMs = 30000; // 30 seconds default
 
+// Singleton AudioContext to handle browser autoplay policies better
+let sharedCtx: AudioContext | null = null;
+
+const getAudioContext = () => {
+  if (!sharedCtx) {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      sharedCtx = new AudioContextClass();
+    }
+  }
+  return sharedCtx;
+};
+
+// This should be called on any user interaction (click, touch) to unlock audio
+export const resumeAudioContext = async () => {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    try {
+      await ctx.resume();
+      console.log("AudioContext resumed successfully");
+    } catch (err) {
+      console.error("Failed to resume AudioContext:", err);
+    }
+  }
+};
+
 export const setNotificationVolume = (vol: number) => {
   globalVolume = Math.max(0, Math.min(1, vol));
 };
 
 export const getNotificationVolume = () => globalVolume;
 
-// Generate a simple notification beep using AudioContext
+// Generate a simple notification beep
 export const playNotificationSound = () => {
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    
+    // Resume if suspended (browser policy)
+    if (ctx.state === "suspended") ctx.resume();
 
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
@@ -41,61 +69,74 @@ export const playNotificationSound = () => {
     gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
     osc2.start(ctx.currentTime + 0.15);
     osc2.stop(ctx.currentTime + 0.45);
-
-    setTimeout(() => ctx.close(), 1000);
   } catch (e) {
     // Silently fail
   }
 };
 
-// Urgent alarm: loud sirene-style with 4 rounds of ascending beeps + heavy vibration
+// Urgent alarm: loud sirene-style with multiple rounds of ascending beeps + heavy vibration
 export const playUrgentNotification = () => {
   // Strong vibration pattern
   try {
     if ("vibrate" in navigator) {
-      navigator.vibrate([400, 100, 400, 100, 400, 200, 600]);
+      navigator.vibrate([500, 200, 500, 200, 500, 200, 800, 200, 800]);
     }
   } catch {}
 
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    
+    if (ctx.state === "suspended") ctx.resume();
 
-    const ctx = new AudioContext();
-    const frequencies = [660, 880, 1100, 1320];
-    const rounds = 4;
-    const vol = Math.max(globalVolume, 0.7); // Minimum 70% volume for urgent
+    const frequencies = [660, 880, 1100, 1320, 1500, 1700];
+    const rounds = 6;
+    const vol = Math.max(globalVolume, 0.85);
 
     for (let r = 0; r < rounds; r++) {
       for (let i = 0; i < frequencies.length; i++) {
-        const startTime = ctx.currentTime + r * 0.55 + i * 0.12;
+        const startTime = ctx.currentTime + r * 0.6 + i * 0.1;
+        
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
+        
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
         osc.frequency.value = frequencies[i];
+        osc2.frequency.value = frequencies[i] * 1.01;
+        
         osc.type = r % 2 === 0 ? "square" : "sawtooth";
-        gain.gain.setValueAtTime(0.4 * vol, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+        osc2.type = "sine";
+
+        gain.gain.setValueAtTime(0.5 * vol, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+        
+        gain2.gain.setValueAtTime(0.2 * vol, startTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+
         osc.start(startTime);
-        osc.stop(startTime + 0.1);
+        osc.stop(startTime + 0.15);
+        osc2.start(startTime);
+        osc2.stop(startTime + 0.15);
       }
     }
 
-    // Final long alert tone
-    const finalStart = ctx.currentTime + rounds * 0.55;
+    const finalStart = ctx.currentTime + rounds * 0.6;
     const oscFinal = ctx.createOscillator();
     const gainFinal = ctx.createGain();
     oscFinal.connect(gainFinal);
     gainFinal.connect(ctx.destination);
-    oscFinal.frequency.value = 1500;
-    oscFinal.type = "sine";
-    gainFinal.gain.setValueAtTime(0.5 * vol, finalStart);
-    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 0.5);
+    oscFinal.frequency.value = 1800;
+    oscFinal.type = "square";
+    gainFinal.gain.setValueAtTime(0.6 * vol, finalStart);
+    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 1.0);
     oscFinal.start(finalStart);
-    oscFinal.stop(finalStart + 0.5);
-
-    setTimeout(() => ctx.close(), 4000);
+    oscFinal.stop(finalStart + 1.0);
   } catch {}
 };
 
@@ -108,10 +149,11 @@ export const playStandbyAlert = () => {
   } catch {}
 
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    
+    if (ctx.state === "suspended") ctx.resume();
 
-    const ctx = new AudioContext();
     const vol = globalVolume * 0.5;
 
     const osc = ctx.createOscillator();
@@ -135,12 +177,9 @@ export const playStandbyAlert = () => {
     gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
     osc2.start(ctx.currentTime + 0.25);
     osc2.stop(ctx.currentTime + 0.5);
-
-    setTimeout(() => ctx.close(), 1500);
   } catch {}
 };
 
-// Standby mode: periodic alerts when driver is idle
 export const startStandbyMode = (intervalMs?: number) => {
   stopStandbyMode();
   standbyEnabled = true;

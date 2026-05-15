@@ -9,6 +9,7 @@ import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
+import { resumeAudioContext } from "@/lib/notificationSound";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -277,7 +278,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           )}
           <div className="flex gap-2">
             {!watching ? (
-              <Button onClick={startTracking} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
+              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
             ) : (
               <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
             )}
