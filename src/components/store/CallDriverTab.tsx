@@ -340,17 +340,47 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
+        // Try Google Geocoding first
+        if (GOOGLE_MAPS_API_KEY) {
+          let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR&region=br`;
+          if (storeLat && storeLng) {
+            googleUrl += `&location=${storeLat},${storeLng}&radius=10000`; // Prefer local results within 10km
+          }
+          
+          const res = await fetch(googleUrl);
+          const data = await res.json();
+          if (data.status === "OK" && data.results?.length > 0) {
+            const results = data.results.map((r: any) => ({
+              lat: r.geometry.location.lat.toString(),
+              lon: r.geometry.location.lng.toString(),
+              display_name: r.formatted_address,
+              address: r.address_components.reduce((acc: any, comp: any) => {
+                if (comp.types.includes("route")) acc.road = comp.long_name;
+                if (comp.types.includes("street_number")) acc.house_number = comp.long_name;
+                if (comp.types.includes("sublocality")) acc.suburb = comp.long_name;
+                if (comp.types.includes("administrative_area_level_2")) acc.city = comp.long_name;
+                if (comp.types.includes("administrative_area_level_1")) acc.state = comp.long_name;
+                return acc;
+              }, {})
+            }));
+            setAddressSuggestions(results);
+            setShowSuggestions(true);
+            setSearchingAddress(false);
+            return;
+          }
+        }
+
+        // Fallback to Nominatim
         let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
         
         if (storeLat && storeLng) {
-          const delta = 0.25; // Increased delta for better coverage
-          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`; // bounded=1 to prefer local results
+          const delta = 0.25;
+          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`;
         }
         
         const res = await fetch(searchUrl);
         const data = await res.json();
         if (data && data.length > 0) {
-          // Sort by proximity to store
           if (storeLat && storeLng) {
             data.sort((a: any, b: any) => {
               const da = haversineKm(storeLat, storeLng, parseFloat(a.lat), parseFloat(a.lon));
