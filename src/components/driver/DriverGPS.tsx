@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { DEFAULT_CENTER, MAP_LAYERS } from "@/config/maps";
+import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 
@@ -68,7 +68,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
   } = useGPSTracking({ userId: user?.id });
 
   const [autoFollow, setAutoFollow] = useState(true);
-  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
 
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -116,7 +116,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
       const map = L.map(mapContainerRef.current).setView(center, 15);
       tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
         attribution: MAP_LAYERS[mapType].attribution,
-        maxZoom: mapType === "satellite" ? 18 : 19,
+        maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
       }).addTo(map);
       mapRef.current = map;
     }
@@ -130,7 +130,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         map.removeLayer(tileLayerRef.current);
         tileLayerRef.current = L.tileLayer(currentUrl, {
           attribution: MAP_LAYERS[mapType].attribution,
-          maxZoom: mapType === "satellite" ? 18 : 19,
+          maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
         }).addTo(map);
       }
     }
@@ -322,11 +322,15 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+                  onClick={() => {
+                    const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                    const next = types[(types.indexOf(mapType) + 1) % types.length];
+                    setMapType(next);
+                  }}
                   className="gap-1 text-xs h-7"
                 >
                   <Layers className="w-3 h-3" />
-                  {mapType === "streets" ? "Satélite" : "Mapa"}
+                  {mapType === "google" ? "Google Maps" : mapType === "googleHybrid" ? "Google Satélite" : mapType === "streets" ? "OpenStreet" : "Esri Satélite"}
                 </Button>
                 <Button
                   variant={autoFollow ? "default" : "outline"}

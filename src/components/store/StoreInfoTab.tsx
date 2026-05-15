@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Store, Save, MapPin, Navigation, RotateCcw, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS } from "@/config/maps";
+import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -55,7 +55,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
   const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
@@ -94,27 +94,39 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
     }
   }, []);
 
-  const reverseGeocode = useCallback((lat: number, lng: number) => {
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
-      .then(r => r.json())
-      .then(data => {
-        if (data?.address) {
-          const a = data.address;
-          const parts: string[] = [];
-          const road = a.road || a.pedestrian || a.footway || a.street || "";
-          if (road) parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
-          const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
-          if (neighborhood) parts.push(neighborhood);
-          const city = a.city || a.town || a.village || a.municipality || "";
-          if (city) parts.push(city);
-          if (a.state) parts.push(a.state);
-          if (parts.length > 0) {
-            setForm(f => ({ ...f, address: parts.join(", ") }));
-          }
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      // Try Google Geocoding first
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setForm(f => ({ ...f, address: data.results[0].formatted_address }));
+          return;
         }
-      })
-      .catch(() => {});
-  }, []);
+      }
+
+      // Fallback to Nominatim
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
+      if (data?.address) {
+        const a = data.address;
+        const parts: string[] = [];
+        const road = a.road || a.pedestrian || a.footway || a.street || "";
+        if (road) parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
+        const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
+        if (neighborhood) parts.push(neighborhood);
+        const city = a.city || a.town || a.village || a.municipality || "";
+        if (city) parts.push(city);
+        if (a.state) parts.push(a.state);
+        if (parts.length > 0) {
+          setForm(f => ({ ...f, address: parts.join(", ") }));
+        }
+      }
+    } catch (err) {
+      console.error("Reverse geocode error:", err);
+    }
+  }, [GOOGLE_MAPS_API_KEY]);
 
   // Initialize map
   useEffect(() => {
@@ -128,7 +140,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
 
     tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
       attribution: MAP_LAYERS[mapType].attribution,
-      maxZoom: mapType === "satellite" ? 18 : 19,
+      maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
     }).addTo(map);
 
     // If we already have coordinates, place the marker
@@ -167,7 +179,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
         map.removeLayer(tileLayerRef.current);
         tileLayerRef.current = L.tileLayer(currentUrl, {
           attribution: MAP_LAYERS[mapType].attribution,
-          maxZoom: mapType === "satellite" ? 18 : 19,
+          maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
         }).addTo(map);
       }
     }
@@ -285,11 +297,15 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMapType(mapType === "streets" ? "satellite" : "streets")}
+              onClick={() => {
+                const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                const next = types[(types.indexOf(mapType) + 1) % types.length];
+                setMapType(next);
+              }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "streets" ? "Satélite" : "Mapa"}
+              {mapType === "google" ? "Google Maps" : mapType === "googleHybrid" ? "Google Satélite" : mapType === "streets" ? "OpenStreet" : "Esri Satélite"}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
