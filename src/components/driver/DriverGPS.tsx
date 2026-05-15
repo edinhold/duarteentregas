@@ -116,7 +116,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
       const map = L.map(mapContainerRef.current).setView(center, 15);
       tileLayerRef.current = L.tileLayer(MAP_LAYERS[mapType].url, {
         attribution: MAP_LAYERS[mapType].attribution,
-        maxZoom: mapType === "satellite" ? 18 : 19,
+        maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
       }).addTo(map);
       mapRef.current = map;
     }
