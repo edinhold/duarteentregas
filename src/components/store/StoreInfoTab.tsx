@@ -94,27 +94,39 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
     }
   }, []);
 
-  const reverseGeocode = useCallback((lat: number, lng: number) => {
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`)
-      .then(r => r.json())
-      .then(data => {
-        if (data?.address) {
-          const a = data.address;
-          const parts: string[] = [];
-          const road = a.road || a.pedestrian || a.footway || a.street || "";
-          if (road) parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
-          const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
-          if (neighborhood) parts.push(neighborhood);
-          const city = a.city || a.town || a.village || a.municipality || "";
-          if (city) parts.push(city);
-          if (a.state) parts.push(a.state);
-          if (parts.length > 0) {
-            setForm(f => ({ ...f, address: parts.join(", ") }));
-          }
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      // Try Google Geocoding first
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setForm(f => ({ ...f, address: data.results[0].formatted_address }));
+          return;
         }
-      })
-      .catch(() => {});
-  }, []);
+      }
+
+      // Fallback to Nominatim
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
+      if (data?.address) {
+        const a = data.address;
+        const parts: string[] = [];
+        const road = a.road || a.pedestrian || a.footway || a.street || "";
+        if (road) parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
+        const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
+        if (neighborhood) parts.push(neighborhood);
+        const city = a.city || a.town || a.village || a.municipality || "";
+        if (city) parts.push(city);
+        if (a.state) parts.push(a.state);
+        if (parts.length > 0) {
+          setForm(f => ({ ...f, address: parts.join(", ") }));
+        }
+      }
+    } catch (err) {
+      console.error("Reverse geocode error:", err);
+    }
+  }, [GOOGLE_MAPS_API_KEY]);
 
   // Initialize map
   useEffect(() => {
