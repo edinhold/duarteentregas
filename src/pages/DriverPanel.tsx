@@ -217,9 +217,7 @@ const DriverPanel = () => {
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification("Nova Entrega!", { 
             body: "Uma nova solicitação de entrega está disponível.", 
-            icon: "/favicon.ico",
-            tag: "new-delivery",
-            renotify: true
+            icon: "/favicon.ico"
           });
         }
       })
