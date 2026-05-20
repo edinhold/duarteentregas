@@ -346,7 +346,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-72 rounded-lg overflow-hidden">
+            <div className="h-[450px] rounded-lg overflow-hidden shadow-inner border">
               <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             </div>
           </CardContent>
