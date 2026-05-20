@@ -693,7 +693,7 @@ const DriverPanel = () => {
                       <span className="text-primary text-lg">R$ {netPreview.toFixed(2)}</span>
                     </div>
                   </div>
-                  <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="accent">
+                  <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="default">
                     {withdrawing ? "Processando..." : isPaymentDay ? "💰 Solicitar Saque" : "💰 Solicitar Saque Antecipado"}
                   </Button>
                 </CardContent>
