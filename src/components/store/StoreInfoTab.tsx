@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Store, Save, MapPin, Navigation, RotateCcw, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS } from "@/config/maps";
+import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -55,7 +55,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
   const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
@@ -96,6 +96,14 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setForm(f => ({ ...f, address: data.results[0].formatted_address }));
+          return;
+        }
+      }
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
       const data = await res.json();
       if (data?.address) {
@@ -287,14 +295,14 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
               variant="outline"
               size="sm"
               onClick={() => {
-                const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+                const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
                 const next = types[(types.indexOf(mapType) + 1) % types.length];
                 setMapType(next);
               }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "streets" ? "Mapa" : "Satélite"}
+              {mapType === "google" ? "Google" : mapType === "googleHybrid" ? "Híbrido" : mapType === "streets" ? "OSM" : "Satélite"}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
