@@ -207,12 +207,14 @@ const FinancialTab = () => {
   const handleDeleteAllFinancial = async () => {
     setDeleting(true);
     try {
-      const [c1, c2] = await Promise.all([
+      const [c1, c2, c3, c4] = await Promise.all([
         supabase.from("driver_earnings").select("*", { count: "exact", head: true }),
         supabase.from("withdrawal_requests").select("*", { count: "exact", head: true }),
+        supabase.from("delivery_requests").select("*", { count: "exact", head: true }).eq("status", "delivered"),
+        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "delivered"),
       ]);
 
-      const totalRecords = (c1.count || 0) + (c2.count || 0);
+      const totalRecords = (c1.count || 0) + (c2.count || 0) + (c3.count || 0) + (c4.count || 0);
       if (totalRecords === 0) {
         toast.info("Nenhum registro financeiro para apagar.");
         setDeleting(false);
@@ -220,18 +222,26 @@ const FinancialTab = () => {
         return;
       }
 
-      const [r1, r2] = await Promise.all([
+      // First delete orders to avoid FK issues with delivery_requests
+      const [r4, r3, r1, r2] = await Promise.all([
+        supabase.from("orders").delete().eq("status", "delivered"),
+        supabase.from("delivery_requests").delete().eq("status", "delivered"),
         supabase.from("driver_earnings").delete().gte("created_at", "1970-01-01T00:00:00Z"),
         supabase.from("withdrawal_requests").delete().gte("created_at", "1970-01-01T00:00:00Z"),
       ]);
+      
       if (r1.error) throw r1.error;
       if (r2.error) throw r2.error;
-      toast.success(`${totalRecords} registro(s) financeiro(s) apagados com sucesso!`);
+      if (r3.error) throw r3.error;
+      if (r4.error) throw r4.error;
+      
+      toast.success(`${totalRecords} registro(s) financeiro(s) e de faturamento apagados com sucesso!`);
       setSelectedEarnings(new Set());
       setSelectedWithdrawals(new Set());
       queryClient.invalidateQueries({ queryKey: ["admin-earnings"] });
       queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-delivered-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     } catch (err: any) {
       console.error("Erro ao apagar registros financeiros:", err);
       toast.error(err.message || "Erro ao apagar registros.");
