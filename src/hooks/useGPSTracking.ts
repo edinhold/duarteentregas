@@ -59,6 +59,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const [sampleCount, setSampleCount] = useState(0);
   const [isStationary, setIsStationary] = useState(false);
   const [totalDistance, setTotalDistance] = useState(0);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | "unsupported">("prompt");
 
   const watchIdRef = useRef<number | null>(null);
@@ -284,6 +285,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       setSpeed(spd);
       setGpsQuality(classifyQuality(acc));
       setWatching(true);
+      setErrorStatus(null);
 
       savePositionToDb(finalPos.lat, finalPos.lng, acc, hdg, spd, stationary);
     },
@@ -306,15 +308,22 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     totalDistanceRef.current = 0;
     setTotalDistance(0);
     setSampleCount(0);
+    setErrorStatus(null);
 
     const id = navigator.geolocation.watchPosition(
       processReading,
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
+          setErrorStatus("Permissão de localização negada.");
           toast.error("Permissão de localização negada.");
         } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setErrorStatus("Localização indisponível. Verifique se o GPS está ativado.");
           toast.error("Localização indisponível. Verifique se o GPS está ativado.");
+        } else if (err.code === err.TIMEOUT) {
+          setErrorStatus("Tempo esgotado ao obter localização. Tente novamente.");
+          toast.error("Tempo esgotado ao obter localização.");
         } else {
+          setErrorStatus("Erro ao obter localização.");
           toast.error("Erro ao obter localização");
         }
         setWatching(false);
@@ -374,6 +383,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     isStationary,
     totalDistance,
     permissionStatus,
+    errorStatus,
     discardedCount: discardedCountRef.current,
     startTracking,
     stopTracking,

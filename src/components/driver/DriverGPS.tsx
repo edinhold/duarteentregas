@@ -65,6 +65,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     isStationary,
     totalDistance,
     permissionStatus,
+    errorStatus,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
@@ -279,8 +280,22 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm">Obtendo localização...</span>
+            <div className="flex flex-col items-center justify-center gap-2 py-4 text-muted-foreground border rounded-lg bg-muted/20">
+              {errorStatus ? (
+                <>
+                  <SignalZero className="w-8 h-8 text-destructive animate-pulse" />
+                  <p className="text-sm text-center px-4 font-medium text-destructive">{errorStatus}</p>
+                  <Button variant="outline" size="sm" onClick={startTracking} className="mt-2">
+                    Tentar Novamente
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="text-sm font-medium">Buscando sinal do GPS...</span>
+                  <p className="text-xs text-muted-foreground px-4 text-center">Isso pode levar alguns segundos, certifique-se de estar em local aberto.</p>
+                </>
+              )}
             </div>
           )}
           <div className="flex gap-2">
