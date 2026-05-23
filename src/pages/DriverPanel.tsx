@@ -222,11 +222,20 @@ const DriverPanel = () => {
           });
         }
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, () => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, (payload: any) => {
+        console.log("Delivery request updated:", payload);
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
         queryClient.invalidateQueries({ queryKey: ["driver-my-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["driver-completed-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
+        
+        // If status changed to accepted and I am the driver, or if it was accepted by someone else
+        if (payload.new?.status === "accepted") {
+          if (payload.new?.driver_id === user.id) {
+            playNotificationSound();
+            toast.success("✅ Pedido confirmado para você!");
+          }
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_earnings" }, () => {
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
