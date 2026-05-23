@@ -7,7 +7,7 @@ const WhatsAppButton = () => {
     queryKey: ["delivery-config-whatsapp"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("delivery_config")
+        .from("public_delivery_config")
         .select("whatsapp_number")
         .limit(1)
         .single();

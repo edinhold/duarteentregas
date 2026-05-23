@@ -143,7 +143,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
     queryFn: async () => {
-      const { data } = await supabase.from("delivery_config").select("*").limit(1).single();
+      const { data } = await supabase.from("public_delivery_config").select("*").limit(1).single();
       return data;
     },
   });
