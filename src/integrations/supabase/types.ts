@@ -764,6 +764,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_delivery: { Args: { p_request_id: string }; Returns: string }
       deduct_credits_for_delivery:
         | {
             Args: {
