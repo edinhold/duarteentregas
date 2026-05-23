@@ -945,6 +945,16 @@ export type Database = {
         Args: { driver_id_to_check: string }
         Returns: boolean
       }
+      place_order: {
+        Args: {
+          p_address: string
+          p_items: Json
+          p_notes?: string
+          p_payment_method: string
+          p_restaurant_id: string
+        }
+        Returns: string
+      }
       redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
