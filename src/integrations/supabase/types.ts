@@ -782,6 +782,36 @@ export type Database = {
       }
     }
     Views: {
+      assigned_driver_details: {
+        Row: {
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          phone: string | null
+          photo_url: string | null
+          vehicle_plate: string | null
+          vehicle_type: string | null
+        }
+        Insert: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          phone?: string | null
+          photo_url?: string | null
+          vehicle_plate?: string | null
+          vehicle_type?: string | null
+        }
+        Update: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          phone?: string | null
+          photo_url?: string | null
+          vehicle_plate?: string | null
+          vehicle_type?: string | null
+        }
+        Relationships: []
+      }
       delivery_config_public: {
         Row: {
           base_fee: number | null
@@ -879,6 +909,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_store_owner_of_driver: {
+        Args: { driver_id_to_check: string }
         Returns: boolean
       }
       redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
