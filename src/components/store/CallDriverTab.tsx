@@ -14,7 +14,7 @@ import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
+import { MAP_LAYERS } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -133,7 +133,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
   const storeMarkerRef = useRef<L.Marker | null>(null);
   const deliveryMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
@@ -234,17 +234,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      // Try Google Geocoding first if key is available
-      if (GOOGLE_MAPS_API_KEY) {
-        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-        const data = await res.json();
-        if (data.status === "OK" && data.results?.[0]) {
-          setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
-          return;
-        }
-      }
-
-      // Fallback to Nominatim
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
       const data = await res.json();
       if (data) {
@@ -254,7 +243,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     } catch (err) {
       console.error("Reverse geocode error:", err);
     }
-  }, [formatAddress, GOOGLE_MAPS_API_KEY]);
+  }, [formatAddress]);
 
   const startGPSWatch = useCallback(() => {
     if (!navigator.geolocation) {
@@ -340,35 +329,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        // Try Google Geocoding first
-        if (GOOGLE_MAPS_API_KEY) {
-          let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR&region=br`;
-          if (storeLat && storeLng) {
-            googleUrl += `&location=${storeLat},${storeLng}&radius=10000`; // Prefer local results within 10km
-          }
-          
-          const res = await fetch(googleUrl);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.length > 0) {
-            const results = data.results.map((r: any) => ({
-              lat: r.geometry.location.lat.toString(),
-              lon: r.geometry.location.lng.toString(),
-              display_name: r.formatted_address,
-              address: r.address_components.reduce((acc: any, comp: any) => {
-                if (comp.types.includes("route")) acc.road = comp.long_name;
-                if (comp.types.includes("street_number")) acc.house_number = comp.long_name;
-                if (comp.types.includes("sublocality")) acc.suburb = comp.long_name;
-                if (comp.types.includes("administrative_area_level_2")) acc.city = comp.long_name;
-                if (comp.types.includes("administrative_area_level_1")) acc.state = comp.long_name;
-                return acc;
-              }, {})
-            }));
-            setAddressSuggestions(results);
-            setShowSuggestions(true);
-            setSearchingAddress(false);
-            return;
-          }
-        }
 
         // Fallback to Nominatim
         let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
@@ -452,15 +412,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setManualDistanceEnabled(false);
       
       try {
-        // Try Google Geocoding first
-        if (GOOGLE_MAPS_API_KEY) {
-          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.[0]) {
-            setCallForm(f => ({ ...f, delivery: data.results[0].formatted_address }));
-            return;
-          }
-        }
+
 
         // Fallback to Nominatim
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
@@ -540,15 +492,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           setManualDistanceEnabled(false);
           
           try {
-            // Try Google Geocoding first
-            if (GOOGLE_MAPS_API_KEY) {
-              const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.lat},${pos.lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-              const data = await res.json();
-              if (data.status === "OK" && data.results?.[0]) {
-                setCallForm(f => ({ ...f, delivery: data.results[0].formatted_address }));
-                return;
-              }
-            }
+
 
             // Fallback to Nominatim
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
@@ -767,14 +711,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               variant="outline"
               size="sm"
               onClick={() => {
-                const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
                 const next = types[(types.indexOf(mapType) + 1) % types.length];
                 setMapType(next);
               }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "google" ? "Google Maps" : mapType === "googleHybrid" ? "Google Satélite" : mapType === "streets" ? "OpenStreet" : "Esri Satélite"}
+              {mapType === "streets" ? "Mapa" : "Satélite"}
             </Button>
           </div>
         </CardHeader>
