@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers } from "lucide-react";
+import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers, RotateCcw } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
@@ -64,6 +64,8 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     sampleCount,
     isStationary,
     totalDistance,
+    permissionStatus,
+    errorStatus,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
@@ -100,17 +102,17 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     .filter((r: any) => r.restaurants?.latitude && r.restaurants?.longitude)
     .map((r: any) => ({ id: r.id, lat: r.restaurants.latitude, lng: r.restaurants.longitude, name: r.restaurants.name }));
 
-  const showMap = driverPosition || requestMarkers.length > 0;
+  const showMap = true; // Always show map frame
   const qc = qualityConfig[gpsQuality];
 
   // Initialize and update map
   useEffect(() => {
-    if (!showMap || !mapContainerRef.current) return;
+    if (!mapContainerRef.current) return;
 
     if (!mapRef.current) {
       const center: [number, number] = driverPosition
         ? [driverPosition.lat, driverPosition.lng]
-        : requestMarkers[0]
+        : requestMarkers.length > 0
           ? [requestMarkers[0].lat, requestMarkers[0].lng]
           : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
@@ -230,6 +232,12 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {permissionStatus === "denied" && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-2 flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <span>Acesso à localização negado. Por favor, ative nas configurações do navegador.</span>
+            </div>
+          )}
           {driverPosition ? (
             <div className="bg-muted/50 rounded-lg p-3 space-y-1">
               <div className="flex items-center justify-between text-sm">
@@ -272,15 +280,36 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm">Obtendo localização...</span>
+            <div className="flex flex-col items-center justify-center gap-2 py-4 text-muted-foreground border rounded-lg bg-muted/20">
+              {errorStatus ? (
+                <>
+                  <SignalZero className="w-8 h-8 text-destructive animate-pulse" />
+                  <p className="text-sm text-center px-4 font-medium text-destructive">{errorStatus}</p>
+                  <Button variant="outline" size="sm" onClick={startTracking} className="mt-2">
+                    Tentar Novamente
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="text-sm font-medium">Buscando sinal do GPS...</span>
+                  <p className="text-xs text-muted-foreground px-4 text-center">Isso pode levar alguns segundos, certifique-se de estar em local aberto.</p>
+                </>
+              )}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             {!watching ? (
-              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
+              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1 font-bold"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
             ) : (
-              <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
+              <div className="flex gap-2 w-full">
+                <Button onClick={startTracking} size="sm" variant="outline" className="flex-1 gap-1 text-xs">
+                  <RotateCcw className="w-3 h-3" /> Atualizar
+                </Button>
+                <Button onClick={stopTracking} size="sm" variant="secondary" className="flex-1 gap-1 text-xs text-destructive">
+                  <Pause className="w-3 h-3" /> Pausar
+                </Button>
+              </div>
             )}
           </div>
           {driverPosition && user?.id && (
@@ -314,8 +343,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         </Card>
       )}
 
-      {showMap && (
-        <Card>
+      <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
@@ -350,8 +378,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             </div>
           </CardContent>
-        </Card>
-      )}
+      </Card>
     </div>
   );
 };
