@@ -1,8 +1,8 @@
 export const DEFAULT_CENTER = { lat: -15.5595, lng: -54.3079 }; // Primavera do Leste, MT center
 export const DEFAULT_ZOOM = 14;
 
-// Add Google Maps API Key provided by user
-export const GOOGLE_MAPS_API_KEY = "AQ.Ab8RN6LJv8cYpXjZL8fEqDL9l_vgDqg42x_W51MAG5SPxgZt4w";
+// Use environment variable for the API Key to avoid hardcoding in source control
+export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 export const MAP_LAYERS = {
   streets: {
