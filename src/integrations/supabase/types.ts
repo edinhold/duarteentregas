@@ -842,6 +842,42 @@ export type Database = {
         }
         Relationships: []
       }
+      public_delivery_config: {
+        Row: {
+          app_fee_per_delivery: number | null
+          base_fee: number | null
+          fee_per_km: number | null
+          id: string | null
+          max_km: number | null
+          min_km: number | null
+          promo_credit_percent: number | null
+          round_km_up: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          app_fee_per_delivery?: number | null
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          promo_credit_percent?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          app_fee_per_delivery?: number | null
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          promo_credit_percent?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       restaurants_public: {
         Row: {
           address: string | null
@@ -956,6 +992,7 @@ export type Database = {
         Returns: string
       }
       redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
+      request_withdrawal: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "driver" | "store_owner"
