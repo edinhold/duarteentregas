@@ -970,6 +970,7 @@ export type Database = {
             }
             Returns: string
           }
+      delete_all_chat_messages: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

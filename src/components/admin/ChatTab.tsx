@@ -86,10 +86,7 @@ const ChatTab = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from("chat_messages")
-        .delete()
-        .gte("created_at", "1970-01-01T00:00:00Z");
+      const { error } = await supabase.rpc("delete_all_chat_messages");
       
       if (error) throw error;
       
