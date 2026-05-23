@@ -61,6 +61,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const [totalDistance, setTotalDistance] = useState(0); // cumulative meters
 
   const watchIdRef = useRef<number | null>(null);
+  const userIdRef = useRef(userId);
+  const optionsRef = useRef(options);
   const lastSavedRef = useRef(0);
   const kalmanRef = useRef<KalmanState | null>(null);
   const historyRef = useRef<Array<{ lat: number; lng: number; acc: number; ts: number }>>([]);
@@ -69,6 +71,12 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const lastMovingPosRef = useRef<GPSPosition | null>(null);
   const lastAcceptedPosRef = useRef<GPSPosition | null>(null);
   const totalDistanceRef = useRef(0);
+
+  // Sync refs
+  useEffect(() => {
+    userIdRef.current = userId;
+    optionsRef.current = options;
+  }, [userId, options]);
 
   const classifyQuality = useCallback((acc: number) => {
     if (acc <= 5) return "excellent";
@@ -157,7 +165,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   // ---------- Save to DB ----------
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
-      if (!userId) return;
+      const currentUserId = userIdRef.current;
+      if (!currentUserId) return;
       const now = Date.now();
       const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
       if (now - lastSavedRef.current < interval) return;
@@ -166,8 +175,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       try {
         await (supabase as any).from("driver_locations").upsert(
           {
-            user_id: userId,
-            driver_id: userId,
+            user_id: currentUserId,
+            driver_id: currentUserId,
             latitude: lat,
             longitude: lng,
             accuracy: acc,
@@ -181,7 +190,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         console.error("Erro ao salvar posição:", e);
       }
     },
-    [userId, saveIntervalMoving, saveIntervalStationary]
+    [saveIntervalMoving, saveIntervalStationary]
   );
 
   // ---------- Process raw GPS reading ----------
@@ -327,16 +336,20 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     }
   }, []);
 
-  // Auto-start on mount
+  // Auto-start on mount or when userId becomes available
   useEffect(() => {
-    startTracking();
+    // If we're not watching and we have a userId, or if we just want to ensure it's started
+    if (!watching && userId) {
+      startTracking();
+    }
+    
     return () => {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId, startTracking, watching]);
 
   return {
     position,

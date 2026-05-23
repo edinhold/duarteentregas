@@ -100,17 +100,17 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     .filter((r: any) => r.restaurants?.latitude && r.restaurants?.longitude)
     .map((r: any) => ({ id: r.id, lat: r.restaurants.latitude, lng: r.restaurants.longitude, name: r.restaurants.name }));
 
-  const showMap = driverPosition || requestMarkers.length > 0;
+  const showMap = true; // Always show map frame
   const qc = qualityConfig[gpsQuality];
 
   // Initialize and update map
   useEffect(() => {
-    if (!showMap || !mapContainerRef.current) return;
+    if (!mapContainerRef.current) return;
 
     if (!mapRef.current) {
       const center: [number, number] = driverPosition
         ? [driverPosition.lat, driverPosition.lng]
-        : requestMarkers[0]
+        : requestMarkers.length > 0
           ? [requestMarkers[0].lat, requestMarkers[0].lng]
           : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
@@ -314,8 +314,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         </Card>
       )}
 
-      {showMap && (
-        <Card>
+      <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
@@ -350,8 +349,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
             </div>
           </CardContent>
-        </Card>
-      )}
+      </Card>
     </div>
   );
 };
