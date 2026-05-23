@@ -223,8 +223,10 @@ const FinancialTab = () => {
       }
 
       // First delete orders to avoid FK issues with delivery_requests
-      const [r4, r3, r1, r2] = await Promise.all([
-        supabase.from("orders").delete().eq("status", "delivered"),
+      const orderDelete = await supabase.from("orders").delete().eq("status", "delivered");
+      if (orderDelete.error) throw orderDelete.error;
+
+      const [r3, r1, r2] = await Promise.all([
         supabase.from("delivery_requests").delete().eq("status", "delivered"),
         supabase.from("driver_earnings").delete().gte("created_at", "1970-01-01T00:00:00Z"),
         supabase.from("withdrawal_requests").delete().gte("created_at", "1970-01-01T00:00:00Z"),
@@ -233,7 +235,6 @@ const FinancialTab = () => {
       if (r1.error) throw r1.error;
       if (r2.error) throw r2.error;
       if (r3.error) throw r3.error;
-      if (r4.error) throw r4.error;
       
       toast.success(`${totalRecords} registro(s) financeiro(s) e de faturamento apagados com sucesso!`);
       setSelectedEarnings(new Set());
