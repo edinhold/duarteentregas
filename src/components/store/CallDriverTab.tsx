@@ -492,15 +492,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           setManualDistanceEnabled(false);
           
           try {
-            // Try Google Geocoding first
-            if (GOOGLE_MAPS_API_KEY) {
-              const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.lat},${pos.lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-              const data = await res.json();
-              if (data.status === "OK" && data.results?.[0]) {
-                setCallForm(f => ({ ...f, delivery: data.results[0].formatted_address }));
-                return;
-              }
-            }
+
 
             // Fallback to Nominatim
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
@@ -719,14 +711,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               variant="outline"
               size="sm"
               onClick={() => {
-                const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
                 const next = types[(types.indexOf(mapType) + 1) % types.length];
                 setMapType(next);
               }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "google" ? "Google Maps" : mapType === "googleHybrid" ? "Google Satélite" : mapType === "streets" ? "OpenStreet" : "Esri Satélite"}
+              {mapType === "streets" ? "Mapa" : "Satélite"}
             </Button>
           </div>
         </CardHeader>
