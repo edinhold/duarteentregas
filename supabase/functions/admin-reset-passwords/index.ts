@@ -39,17 +39,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Re-verify admin password for identity confirmation
+    // Force re-verify admin password for identity confirmation (MANDATORY)
     const { admin_password } = await req.json();
-    if (admin_password) {
-      const { error: signInError } = await createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!)
-        .auth.signInWithPassword({ email: caller.email!, password: admin_password });
-      if (signInError) {
-        return new Response(JSON.stringify({ error: "Senha do administrador incorreta. Confirme sua identidade." }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    if (!admin_password) {
+      return new Response(JSON.stringify({ error: "Senha do administrador é obrigatória para esta operação." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { error: signInError } = await createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!)
+      .auth.signInWithPassword({ email: caller.email!, password: admin_password });
+    
+    if (signInError) {
+      return new Response(JSON.stringify({ error: "Senha do administrador incorreta. Confirme sua identidade." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // List all users
