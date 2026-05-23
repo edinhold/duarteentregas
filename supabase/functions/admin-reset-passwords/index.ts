@@ -15,13 +15,19 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization")!;
 
-    // Verify caller is admin
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const callerClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user: caller } } = await callerClient.auth.getUser();
     if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+      return new Response(JSON.stringify({ error: "Sessão inválida" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -33,32 +39,38 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Sem permissão de administrador" }), {
+      return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Force re-verify admin password for identity confirmation (MANDATORY)
-    const { admin_password } = await req.json();
+    // MANDATORY password re-confirmation
+    const body = await req.json();
+    const { admin_password } = body;
+    
     if (!admin_password) {
-      return new Response(JSON.stringify({ error: "Senha do administrador é obrigatória para esta operação." }), {
+      return new Response(JSON.stringify({ error: "Confirmação de senha administrativa é obrigatória." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { error: signInError } = await createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!)
-      .auth.signInWithPassword({ email: caller.email!, password: admin_password });
+    // Use a fresh client for credential verification to avoid any session contamination
+    const verificationClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
+    const { error: signInError } = await verificationClient.auth.signInWithPassword({ 
+      email: caller.email!, 
+      password: admin_password 
+    });
     
     if (signInError) {
-      return new Response(JSON.stringify({ error: "Senha do administrador incorreta. Confirme sua identidade." }), {
+      return new Response(JSON.stringify({ error: "Senha incorreta. Ação não autorizada." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // List all users
+    // List users in chunks
     const allUsers: any[] = [];
     let page = 1;
     const perPage = 100;
@@ -67,45 +79,36 @@ Deno.serve(async (req) => {
         page,
         perPage,
       });
-      if (error) throw error;
+      if (error) throw new Error("Falha ao listar usuários");
       if (!users || users.length === 0) break;
       allUsers.push(...users);
       if (users.length < perPage) break;
       page++;
     }
 
-    // Filter out the caller admin
     const targetUsers = allUsers.filter((u) => u.id !== caller.id);
 
     let successCount = 0;
     let failureCount = 0;
-    const errors: string[] = [];
 
-    // Send recovery email to each user
     for (const user of targetUsers) {
-      if (!user.email) {
-        failureCount++;
-        continue;
-      }
+      if (!user.email) continue;
       try {
-        // Generate recovery link (this sends the recovery email)
         const { error: linkError } = await adminClient.auth.admin.generateLink({
           type: "recovery",
           email: user.email,
         });
         if (linkError) {
           failureCount++;
-          errors.push(`${user.email}: ${linkError.message}`);
         } else {
           successCount++;
         }
-      } catch (e: any) {
+      } catch (e) {
         failureCount++;
-        errors.push(`${user.email}: ${e.message}`);
       }
     }
 
-    // Log the action for audit
+    // Audit the action
     await adminClient.from("password_reset_logs").insert({
       admin_user_id: caller.id,
       action: "bulk_reset",
@@ -117,15 +120,15 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        total: targetUsers.length,
+        processed: targetUsers.length,
         success_count: successCount,
         failure_count: failureCount,
-        errors: errors.slice(0, 10), // limit error details
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || "Erro interno" }), {
+  } catch (err) {
+    console.error("Bulk reset error:", err);
+    return new Response(JSON.stringify({ error: "Ocorreu um erro ao processar a solicitação." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -881,6 +881,36 @@ export type Database = {
         }
         Relationships: []
       }
+      store_config: {
+        Row: {
+          base_fee: number | null
+          fee_per_km: number | null
+          id: string | null
+          max_km: number | null
+          min_km: number | null
+          round_km_up: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
