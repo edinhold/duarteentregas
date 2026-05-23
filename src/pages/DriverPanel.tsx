@@ -313,22 +313,16 @@ const DriverPanel = () => {
 
   const updateStatus = async (requestId: string, status: string) => {
     try {
-      const { error } = await supabase.from("delivery_requests").update({ status }).eq("id", requestId);
-      if (error) throw error;
-
-      // If delivered, create earning record (deduct app fee)
-      if (status === "delivered" && activeRequest && driverProfile) {
-        const totalFee = Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5);
-        const appFeePercent = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 10);
-        const appFee = (totalFee * appFeePercent) / 100;
-        const driverAmount = Math.max(totalFee - appFee, 0);
-        await supabase.from("driver_earnings").insert({
-          driver_id: driverProfile.id,
-          delivery_request_id: requestId,
-          amount: driverAmount,
-          status: "pending",
-        } as any);
+      if (status === "delivered") {
+        // Use secure RPC that validates ownership and inserts earnings atomically
+        const { error } = await (supabase as any).rpc("complete_delivery", {
+          p_request_id: requestId,
+        });
+        if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
+      } else {
+        const { error } = await supabase.from("delivery_requests").update({ status }).eq("id", requestId);
+        if (error) throw error;
       }
 
       toast.success("Status atualizado!");
