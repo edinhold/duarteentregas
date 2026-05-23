@@ -75,6 +75,7 @@ export const playNotificationSound = () => {
 };
 
 // Urgent alarm: loud sirene-style with multiple rounds of ascending beeps + heavy vibration
+// Optimized for maximum audibility and impact
 export const playUrgentNotification = () => {
   // Strong vibration pattern
   try {
@@ -89,13 +90,14 @@ export const playUrgentNotification = () => {
     
     if (ctx.state === "suspended") ctx.resume();
 
+    // High penetration frequencies
     const frequencies = [660, 880, 1100, 1320, 1500, 1700];
-    const rounds = 6;
-    const vol = Math.max(globalVolume, 0.85);
+    const rounds = 8; // Increased rounds
+    const vol = 1.0; // Force maximum volume for urgent alerts
 
     for (let r = 0; r < rounds; r++) {
       for (let i = 0; i < frequencies.length; i++) {
-        const startTime = ctx.currentTime + r * 0.6 + i * 0.1;
+        const startTime = ctx.currentTime + r * 0.5 + i * 0.08;
         
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -108,36 +110,39 @@ export const playUrgentNotification = () => {
         gain2.connect(ctx.destination);
 
         osc.frequency.value = frequencies[i];
-        osc2.frequency.value = frequencies[i] * 1.01;
+        osc2.frequency.value = frequencies[i] * 1.02; // Slightly more detuned for "emergency" feel
         
-        osc.type = r % 2 === 0 ? "square" : "sawtooth";
-        osc2.type = "sine";
+        osc.type = "sawtooth"; // Harsh, audible waveform
+        osc2.type = "square"; // Penetrating waveform
 
-        gain.gain.setValueAtTime(0.5 * vol, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+        gain.gain.setValueAtTime(0.6 * vol, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
         
-        gain2.gain.setValueAtTime(0.2 * vol, startTime);
-        gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+        gain2.gain.setValueAtTime(0.3 * vol, startTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
 
         osc.start(startTime);
-        osc.stop(startTime + 0.15);
+        osc.stop(startTime + 0.2);
         osc2.start(startTime);
-        osc2.stop(startTime + 0.15);
+        osc2.stop(startTime + 0.2);
       }
     }
 
-    const finalStart = ctx.currentTime + rounds * 0.6;
+    // Final loud beep
+    const finalStart = ctx.currentTime + rounds * 0.5;
     const oscFinal = ctx.createOscillator();
     const gainFinal = ctx.createGain();
     oscFinal.connect(gainFinal);
     gainFinal.connect(ctx.destination);
-    oscFinal.frequency.value = 1800;
+    oscFinal.frequency.value = 2000;
     oscFinal.type = "square";
-    gainFinal.gain.setValueAtTime(0.6 * vol, finalStart);
-    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 1.0);
+    gainFinal.gain.setValueAtTime(0.8 * vol, finalStart);
+    gainFinal.gain.exponentialRampToValueAtTime(0.01, finalStart + 1.2);
     oscFinal.start(finalStart);
-    oscFinal.stop(finalStart + 1.0);
-  } catch {}
+    oscFinal.stop(finalStart + 1.2);
+  } catch (e) {
+    console.error("Error playing urgent sound:", e);
+  }
 };
 
 // Standby alert: gentle reminder beep + short vibration
