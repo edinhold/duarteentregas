@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers, RotateCcw } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { DEFAULT_CENTER, MAP_LAYERS } from "@/config/maps";
+import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import { resumeAudioContext } from "@/lib/notificationSound";
@@ -71,7 +71,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
   } = useGPSTracking({ userId: user?.id });
 
   const [autoFollow, setAutoFollow] = useState(true);
-  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
 
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -352,14 +352,14 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+                    const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
                     const next = types[(types.indexOf(mapType) + 1) % types.length];
                     setMapType(next);
                   }}
                   className="gap-1 text-xs h-7"
                 >
                   <Layers className="w-3 h-3" />
-                  {mapType === "streets" ? "Mapa" : "Satélite"}
+                  {mapType === "google" ? "Google" : mapType === "googleHybrid" ? "Híbrido" : mapType === "streets" ? "OSM" : "Satélite"}
                 </Button>
                 <Button
                   variant={autoFollow ? "default" : "outline"}
