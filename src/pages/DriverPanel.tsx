@@ -162,7 +162,7 @@ const DriverPanel = () => {
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
     queryFn: async () => {
-      const { data } = await supabase.from("delivery_config").select("*").limit(1).single();
+      const { data } = await supabase.from("public_delivery_config").select("*").limit(1).single();
       return data;
     },
   });
@@ -372,21 +372,11 @@ const DriverPanel = () => {
       const isPaymentDay = today === paymentDay;
       const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
       const feeAmount = (totalPending * feePercent) / 100;
-      const netAmount = totalPending - feeAmount;
-
-      const { error } = await supabase.from("withdrawal_requests").insert({
-        driver_id: driverProfile!.id,
-        driver_user_id: user!.id,
-        amount: totalPending,
-        fee_percent: feePercent,
-        fee_amount: feeAmount,
-        net_amount: netAmount,
-        pix_key: pixKey,
-        pix_key_type: pixKeyType,
-      } as any);
+      const { error } = await (supabase as any).rpc("request_withdrawal");
       if (error) throw error;
-      toast.success(`Saque solicitado! Valor líquido: R$ ${netAmount.toFixed(2)}`);
+      toast.success(`Saque solicitado com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ["my-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["my-earnings"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao solicitar saque");
     } finally {
