@@ -64,6 +64,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     sampleCount,
     isStationary,
     totalDistance,
+    permissionStatus,
     startTracking,
     stopTracking,
   } = useGPSTracking({ userId: user?.id });
@@ -230,6 +231,12 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {permissionStatus === "denied" && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-2 flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <span>Acesso à localização negado. Por favor, ative nas configurações do navegador.</span>
+            </div>
+          )}
           {driverPosition ? (
             <div className="bg-muted/50 rounded-lg p-3 space-y-1">
               <div className="flex items-center justify-between text-sm">

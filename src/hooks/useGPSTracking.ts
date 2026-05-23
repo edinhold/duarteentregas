@@ -45,9 +45,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     userId,
     saveIntervalMoving = 2000,
     saveIntervalStationary = 15000,
-    maxAcceptableAccuracy = 150,       // raised from 100 — urban areas often 100-150m
+    maxAcceptableAccuracy = 150,
     outlierThresholdKmh = 200,
-    stationarySpeedThreshold = 0.2,    // lowered from 0.5 — ~0.7 km/h, only truly stopped
+    stationarySpeedThreshold = 0.2,
   } = options;
 
   const [position, setPosition] = useState<GPSPosition | null>(null);
@@ -58,7 +58,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const [gpsQuality, setGpsQuality] = useState<"excellent" | "good" | "fair" | "poor">("poor");
   const [sampleCount, setSampleCount] = useState(0);
   const [isStationary, setIsStationary] = useState(false);
-  const [totalDistance, setTotalDistance] = useState(0); // cumulative meters
+  const [totalDistance, setTotalDistance] = useState(0);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState | "unsupported">("prompt");
 
   const watchIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
@@ -336,9 +337,20 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     }
   }, []);
 
+  // Monitor permission
+  useEffect(() => {
+    if ("permissions" in navigator) {
+      navigator.permissions.query({ name: "geolocation" as any }).then((status) => {
+        setPermissionStatus(status.state);
+        status.onchange = () => setPermissionStatus(status.state);
+      });
+    } else {
+      setPermissionStatus("unsupported");
+    }
+  }, []);
+
   // Auto-start on mount or when userId becomes available
   useEffect(() => {
-    // If we're not watching and we have a userId, or if we just want to ensure it's started
     if (!watching && userId) {
       startTracking();
     }
@@ -361,6 +373,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     sampleCount,
     isStationary,
     totalDistance,
+    permissionStatus,
     discardedCount: discardedCountRef.current,
     startTracking,
     stopTracking,
