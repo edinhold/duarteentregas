@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers } from "lucide-react";
+import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers, RotateCcw } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
@@ -298,11 +298,18 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               )}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             {!watching ? (
-              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
+              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1 font-bold"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
             ) : (
-              <Button onClick={stopTracking} size="sm" variant="outline" className="flex-1">Pausar GPS</Button>
+              <div className="flex gap-2 w-full">
+                <Button onClick={startTracking} size="sm" variant="outline" className="flex-1 gap-1 text-xs">
+                  <RotateCcw className="w-3 h-3" /> Atualizar
+                </Button>
+                <Button onClick={stopTracking} size="sm" variant="secondary" className="flex-1 gap-1 text-xs text-destructive">
+                  <Pause className="w-3 h-3" /> Pausar
+                </Button>
+              </div>
             )}
           </div>
           {driverPosition && user?.id && (
