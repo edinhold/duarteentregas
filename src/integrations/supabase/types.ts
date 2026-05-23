@@ -241,6 +241,13 @@ export type Database = {
             referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "delivery_requests_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       driver_earnings: {
@@ -474,6 +481,13 @@ export type Database = {
             referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       password_reset_logs: {
@@ -558,6 +572,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
             referencedColumns: ["id"]
           },
         ]
@@ -761,7 +782,75 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      delivery_config_public: {
+        Row: {
+          base_fee: number | null
+          fee_per_km: number | null
+          id: string | null
+          max_km: number | null
+          min_km: number | null
+          round_km_up: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_fee?: number | null
+          fee_per_km?: number | null
+          id?: string | null
+          max_km?: number | null
+          min_km?: number | null
+          round_km_up?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      restaurants_public: {
+        Row: {
+          address: string | null
+          delivery_fee: number | null
+          delivery_time: string | null
+          id: string | null
+          is_open: boolean | null
+          latitude: number | null
+          longitude: number | null
+          min_order: number | null
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          delivery_fee?: number | null
+          delivery_time?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          min_order?: number | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          delivery_fee?: number | null
+          delivery_time?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          min_order?: number | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
