@@ -343,8 +343,8 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
             </div>
           </CardContent>
         </Card>
-      </div>
       )}
+      </div>
 
       <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none sm:border sm:shadow-sm">
           <CardHeader className="pb-2 flex-none">
