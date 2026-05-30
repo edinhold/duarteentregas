@@ -35,7 +35,10 @@ const DriverPanel = () => {
   const [cancelling, setCancelling] = useState(false);
 
   // Single instance of GPS tracking for the whole panel
-  const trackingData = useGPSTracking({ userId: user?.id });
+  const trackingData = useGPSTracking({ 
+    userId: user?.id,
+    driverId: driverProfile?.id
+  });
 
   // Get driver profile
   const { data: driverProfile } = useQuery({
