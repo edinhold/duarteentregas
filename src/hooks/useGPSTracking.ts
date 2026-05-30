@@ -81,11 +81,13 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const lastAcceptedPosRef = useRef<GPSPosition | null>(null);
   const totalDistanceRef = useRef(0);
   const lastReadingTsRef = useRef<number>(0);
+  const lastErrorTsRef = useRef<number>(0);
   const errorToastShownRef = useRef<Record<number, number>>({});
   const watchdogRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
   const pollingIntervalRef = useRef<number | null>(null);
+  const offlineQueueRef = useRef<any[]>([]);
 
 
   // Sync refs
@@ -179,7 +181,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return { lat: wLat / totalWeight, lng: wLng / totalWeight };
   }, []);
 
-  // ---------- Save to DB with Retry & Offline Support ----------
+  // ---------- Save to DB with Robust Offline Queue ----------
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       const currentUserId = userIdRef.current;
@@ -188,6 +190,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       
       const now = Date.now();
       const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
+      
+      // Still enforce interval even if we queue
       if (now - lastSavedRef.current < interval) return;
       lastSavedRef.current = now;
 
@@ -207,28 +211,44 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         const { error } = await (supabase as any).from("driver_locations").upsert(data, { onConflict: "user_id" });
         if (error) throw error;
         
-        // Also update driver active status if we're here
+        // Also update driver active status
         await (supabase as any).from("drivers").update({ is_active: true, updated_at: new Date().toISOString() }).eq("user_id", currentUserId);
       };
 
       try {
         await tryUpsert(payload);
         
-        // If we succeeded, try to sync any pending ones from localStorage (minimal queue)
-        const pending = localStorage.getItem("pending_gps_sync");
-        if (pending) {
-          localStorage.removeItem("pending_gps_sync");
-          // Just sync the last one if we were offline
-          const lastOne = JSON.parse(pending);
-          tryUpsert(lastOne).catch(() => {});
+        // Success! Now try to clear the queue if any
+        if (offlineQueueRef.current.length > 0) {
+          const queue = [...offlineQueueRef.current];
+          offlineQueueRef.current = []; // Clear first to avoid loops
+          localStorage.removeItem("pending_gps_queue");
+          
+          // Just sync the most recent 3 points to avoid overloading
+          const toSync = queue.slice(-3);
+          for (const item of toSync) {
+            try { await tryUpsert(item); } catch {}
+          }
+        }
+        
+        // If we were showing a connection error, clear it only after success
+        if (errorStatus?.includes("conexão")) {
+          setErrorStatus(null);
         }
       } catch (e) {
-        console.warn("[GPS] Sync failed, saving for retry:", e);
-        localStorage.setItem("pending_gps_sync", JSON.stringify(payload));
-        setErrorStatus("Erro de conexão. Tentando sincronizar...");
+        console.warn("[GPS] DB Sync failed, adding to queue:", e);
+        // Add to in-memory queue and persist
+        offlineQueueRef.current.push(payload);
+        if (offlineQueueRef.current.length > 50) offlineQueueRef.current.shift(); // Limit size
+        localStorage.setItem("pending_gps_queue", JSON.stringify(offlineQueueRef.current));
+        
+        // Only show error if it's been failing for a while (> 15s)
+        if (Date.now() - lastReadingTsRef.current > 15_000) {
+          setErrorStatus("Erro de conexão. Sincronização pendente...");
+        }
       }
     },
-    [saveIntervalMoving, saveIntervalStationary]
+    [saveIntervalMoving, saveIntervalStationary, errorStatus]
   );
 
   // ---------- Process raw GPS reading ----------
@@ -366,74 +386,85 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   }, []);
 
   // ---------- Start / Stop ----------
-  const startTracking = useCallback(() => {
+  const startTracking = useCallback((isRestart = false) => {
     if (!navigator.geolocation) {
       toast.error("GPS não suportado neste dispositivo");
       return;
     }
 
-    // Request wake lock to keep GPS active even if user doesn't touch screen
+    // Request wake lock to keep GPS active
     requestWakeLock();
     startNoSleepLoop();
 
-    // Clear any existing watch before starting a new one
+    // Clear any existing watch
     if (watchIdRef.current !== null) {
       try { navigator.geolocation.clearWatch(watchIdRef.current); } catch {}
       watchIdRef.current = null;
     }
 
-    kalmanRef.current = null;
-    historyRef.current = [];
-    discardedCountRef.current = 0;
-    stationaryCountRef.current = 0;
-    lastMovingPosRef.current = null;
-    lastAcceptedPosRef.current = null;
-    totalDistanceRef.current = 0;
-    setTotalDistance(0);
-    setSampleCount(0);
-    setErrorStatus(null);
-    lastReadingTsRef.current = Date.now();
+    // Only reset state if this is NOT a silent restart/re-tracking attempt
+    if (!isRestart) {
+      kalmanRef.current = null;
+      historyRef.current = [];
+      discardedCountRef.current = 0;
+      stationaryCountRef.current = 0;
+      lastMovingPosRef.current = null;
+      lastAcceptedPosRef.current = null;
+      totalDistanceRef.current = 0;
+      setTotalDistance(0);
+      setSampleCount(0);
+      setErrorStatus(null);
+      lastReadingTsRef.current = Date.now();
+      
+      // Restore queue from storage if any
+      try {
+        const savedQueue = localStorage.getItem("pending_gps_queue");
+        if (savedQueue) offlineQueueRef.current = JSON.parse(savedQueue);
+      } catch {}
+    }
 
-    // 1) Quick warm-up: get a fast cached fix to show something immediately
+    // 1) Quick warm-up: get a fast cached fix
     navigator.geolocation.getCurrentPosition(
       processReading,
       () => {},
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 8_000 }
-    );
-    // 2) Then a high-accuracy fix
-    navigator.geolocation.getCurrentPosition(
-      processReading,
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5_000 }
     );
 
     const id = navigator.geolocation.watchPosition(
       processReading,
       (err) => {
         const code = err.code;
+        lastErrorTsRef.current = Date.now();
+
         if (code === err.PERMISSION_DENIED) {
           setErrorStatus("Permissão de localização negada.");
           maybeToastError(code, "Permissão de localização negada.");
           setWatching(false);
-          return; // Don't retry on permission denial
-        } else if (code === err.POSITION_UNAVAILABLE) {
-          setErrorStatus("Buscando sinal GPS...");
-          maybeToastError(code, "Sinal GPS fraco. Tentando reconectar...");
-        } else if (code === err.TIMEOUT) {
-          setErrorStatus("Sinal GPS lento. Reconectando...");
-        } else {
-          setErrorStatus("Erro ao obter localização. Reconectando...");
+          return;
+        } 
+        
+        // For other errors, only show in UI if prolonged
+        const sinceLastReading = Date.now() - lastReadingTsRef.current;
+        if (sinceLastReading > 15_000) {
+          if (code === err.POSITION_UNAVAILABLE) {
+            setErrorStatus("Buscando sinal GPS...");
+          } else if (code === err.TIMEOUT) {
+            setErrorStatus("Sinal GPS instável...");
+          } else {
+            setErrorStatus("Reconectando GPS...");
+          }
         }
-        // Auto-restart watch after a short delay (don't give up)
+
+        // Silent restart watch after 3s
         if (restartTimeoutRef.current) window.clearTimeout(restartTimeoutRef.current);
         restartTimeoutRef.current = window.setTimeout(() => {
-          startTracking();
+          startTracking(true); // silent restart
         }, 3000);
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 0,      // Always fresh data — no caching
-        timeout: 60_000,    // Generous timeout for weak-signal areas
+        maximumAge: 0,
+        timeout: 30_000, 
       }
     );
 
@@ -455,30 +486,30 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       );
     }, 15_000); // 15s polling interval as fallback
 
-    // 3) Watchdog: if no new reading in 15s (was 30s), restart watch and force-poke GPS
+    // 3) Watchdog: Check status every 10s
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
-      // Re-request wake lock periodically as some browsers release it silently
       requestWakeLock();
       
       const sinceLast = Date.now() - lastReadingTsRef.current;
+      
+      // If no reading in 15s, try a direct poke
       if (sinceLast > 15_000) {
-        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Forcing getCurrentPosition.");
-        // Poke GPS with a direct request to wake up the sensor
+        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Poking sensor.");
         navigator.geolocation.getCurrentPosition(
           processReading,
           (err) => console.warn("[GPS] Heartbeat poke failed:", err.message),
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 8_000 }
         );
         
-        // If it's been even longer, full restart
-        if (sinceLast > 30_000) {
-          console.warn("[GPS] Watchdog: critical delay. Full restart.");
-          startTracking();
+        // If no reading in 40s, force a restart
+        if (sinceLast > 40_000) {
+          console.warn("[GPS] Watchdog: critical delay. Silent restart.");
+          startTracking(true);
         }
       }
     }, 10_000);
-  }, [processReading, maybeToastError]);
+  }, [processReading, maybeToastError, requestWakeLock, errorStatus]);
 
   const stopTracking = useCallback(() => {
     releaseWakeLock();
