@@ -137,6 +137,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
         attribution: MAP_LAYERS[mapType].attribution,
         maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
       }).addTo(map);
+      map.on("dragstart", () => setAutoFollow(false));
       mapRef.current = map;
     }
 
