@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -451,9 +451,12 @@ const DriverPanel = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-4 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm">
+          <TabsList className="grid w-full grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm">
             <TabsTrigger value="home" className="flex items-center gap-1">
               <Home className="w-4 h-4" /> <span className="hidden xs:inline">Início</span>
+            </TabsTrigger>
+            <TabsTrigger value="map" className="flex items-center gap-1">
+              <MapIcon className="w-4 h-4" /> <span className="hidden xs:inline">Mapa</span>
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-1">
               <History className="w-4 h-4" /> <span className="hidden xs:inline">Histórico</span>
@@ -570,6 +573,16 @@ const DriverPanel = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="map" className="space-y-4 outline-none -mx-4 -mt-4">
+            <div className="h-[calc(100vh-120px)] w-full">
+               <DriverGPS
+                activeRequest={activeRequest}
+                pendingRequests={pendingRequests}
+                onAcceptRequest={acceptRequest}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4 outline-none">
