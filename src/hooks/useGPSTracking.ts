@@ -83,6 +83,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const errorToastShownRef = useRef<Record<number, number>>({});
   const watchdogRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<number | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
 
   // Sync refs
@@ -317,12 +318,40 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     }
   }, []);
 
+  // ---------- Wake Lock (Keep Screen On) ----------
+  const requestWakeLock = useCallback(async () => {
+    if ("wakeLock" in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        console.log("[GPS] Wake Lock active");
+        wakeLockRef.current.addEventListener("release", () => {
+          console.log("[GPS] Wake Lock released");
+          wakeLockRef.current = null;
+        });
+      } catch (err: any) {
+        console.warn(`[GPS] Wake Lock failed: ${err.message}`);
+      }
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      } catch {}
+    }
+  }, []);
+
   // ---------- Start / Stop ----------
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("GPS não suportado neste dispositivo");
       return;
     }
+
+    // Request wake lock to keep GPS active even if user doesn't touch screen
+    requestWakeLock();
 
     // Clear any existing watch before starting a new one
     if (watchIdRef.current !== null) {
@@ -400,6 +429,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   }, [processReading, maybeToastError]);
 
   const stopTracking = useCallback(() => {
+    releaseWakeLock();
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -413,7 +443,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       restartTimeoutRef.current = null;
     }
     setWatching(false);
-  }, []);
+  }, [releaseWakeLock]);
 
   // Monitor permission
   useEffect(() => {
@@ -452,6 +482,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === "visible" && userId) {
+        requestWakeLock();
         const sinceLast = Date.now() - lastReadingTsRef.current;
         if (sinceLast > 10_000) {
           startTracking();
