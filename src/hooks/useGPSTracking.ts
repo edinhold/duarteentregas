@@ -85,6 +85,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const watchdogRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
 
 
   // Sync refs
@@ -475,6 +476,10 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     if (restartTimeoutRef.current) {
       window.clearTimeout(restartTimeoutRef.current);
       restartTimeoutRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
     setWatching(false);
   }, [releaseWakeLock]);
