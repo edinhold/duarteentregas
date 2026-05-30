@@ -278,6 +278,20 @@ const DriverPanel = () => {
       window.removeEventListener('touchstart', handleFirstInteraction);
     };
   }, [user, activeRequest?.id, driverProfile?.id]);
+  
+  // Keep driver active status synced while panel is open
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const keepActive = async () => {
+      await supabase.from("drivers").update({ is_active: true, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+    };
+    
+    keepActive();
+    const interval = setInterval(keepActive, 60000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const acceptRequest = async (requestId: string) => {
     try {
