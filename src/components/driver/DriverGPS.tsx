@@ -381,7 +381,6 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
       )}
     </div>
   );
-  );
 };
 
 export default DriverGPS;
