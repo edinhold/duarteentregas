@@ -300,6 +300,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       setGpsQuality(classifyQuality(acc));
       setWatching(true);
       setErrorStatus(null);
+      lastReadingTsRef.current = Date.now();
 
       savePositionToDb(finalPos.lat, finalPos.lng, acc, hdg, spd, stationary);
     },
