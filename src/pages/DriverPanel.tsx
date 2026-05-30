@@ -34,12 +34,6 @@ const DriverPanel = () => {
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  // Single instance of GPS tracking for the whole panel
-  const trackingData = useGPSTracking({ 
-    userId: user?.id,
-    driverId: driverProfile?.id
-  });
-
   // Get driver profile
   const { data: driverProfile } = useQuery({
     queryKey: ["my-driver-profile", user?.id],
@@ -49,6 +43,12 @@ const DriverPanel = () => {
       return data;
     },
     enabled: !!user,
+  });
+
+  // Single instance of GPS tracking for the whole panel
+  const trackingData = useGPSTracking({ 
+    userId: user?.id,
+    driverId: driverProfile?.id
   });
 
   // Load PIX info from profile
