@@ -65,8 +65,8 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     const map = L.map(containerRef.current).setView(center, DEFAULT_ZOOM);
     mapRef.current = map;
 
-    L.tileLayer(MAP_LAYERS.google.url, {
-      attribution: MAP_LAYERS.google.attribution,
+    L.tileLayer(MAP_LAYERS.streets.url, {
+      attribution: MAP_LAYERS.streets.attribution,
     }).addTo(map);
 
     return () => {
