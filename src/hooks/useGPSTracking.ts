@@ -45,8 +45,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     userId,
     saveIntervalMoving = 2000,
     saveIntervalStationary = 15000,
-    maxAcceptableAccuracy = 150,
-    outlierThresholdKmh = 200,
+    maxAcceptableAccuracy = 300, // Relaxed from 150
+    outlierThresholdKmh = 250,   // Relaxed from 200
     stationarySpeedThreshold = 0.2,
   } = options;
 
@@ -334,8 +334,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 0,      // Forces the device to get a fresh position
-        timeout: 15000,     // Allow more time for first fix
+        maximumAge: 5000,    // Allow slightly old positions if fresh one is slow
+        timeout: 30000,     // Allow 30s for fix (better for cold starts)
       }
     );
 
