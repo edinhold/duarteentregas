@@ -308,11 +308,11 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
                 )}
                 <div className="mt-2 flex gap-1">
                   {!watching ? (
-                    <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="xs" className="w-full h-7 text-[10px]">
+                    <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="w-full h-7 text-[10px] px-2">
                       <Locate className="w-3 h-3 mr-1" /> Reativar
                     </Button>
                   ) : (
-                    <Button onClick={stopTracking} variant="ghost" size="xs" className="w-full h-7 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50">
+                    <Button onClick={stopTracking} variant="ghost" size="sm" className="w-full h-7 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 px-2">
                       <Pause className="w-3 h-3 mr-1" /> Pausar
                     </Button>
                   )}
