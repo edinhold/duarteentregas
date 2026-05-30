@@ -290,6 +290,13 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
               )}
             </div>
 
+            {permissionStatus === "denied" && (
+              <div className="bg-red-50 text-red-600 p-2 rounded text-[10px] mb-2 flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                <span>Acesso negado. Ative no navegador.</span>
+              </div>
+            )}
+
             {driverPosition ? (
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px]">
