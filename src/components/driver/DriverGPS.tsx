@@ -244,14 +244,16 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
             variant="secondary"
             size="sm"
             onClick={() => {
-              const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+              const types: (keyof typeof MAP_LAYERS)[] = ["streets", "google", "satellite"];
               const next = types[(types.indexOf(mapType) + 1) % types.length];
               setMapType(next);
             }}
             className="shadow-md gap-2 bg-white/90 backdrop-blur-sm hover:bg-white"
           >
             <Layers className="w-4 h-4" />
-            <span className="hidden sm:inline">{mapType === "streets" ? "Ver Satélite" : "Ver Ruas"}</span>
+            <span className="hidden sm:inline">
+              {mapType === "streets" ? "Ver Google" : mapType === "google" ? "Ver Satélite" : "Ver Ruas"}
+            </span>
           </Button>
 
           <Button
