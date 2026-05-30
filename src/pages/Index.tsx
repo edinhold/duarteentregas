@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import logoDuarte from "@/assets/logo-duarte.jpeg";
 import { useNavigate } from "react-router-dom";
 import { useCategories, useRestaurants } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
 import RestaurantMap from "@/components/RestaurantMap";
@@ -18,7 +19,26 @@ import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
+  
+  // Se o usuário estiver logado, redirecionar para o painel correspondente
+  useEffect(() => {
+    if (!loading && user) {
+      const checkRole = async () => {
+        const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+        const userRoles = roles?.map(r => r.role) || [];
+        
+        if (userRoles.includes("driver")) {
+          navigate("/entregador", { replace: true });
+        } else if (userRoles.includes("store_owner")) {
+          navigate("/lojista", { replace: true });
+        } else if (userRoles.includes("admin")) {
+          navigate("/admin", { replace: true });
+        }
+      };
+      checkRole();
+    }
+  }, [user, loading, navigate]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
