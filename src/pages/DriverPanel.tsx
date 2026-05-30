@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
+import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -32,6 +33,9 @@ const DriverPanel = () => {
   const [withdrawing, setWithdrawing] = useState(false);
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // Single instance of GPS tracking for the whole panel
+  const trackingData = useGPSTracking({ userId: user?.id });
 
   // Get driver profile
   const { data: driverProfile } = useQuery({
@@ -475,6 +479,7 @@ const DriverPanel = () => {
               activeRequest={activeRequest}
               pendingRequests={pendingRequests}
               onAcceptRequest={acceptRequest}
+              trackingData={trackingData}
             />
 
             {/* Active delivery */}
@@ -581,6 +586,7 @@ const DriverPanel = () => {
                 activeRequest={activeRequest}
                 pendingRequests={pendingRequests}
                 onAcceptRequest={acceptRequest}
+                trackingData={trackingData}
               />
             </div>
           </TabsContent>
