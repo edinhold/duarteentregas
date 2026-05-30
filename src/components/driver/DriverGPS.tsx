@@ -216,8 +216,9 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
   }, []);
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex-none space-y-4">
+        <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Navigation className="w-4 h-4" /> GPS em Tempo Real
@@ -343,9 +344,10 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
           </CardContent>
         </Card>
       )}
+      </div>
 
-      <Card>
-          <CardHeader className="pb-2">
+      <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none sm:border sm:shadow-sm">
+          <CardHeader className="pb-2 flex-none">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
               <div className="flex items-center gap-2">
@@ -374,9 +376,9 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-[450px] rounded-lg overflow-hidden shadow-inner border">
-              <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
+          <CardContent className="flex-1 p-0 sm:p-6 min-h-0">
+            <div className="h-full w-full rounded-none sm:rounded-lg overflow-hidden shadow-inner border-y sm:border">
+              <div ref={mapContainerRef} className="w-full h-full" />
             </div>
           </CardContent>
       </Card>
