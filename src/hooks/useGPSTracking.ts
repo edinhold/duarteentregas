@@ -178,33 +178,53 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return { lat: wLat / totalWeight, lng: wLng / totalWeight };
   }, []);
 
-  // ---------- Save to DB ----------
+  // ---------- Save to DB with Retry & Offline Support ----------
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       const currentUserId = userIdRef.current;
       const currentDriverId = driverIdRef.current;
       if (!currentUserId) return;
+      
       const now = Date.now();
       const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
       if (now - lastSavedRef.current < interval) return;
       lastSavedRef.current = now;
 
+      const payload = {
+        user_id: currentUserId,
+        driver_id: currentDriverId || currentUserId,
+        latitude: lat,
+        longitude: lng,
+        accuracy: acc,
+        heading: hdg,
+        speed: spd,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Helper to try upsert
+      const tryUpsert = async (data: any) => {
+        const { error } = await (supabase as any).from("driver_locations").upsert(data, { onConflict: "user_id" });
+        if (error) throw error;
+        
+        // Also update driver active status if we're here
+        await (supabase as any).from("drivers").update({ is_active: true, updated_at: new Date().toISOString() }).eq("user_id", currentUserId);
+      };
+
       try {
-        await (supabase as any).from("driver_locations").upsert(
-          {
-            user_id: currentUserId,
-            driver_id: currentDriverId || currentUserId,
-            latitude: lat,
-            longitude: lng,
-            accuracy: acc,
-            heading: hdg,
-            speed: spd,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
+        await tryUpsert(payload);
+        
+        // If we succeeded, try to sync any pending ones from localStorage (minimal queue)
+        const pending = localStorage.getItem("pending_gps_sync");
+        if (pending) {
+          localStorage.removeItem("pending_gps_sync");
+          // Just sync the last one if we were offline
+          const lastOne = JSON.parse(pending);
+          tryUpsert(lastOne).catch(() => {});
+        }
       } catch (e) {
-        console.error("Erro ao salvar posição:", e);
+        console.warn("[GPS] Sync failed, saving for retry:", e);
+        localStorage.setItem("pending_gps_sync", JSON.stringify(payload));
+        setErrorStatus("Erro de conexão. Tentando sincronizar...");
       }
     },
     [saveIntervalMoving, saveIntervalStationary]
