@@ -10,10 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { isToday, isThisWeek, isThisMonth } from "date-fns";
 import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
@@ -464,6 +465,16 @@ const DriverPanel = () => {
     }));
 
   const totalEarnings = earnings.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const dailyEarnings = earnings
+    .filter((e: any) => isToday(new Date(e.created_at)))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const weeklyEarnings = earnings
+    .filter((e: any) => isThisWeek(new Date(e.created_at), { weekStartsOn: 0 }))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const monthlyEarnings = earnings
+    .filter((e: any) => isThisMonth(new Date(e.created_at)))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+
   const pendingBalance = earnings
     .filter((e: any) => e.status === "pending")
     .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
@@ -684,6 +695,32 @@ const DriverPanel = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Earnings Report */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" /> Relatório de Ganhos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Hoje</p>
+                    <p className="text-sm font-bold text-primary">R$ {dailyEarnings.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Semana</p>
+                    <p className="text-sm font-bold text-primary">R$ {weeklyEarnings.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Mês</p>
+                    <p className="text-sm font-bold text-primary">R$ {monthlyEarnings.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
 
             {/* PIX Key */}
             <Card>
