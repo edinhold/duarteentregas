@@ -33,6 +33,18 @@ const DriverPanel = () => {
   const [withdrawing, setWithdrawing] = useState(false);
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => { setIsOnline(true); toast.success("Internet restabelecida"); };
+    const handleOffline = () => { setIsOnline(false); toast.error("Você está offline"); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Get driver profile
   const { data: driverProfile } = useQuery({
@@ -472,8 +484,13 @@ const DriverPanel = () => {
             <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
           </Badge>
         ) : (
-          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6">
+          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6 animate-pulse">
             <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
+          </Badge>
+        )}
+        {!isOnline && (
+          <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 gap-1 px-2 py-0 h-6 animate-bounce">
+            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">OFFLINE</span>
           </Badge>
         )}
         <ThemeToggle />
