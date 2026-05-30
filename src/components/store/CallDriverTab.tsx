@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code } from "lucide-react";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
@@ -117,6 +117,21 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const { data: driverLocations = [] } = useDriverLocations();
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
+  const { data: favoriteDrivers = [] } = useQuery({
+    queryKey: ["favorite-drivers", restaurant?.id],
+    queryFn: async () => {
+      if (!restaurant?.id) return [];
+      const { data, error } = await supabase
+        .from("store_driver_favorites")
+        .select("driver_id, driver:drivers(id, full_name, driver_code)")
+        .eq("restaurant_id", restaurant.id);
+      if (error) return [];
+      return data;
+    },
+    enabled: !!restaurant?.id,
+  });
   const gpsWatchRef = useRef<number | null>(null);
 
   // Route profile & road distance state
@@ -655,6 +670,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         p_notes: callForm.notes || null,
         p_restaurant_id: restaurant?.id || null,
         p_distance_km: finalDistance,
+        p_preferred_driver_id: selectedDriverId || null,
       } as any);
 
       if (error) throw error;
@@ -1015,6 +1031,44 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               📍 Digite o endereço de entrega ou clique no mapa para calcular o valor automaticamente
             </p>
           )}
+
+          {/* Preferred Driver Selection */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <Label className="text-xs font-semibold flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-yellow-500" />
+              Direcionar para entregador específico (Opcional)
+            </Label>
+            <div className="grid grid-cols-1 gap-2">
+              <select 
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                value={selectedDriverId || ""}
+                onChange={(e) => setSelectedDriverId(e.target.value || null)}
+              >
+                <option value="">Qualquer entregador disponível</option>
+                <optgroup label="Seus Favoritos Online">
+                  {favoriteDrivers.filter((f: any) => driverLocations.some((dl: any) => dl.driver_id === f.driver_id)).map((f: any) => (
+                    <option key={f.driver_id} value={f.driver_id}>
+                      ⭐ {f.driver?.full_name} ({f.driver?.driver_code})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Outros Entregadores Online">
+                  {driverLocations
+                    .filter((dl: any) => !favoriteDrivers.some((f: any) => f.driver_id === dl.driver_id))
+                    .map((dl: any) => (
+                      <option key={dl.driver_id} value={dl.driver_id}>
+                        {dl.driver?.full_name || "Entregador"} ({dl.driver?.driver_code || "N/A"})
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+              {selectedDriverId && (
+                <p className="text-[10px] text-primary font-medium">
+                  Solicitação será enviada prioritariamente para este entregador.
+                </p>
+              )}
+            </div>
+          </div>
 
           <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0 || loadingRoute} className="w-full">
             {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}

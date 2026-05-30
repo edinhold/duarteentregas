@@ -325,6 +325,7 @@ export type Database = {
         Row: {
           cpf: string | null
           created_at: string
+          driver_code: string | null
           full_name: string
           id: string
           is_active: boolean
@@ -344,6 +345,7 @@ export type Database = {
         Insert: {
           cpf?: string | null
           created_at?: string
+          driver_code?: string | null
           full_name: string
           id?: string
           is_active?: boolean
@@ -363,6 +365,7 @@ export type Database = {
         Update: {
           cpf?: string | null
           created_at?: string
+          driver_code?: string | null
           full_name?: string
           id?: string
           is_active?: boolean
@@ -717,6 +720,56 @@ export type Database = {
         }
         Relationships: []
       }
+      store_driver_favorites: {
+        Row: {
+          created_at: string
+          driver_id: string
+          id: string
+          restaurant_id: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          id?: string
+          restaurant_id: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          id?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_driver_favorites_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "assigned_driver_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_driver_favorites_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_driver_favorites_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_driver_favorites_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -966,6 +1019,17 @@ export type Database = {
               p_distance_km?: number
               p_notes?: string
               p_pickup_address: string
+              p_restaurant_id?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_delivery_address: string
+              p_distance_km?: number
+              p_notes?: string
+              p_pickup_address: string
+              p_preferred_driver_id?: string
               p_restaurant_id?: string
             }
             Returns: string
