@@ -440,6 +440,21 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     watchIdRef.current = id;
     setWatching(true);
 
+    // 4) Background Heartbeat/Polling: secondary mechanism to watchPosition
+    // Some browsers stop watchPosition but allow interval-based getCurrentPosition
+    if (pollingIntervalRef.current) window.clearInterval(pollingIntervalRef.current);
+    pollingIntervalRef.current = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') {
+        // Even more critical when hidden
+        console.log("[GPS] Polling while in background...");
+      }
+      navigator.geolocation.getCurrentPosition(
+        processReading,
+        (err) => console.warn("[GPS] Polling error:", err.message),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+      );
+    }, 15_000); // 15s polling interval as fallback
+
     // 3) Watchdog: if no new reading in 15s (was 30s), restart watch and force-poke GPS
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
