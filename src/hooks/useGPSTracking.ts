@@ -85,6 +85,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const watchdogRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
 
 
   // Sync refs
@@ -178,33 +179,53 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     return { lat: wLat / totalWeight, lng: wLng / totalWeight };
   }, []);
 
-  // ---------- Save to DB ----------
+  // ---------- Save to DB with Retry & Offline Support ----------
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       const currentUserId = userIdRef.current;
       const currentDriverId = driverIdRef.current;
       if (!currentUserId) return;
+      
       const now = Date.now();
       const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
       if (now - lastSavedRef.current < interval) return;
       lastSavedRef.current = now;
 
+      const payload = {
+        user_id: currentUserId,
+        driver_id: currentDriverId || currentUserId,
+        latitude: lat,
+        longitude: lng,
+        accuracy: acc,
+        heading: hdg,
+        speed: spd,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Helper to try upsert
+      const tryUpsert = async (data: any) => {
+        const { error } = await (supabase as any).from("driver_locations").upsert(data, { onConflict: "user_id" });
+        if (error) throw error;
+        
+        // Also update driver active status if we're here
+        await (supabase as any).from("drivers").update({ is_active: true, updated_at: new Date().toISOString() }).eq("user_id", currentUserId);
+      };
+
       try {
-        await (supabase as any).from("driver_locations").upsert(
-          {
-            user_id: currentUserId,
-            driver_id: currentDriverId || currentUserId,
-            latitude: lat,
-            longitude: lng,
-            accuracy: acc,
-            heading: hdg,
-            speed: spd,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
+        await tryUpsert(payload);
+        
+        // If we succeeded, try to sync any pending ones from localStorage (minimal queue)
+        const pending = localStorage.getItem("pending_gps_sync");
+        if (pending) {
+          localStorage.removeItem("pending_gps_sync");
+          // Just sync the last one if we were offline
+          const lastOne = JSON.parse(pending);
+          tryUpsert(lastOne).catch(() => {});
+        }
       } catch (e) {
-        console.error("Erro ao salvar posição:", e);
+        console.warn("[GPS] Sync failed, saving for retry:", e);
+        localStorage.setItem("pending_gps_sync", JSON.stringify(payload));
+        setErrorStatus("Erro de conexão. Tentando sincronizar...");
       }
     },
     [saveIntervalMoving, saveIntervalStationary]
@@ -419,19 +440,42 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     watchIdRef.current = id;
     setWatching(true);
 
-    // 3) Watchdog: if no new reading in 30s, restart watch
+    // 4) Background Heartbeat/Polling: secondary mechanism to watchPosition
+    // Some browsers stop watchPosition but allow interval-based getCurrentPosition
+    if (pollingIntervalRef.current) window.clearInterval(pollingIntervalRef.current);
+    pollingIntervalRef.current = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') {
+        // Even more critical when hidden
+        console.log("[GPS] Polling while in background...");
+      }
+      navigator.geolocation.getCurrentPosition(
+        processReading,
+        (err) => console.warn("[GPS] Polling error:", err.message),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+      );
+    }, 15_000); // 15s polling interval as fallback
+
+    // 3) Watchdog: if no new reading in 15s (was 30s), restart watch and force-poke GPS
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
+      // Re-request wake lock periodically as some browsers release it silently
+      requestWakeLock();
+      
       const sinceLast = Date.now() - lastReadingTsRef.current;
-      if (sinceLast > 30_000) {
-        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Restarting watch and poking GPS.");
-        // Poke GPS with a direct request
+      if (sinceLast > 15_000) {
+        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Forcing getCurrentPosition.");
+        // Poke GPS with a direct request to wake up the sensor
         navigator.geolocation.getCurrentPosition(
           processReading,
-          () => {},
+          (err) => console.warn("[GPS] Heartbeat poke failed:", err.message),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
         );
-        startTracking();
+        
+        // If it's been even longer, full restart
+        if (sinceLast > 30_000) {
+          console.warn("[GPS] Watchdog: critical delay. Full restart.");
+          startTracking();
+        }
       }
     }, 10_000);
   }, [processReading, maybeToastError]);
@@ -450,6 +494,10 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     if (restartTimeoutRef.current) {
       window.clearTimeout(restartTimeoutRef.current);
       restartTimeoutRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
     setWatching(false);
   }, [releaseWakeLock]);
