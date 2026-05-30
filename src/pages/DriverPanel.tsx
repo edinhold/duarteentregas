@@ -696,6 +696,32 @@ const DriverPanel = () => {
               </Card>
             </div>
 
+            {/* Earnings Report */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" /> Relatório de Ganhos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Hoje</p>
+                    <p className="text-sm font-bold text-primary">R$ {dailyEarnings.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Semana</p>
+                    <p className="text-sm font-bold text-primary">R$ {weeklyEarnings.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Mês</p>
+                    <p className="text-sm font-bold text-primary">R$ {monthlyEarnings.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+
             {/* PIX Key */}
             <Card>
               <CardHeader className="pb-2">
