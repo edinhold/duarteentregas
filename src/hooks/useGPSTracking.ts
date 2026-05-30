@@ -419,19 +419,24 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     watchIdRef.current = id;
     setWatching(true);
 
-    // 3) Watchdog: if no new reading in 30s, restart watch
+    // 3) Watchdog: if no new reading in 15s (was 30s), restart watch and force-poke GPS
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
       const sinceLast = Date.now() - lastReadingTsRef.current;
-      if (sinceLast > 30_000) {
-        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Restarting watch and poking GPS.");
-        // Poke GPS with a direct request
+      if (sinceLast > 15_000) {
+        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Forcing getCurrentPosition.");
+        // Poke GPS with a direct request to wake up the sensor
         navigator.geolocation.getCurrentPosition(
           processReading,
-          () => {},
+          (err) => console.warn("[GPS] Heartbeat poke failed:", err.message),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
         );
-        startTracking();
+        
+        // If it's been even longer, full restart
+        if (sinceLast > 30_000) {
+          console.warn("[GPS] Watchdog: critical delay. Full restart.");
+          startTracking();
+        }
       }
     }, 10_000);
   }, [processReading, maybeToastError]);

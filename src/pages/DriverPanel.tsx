@@ -267,8 +267,8 @@ const DriverPanel = () => {
         }
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           console.error("Realtime connection issues:", status);
-          toast.error("Conexão perdida. Recarregando...");
-          setTimeout(() => window.location.reload(), 3000);
+          // Don't reload, Supabase will try to reconnect automatically
+          // Just show a subtle warning if it stays closed for too long
         }
       });
 
