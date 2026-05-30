@@ -18,6 +18,7 @@ interface KalmanState {
 
 interface GPSTrackingOptions {
   userId?: string;
+  driverId?: string;
   saveIntervalMoving?: number;
   saveIntervalStationary?: number;
   maxAcceptableAccuracy?: number;
@@ -43,6 +44,7 @@ const isValidCoord = (lat: number, lng: number): boolean =>
 export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const {
     userId,
+    driverId,
     saveIntervalMoving = 2000,
     saveIntervalStationary = 15000,
     maxAcceptableAccuracy = 300, // Relaxed from 150
@@ -67,6 +69,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
 
   const watchIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
+  const driverIdRef = useRef(driverId);
   const optionsRef = useRef(options);
   const lastSavedRef = useRef(0);
   const kalmanRef = useRef<KalmanState | null>(null);
@@ -80,8 +83,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   // Sync refs
   useEffect(() => {
     userIdRef.current = userId;
+    driverIdRef.current = driverId;
     optionsRef.current = options;
-  }, [userId, options]);
+  }, [userId, driverId, options]);
 
   const classifyQuality = useCallback((acc: number) => {
     if (acc <= 5) return "excellent";
@@ -171,6 +175,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const savePositionToDb = useCallback(
     async (lat: number, lng: number, acc: number, hdg: number | null, spd: number | null, stationary: boolean) => {
       const currentUserId = userIdRef.current;
+      const currentDriverId = driverIdRef.current;
       if (!currentUserId) return;
       const now = Date.now();
       const interval = stationary ? saveIntervalStationary : saveIntervalMoving;
@@ -181,7 +186,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         await (supabase as any).from("driver_locations").upsert(
           {
             user_id: currentUserId,
-            driver_id: currentUserId,
+            driver_id: currentDriverId || currentUserId,
             latitude: lat,
             longitude: lng,
             accuracy: acc,
