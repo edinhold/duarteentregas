@@ -50,9 +50,25 @@ interface DriverGPSProps {
   activeRequest?: any;
   pendingRequests?: any[];
   onAcceptRequest?: (id: string) => void;
+  // Tracking data passed from parent
+  trackingData: {
+    position: { lat: number; lng: number } | null;
+    accuracy: number;
+    heading: number | null;
+    speed: number | null;
+    watching: boolean;
+    gpsQuality: "excellent" | "good" | "fair" | "poor";
+    sampleCount: number;
+    isStationary: boolean;
+    totalDistance: number;
+    permissionStatus: string;
+    errorStatus: string | null;
+    startTracking: () => void;
+    stopTracking: () => void;
+  };
 }
 
-const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: DriverGPSProps) => {
+const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, trackingData }: DriverGPSProps) => {
   const { user } = useAuth();
   const {
     position: driverPosition,
@@ -68,7 +84,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
     errorStatus,
     startTracking,
     stopTracking,
-  } = useGPSTracking({ userId: user?.id });
+  } = trackingData;
 
   const [autoFollow, setAutoFollow] = useState(true);
   const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
@@ -121,6 +137,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
         attribution: MAP_LAYERS[mapType].attribution,
         maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
       }).addTo(map);
+      map.on("dragstart", () => setAutoFollow(false));
       mapRef.current = map;
     }
 
