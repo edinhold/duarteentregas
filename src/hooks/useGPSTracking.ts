@@ -215,7 +215,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
         return;
       }
 
-      // 2. Discard very poor accuracy
+      // 2. Discard very poor accuracy (relaxed for stability)
       if (acc > maxAcceptableAccuracy) {
         discardedCountRef.current++;
         return;
