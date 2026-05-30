@@ -40,6 +40,12 @@ const Auth = () => {
             targetPath = "/lojista";
           } else if (userRoles.includes("driver")) {
             targetPath = "/entregador";
+          } else {
+            // Se não tiver role específica mas for motorista, tenta encontrar
+            const { data: driverProfile } = await supabase.from("drivers").select("id").eq("user_id", loginData.user.id).maybeSingle();
+            if (driverProfile) {
+              targetPath = "/entregador";
+            }
           }
           
           localStorage.setItem("lastRoute", targetPath);
