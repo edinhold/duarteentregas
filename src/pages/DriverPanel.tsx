@@ -465,6 +465,16 @@ const DriverPanel = () => {
     }));
 
   const totalEarnings = earnings.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const dailyEarnings = earnings
+    .filter((e: any) => isToday(new Date(e.created_at)))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const weeklyEarnings = earnings
+    .filter((e: any) => isThisWeek(new Date(e.created_at), { weekStartsOn: 0 }))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const monthlyEarnings = earnings
+    .filter((e: any) => isThisMonth(new Date(e.created_at)))
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+
   const pendingBalance = earnings
     .filter((e: any) => e.status === "pending")
     .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
