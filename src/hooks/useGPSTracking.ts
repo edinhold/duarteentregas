@@ -79,6 +79,11 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const lastMovingPosRef = useRef<GPSPosition | null>(null);
   const lastAcceptedPosRef = useRef<GPSPosition | null>(null);
   const totalDistanceRef = useRef(0);
+  const lastReadingTsRef = useRef<number>(0);
+  const errorToastShownRef = useRef<Record<number, number>>({});
+  const watchdogRef = useRef<number | null>(null);
+  const restartTimeoutRef = useRef<number | null>(null);
+
 
   // Sync refs
   useEffect(() => {
@@ -295,17 +300,34 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       setGpsQuality(classifyQuality(acc));
       setWatching(true);
       setErrorStatus(null);
+      lastReadingTsRef.current = Date.now();
 
       savePositionToDb(finalPos.lat, finalPos.lng, acc, hdg, spd, stationary);
     },
     [applyKalman, isOutlier, weightedAverage, classifyQuality, savePositionToDb, maxAcceptableAccuracy, stationarySpeedThreshold]
   );
 
+  // Throttled toast — avoid spamming the same error repeatedly
+  const maybeToastError = useCallback((code: number, msg: string) => {
+    const now = Date.now();
+    const last = errorToastShownRef.current[code] || 0;
+    if (now - last > 30_000) {
+      errorToastShownRef.current[code] = now;
+      toast.error(msg);
+    }
+  }, []);
+
   // ---------- Start / Stop ----------
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("GPS não suportado neste dispositivo");
       return;
+    }
+
+    // Clear any existing watch before starting a new one
+    if (watchIdRef.current !== null) {
+      try { navigator.geolocation.clearWatch(watchIdRef.current); } catch {}
+      watchIdRef.current = null;
     }
 
     kalmanRef.current = null;
@@ -318,41 +340,79 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     setTotalDistance(0);
     setSampleCount(0);
     setErrorStatus(null);
+    lastReadingTsRef.current = Date.now();
+
+    // 1) Quick warm-up: get a fast cached fix to show something immediately
+    navigator.geolocation.getCurrentPosition(
+      processReading,
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 8_000 }
+    );
+    // 2) Then a high-accuracy fix
+    navigator.geolocation.getCurrentPosition(
+      processReading,
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }
+    );
 
     const id = navigator.geolocation.watchPosition(
       processReading,
       (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
+        const code = err.code;
+        if (code === err.PERMISSION_DENIED) {
           setErrorStatus("Permissão de localização negada.");
-          toast.error("Permissão de localização negada.");
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setErrorStatus("Localização indisponível. Verifique se o GPS está ativado.");
-          toast.error("Localização indisponível. Verifique se o GPS está ativado.");
-        } else if (err.code === err.TIMEOUT) {
-          setErrorStatus("Tempo esgotado ao obter localização. Tente novamente.");
-          toast.error("Tempo esgotado ao obter localização.");
+          maybeToastError(code, "Permissão de localização negada.");
+          setWatching(false);
+          return; // Don't retry on permission denial
+        } else if (code === err.POSITION_UNAVAILABLE) {
+          setErrorStatus("Buscando sinal GPS...");
+          maybeToastError(code, "Sinal GPS fraco. Tentando reconectar...");
+        } else if (code === err.TIMEOUT) {
+          setErrorStatus("Sinal GPS lento. Reconectando...");
         } else {
-          setErrorStatus("Erro ao obter localização.");
-          toast.error("Erro ao obter localização");
+          setErrorStatus("Erro ao obter localização. Reconectando...");
         }
-        setWatching(false);
+        // Auto-restart watch after a short delay (don't give up)
+        if (restartTimeoutRef.current) window.clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = window.setTimeout(() => {
+          startTracking();
+        }, 3000);
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 5000,    // Allow slightly old positions if fresh one is slow
-        timeout: 30000,     // Allow 30s for fix (better for cold starts)
+        maximumAge: 0,      // Always fresh data — no caching
+        timeout: 60_000,    // Generous timeout for weak-signal areas
       }
     );
 
     watchIdRef.current = id;
-  }, [processReading]);
+    setWatching(true);
+
+    // 3) Watchdog: if no new reading in 45s, restart watch
+    if (watchdogRef.current) window.clearInterval(watchdogRef.current);
+    watchdogRef.current = window.setInterval(() => {
+      const sinceLast = Date.now() - lastReadingTsRef.current;
+      if (sinceLast > 45_000) {
+        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Restarting watch.");
+        startTracking();
+      }
+    }, 15_000);
+  }, [processReading, maybeToastError]);
 
   const stopTracking = useCallback(() => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
-      setWatching(false);
     }
+    if (watchdogRef.current) {
+      window.clearInterval(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+    if (restartTimeoutRef.current) {
+      window.clearTimeout(restartTimeoutRef.current);
+      restartTimeoutRef.current = null;
+    }
+    setWatching(false);
   }, []);
 
   // Monitor permission
@@ -369,17 +429,45 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
 
   // Auto-start on mount or when userId becomes available
   useEffect(() => {
-    if (!watching && userId) {
+    if (userId && watchIdRef.current === null) {
       startTracking();
     }
-    
     return () => {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
+      if (watchdogRef.current) {
+        window.clearInterval(watchdogRef.current);
+        watchdogRef.current = null;
+      }
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
     };
-  }, [userId, startTracking, watching]);
+  }, [userId, startTracking]);
+
+  // Restart when tab becomes visible again (mobile browsers pause GPS in background)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && userId) {
+        const sinceLast = Date.now() - lastReadingTsRef.current;
+        if (sinceLast > 10_000) {
+          startTracking();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onVisibility);
+    window.addEventListener("online", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onVisibility);
+      window.removeEventListener("online", onVisibility);
+    };
+  }, [userId, startTracking]);
+
 
   return {
     position,
