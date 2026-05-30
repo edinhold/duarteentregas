@@ -1003,37 +1003,17 @@ export type Database = {
     }
     Functions: {
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
-      deduct_credits_for_delivery:
-        | {
-            Args: {
-              p_delivery_address: string
-              p_notes?: string
-              p_pickup_address: string
-              p_restaurant_id?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_delivery_address: string
-              p_distance_km?: number
-              p_notes?: string
-              p_pickup_address: string
-              p_restaurant_id?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_delivery_address: string
-              p_distance_km?: number
-              p_notes?: string
-              p_pickup_address: string
-              p_preferred_driver_id?: string
-              p_restaurant_id?: string
-            }
-            Returns: string
-          }
+      deduct_credits_for_delivery: {
+        Args: {
+          p_delivery_address: string
+          p_distance_km?: number
+          p_notes?: string
+          p_pickup_address: string
+          p_preferred_driver_id?: string
+          p_restaurant_id?: string
+        }
+        Returns: string
+      }
       delete_all_chat_messages: { Args: never; Returns: undefined }
       has_role: {
         Args: {
