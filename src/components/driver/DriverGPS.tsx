@@ -233,173 +233,154 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
   }, []);
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="flex-none space-y-4">
-        <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Navigation className="w-4 h-4" /> GPS em Tempo Real
-            {isStationary && watching && (
-              <Badge variant="outline" className="gap-1 text-xs ml-1"><Pause className="w-3 h-3" /> Parado</Badge>
-            )}
-            {watching ? (
-              <Badge variant="default" className="ml-auto gap-1 text-xs"><Signal className="w-3 h-3" /> Ativo</Badge>
+    <div className="relative w-full h-full overflow-hidden flex flex-col">
+      {/* Map Container */}
+      <div className="flex-1 relative min-h-0">
+        <div ref={mapContainerRef} className="w-full h-full z-0" />
+
+        {/* Floating Controls - Top Right */}
+        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+              const next = types[(types.indexOf(mapType) + 1) % types.length];
+              setMapType(next);
+            }}
+            className="shadow-md gap-2 bg-white/90 backdrop-blur-sm hover:bg-white"
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">{mapType === "streets" ? "Ver Satélite" : "Ver Ruas"}</span>
+          </Button>
+
+          <Button
+            variant={autoFollow ? "default" : "secondary"}
+            size="sm"
+            onClick={() => setAutoFollow(!autoFollow)}
+            className="shadow-md gap-2 bg-white/90 backdrop-blur-sm hover:bg-white"
+          >
+            <Crosshair className={`w-4 h-4 ${autoFollow ? "text-white" : ""}`} />
+            <span className="hidden sm:inline">{autoFollow ? "Seguindo" : "Seguir Me"}</span>
+          </Button>
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={startTracking}
+            className="shadow-md gap-2 bg-white/90 backdrop-blur-sm hover:bg-white"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Reiniciar</span>
+          </Button>
+        </div>
+
+        {/* GPS Status Overlay - Top Left */}
+        <div className="absolute top-4 left-4 z-[1000] max-w-[200px] sm:max-w-xs">
+          <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-md border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${watching ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  GPS {watching ? 'Ativo' : 'Inativo'}
+                </span>
+              </div>
+              {isStationary && watching && (
+                <Badge variant="outline" className="text-[10px] h-4 px-1">Parado</Badge>
+              )}
+            </div>
+
+            {driverPosition ? (
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">Qualidade:</span>
+                  <span className={`font-bold ${qc.color}`}>{qc.icon} {qc.label}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">Precisão:</span>
+                  <span className={`font-bold ${accuracy <= 10 ? "text-green-600" : "text-yellow-600"}`}>±{Math.round(accuracy)}m</span>
+                </div>
+                {speed !== null && speed > 0 && (
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-500">Velocidade:</span>
+                    <span className="font-bold">{Math.round(speed * 3.6)} km/h</span>
+                  </div>
+                )}
+                <div className="mt-2 flex gap-1">
+                  {!watching ? (
+                    <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="xs" className="w-full h-7 text-[10px]">
+                      <Locate className="w-3 h-3 mr-1" /> Reativar
+                    </Button>
+                  ) : (
+                    <Button onClick={stopTracking} variant="ghost" size="xs" className="w-full h-7 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50">
+                      <Pause className="w-3 h-3 mr-1" /> Pausar
+                    </Button>
+                  )}
+                </div>
+              </div>
             ) : (
-              <Badge variant="destructive" className="ml-auto gap-1 text-xs"><SignalZero className="w-3 h-3" /> Inativo</Badge>
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                <span className="text-[11px]">Buscando sinal...</span>
+              </div>
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {permissionStatus === "denied" && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-2 flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              <span>Acesso à localização negado. Por favor, ative nas configurações do navegador.</span>
-            </div>
-          )}
-          {driverPosition ? (
-            <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">📍 Sua posição</span>
-                <span className="font-mono text-xs">{driverPosition.lat.toFixed(5)}, {driverPosition.lng.toFixed(5)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">🎯 Precisão</span>
-                <span className={`font-bold ${accuracy <= 10 ? "text-green-600" : accuracy <= 30 ? "text-yellow-600" : "text-red-500"}`}>±{Math.round(accuracy)}m</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground"><Shield className="w-3 h-3 inline mr-1" />Qualidade</span>
-                <span className={`font-bold ${qc.color}`}>{qc.icon} {qc.label}</span>
-              </div>
-              {speed !== null && speed > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">🚗 Velocidade</span>
-                  <span className="font-bold">{Math.round(speed * 3.6)} km/h</span>
-                </div>
-              )}
-              {heading !== null && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">🧭 Direção</span>
-                  <span className="font-bold">{Math.round(heading)}°</span>
-                </div>
-              )}
-              {totalDistance > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">📏 Distância</span>
-                  <span className="font-bold text-primary">
-                    {totalDistance >= 1000 ? `${(totalDistance / 1000).toFixed(2)} km` : `${Math.round(totalDistance)} m`}
-                  </span>
-                </div>
-              )}
-              {sampleCount > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">📊 Amostras</span>
-                  <span className="text-xs text-muted-foreground">{sampleCount} válidas</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-2 py-4 text-muted-foreground border rounded-lg bg-muted/20">
-              {errorStatus ? (
-                <>
-                  <SignalZero className="w-8 h-8 text-destructive animate-pulse" />
-                  <p className="text-sm text-center px-4 font-medium text-destructive">{errorStatus}</p>
-                  <Button variant="outline" size="sm" onClick={startTracking} className="mt-2">
-                    Tentar Novamente
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <span className="text-sm font-medium">Buscando sinal do GPS...</span>
-                  <p className="text-xs text-muted-foreground px-4 text-center">Isso pode levar alguns segundos, certifique-se de estar em local aberto.</p>
-                </>
-              )}
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            {!watching && (
-              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1 font-bold"><Locate className="w-4 h-4 mr-1" /> Reativar GPS</Button>
-            )}
-            {watching && (
-              <div className="flex gap-2 w-full">
-                <Button onClick={startTracking} size="sm" variant="outline" className="flex-1 gap-1 text-xs">
-                  <RotateCcw className="w-3 h-3" /> Reiniciar
-                </Button>
-                <Button onClick={stopTracking} size="sm" variant="secondary" className="flex-1 gap-1 text-xs text-destructive">
-                  <Pause className="w-3 h-3" /> Desativar
-                </Button>
+            
+            {errorStatus && (
+              <div className="mt-2 text-[10px] text-red-500 font-medium leading-tight">
+                ⚠️ {errorStatus}
               </div>
             )}
           </div>
-          {driverPosition && user?.id && (
-            <ReportLocationButton
+        </div>
+
+        {/* Navigation Overlay - Bottom */}
+        {activeRequest && currentDestination && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-sm">
+            <div className="bg-primary text-primary-foreground p-3 rounded-xl shadow-xl border border-primary-foreground/10 overflow-hidden">
+              <div className="flex items-start gap-3">
+                <div className="bg-white/20 p-2 rounded-lg">
+                  <MapPin className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase font-bold opacity-80">{currentDestinationLabel}</p>
+                  <p className="text-sm font-semibold truncate leading-tight">{currentDestination}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <Button 
+                  onClick={() => openNavigation(currentDestination, "google")} 
+                  variant="secondary" 
+                  size="sm" 
+                  className="bg-white text-primary hover:bg-white/90 h-8 text-xs font-bold"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" /> Google Maps
+                </Button>
+                <Button 
+                  onClick={() => openNavigation(currentDestination, "waze")} 
+                  variant="secondary" 
+                  size="sm" 
+                  className="bg-white text-primary hover:bg-white/90 h-8 text-xs font-bold"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" /> Waze
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Manual Report Action (Hidden/Minimized or only shown if needed) */}
+      {driverPosition && user?.id && (
+        <div className="hidden">
+           <ReportLocationButton
               latitude={driverPosition.lat}
               longitude={driverPosition.lng}
               userId={user.id}
             />
-          )}
-        </CardContent>
-      </Card>
-
-      {activeRequest && currentDestination && (
-        <Card className="border-primary">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary" /> {currentDestinationLabel} — Navegar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">{currentDestination}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button onClick={() => openNavigation(currentDestination, "google")} variant="outline" size="sm" className="gap-1">
-                <ExternalLink className="w-3 h-3" /> Google Maps
-              </Button>
-              <Button onClick={() => openNavigation(currentDestination, "waze")} variant="outline" size="sm" className="gap-1">
-                <ExternalLink className="w-3 h-3" /> Waze
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
-      </div>
-
-      <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none sm:border sm:shadow-sm">
-          <CardHeader className="pb-2 flex-none">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Mapa ao Vivo</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
-                    const next = types[(types.indexOf(mapType) + 1) % types.length];
-                    setMapType(next);
-                  }}
-                  className="gap-1 text-xs h-7"
-                >
-                  <Layers className="w-3 h-3" />
-                  {mapType === "streets" ? "OSM" : "Satélite"}
-                </Button>
-                <Button
-                  variant={autoFollow ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setAutoFollow(!autoFollow)}
-                  className="gap-1 text-xs h-7"
-                >
-                  <Crosshair className="w-3 h-3" />
-                  {autoFollow ? "Seguindo" : "Seguir"}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 p-0 sm:p-6 min-h-0">
-            <div className="h-full w-full rounded-none sm:rounded-lg overflow-hidden shadow-inner border-y sm:border">
-              <div ref={mapContainerRef} className="w-full h-full" />
-            </div>
-          </CardContent>
-      </Card>
     </div>
+  );
   );
 };
 
