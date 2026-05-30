@@ -240,7 +240,7 @@ export const startNoSleepLoop = () => {
   };
 
   playSilent();
-  noSleepInterval = setInterval(playSilent, 15000);
+  noSleepInterval = setInterval(playSilent, 5000); // More frequent to keep thread alive
 };
 
 export const stopNoSleepLoop = () => {

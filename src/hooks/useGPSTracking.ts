@@ -458,6 +458,9 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     // 3) Watchdog: if no new reading in 15s (was 30s), restart watch and force-poke GPS
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
+      // Re-request wake lock periodically as some browsers release it silently
+      requestWakeLock();
+      
       const sinceLast = Date.now() - lastReadingTsRef.current;
       if (sinceLast > 15_000) {
         console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Forcing getCurrentPosition.");
