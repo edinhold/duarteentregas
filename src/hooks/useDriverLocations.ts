@@ -29,9 +29,12 @@ export const useDriverLocations = () => {
     queryFn: async () => {
       // Only show drivers active in the last 10 minutes
       const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("driver_locations")
-        .select("*")
+        .select(`
+          *,
+          driver:drivers(id, driver_code, full_name)
+        `)
         .gte("updated_at", tenMinAgo);
       if (error) throw error;
       return data;
