@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Restaurant } from "@/types";
-import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAP_LAYERS } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -65,8 +65,8 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     const map = L.map(containerRef.current).setView(center, DEFAULT_ZOOM);
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    L.tileLayer(MAP_LAYERS.google.url, {
+      attribution: MAP_LAYERS.google.attribution,
     }).addTo(map);
 
     return () => {
