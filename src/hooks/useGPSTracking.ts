@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { startNoSleepLoop, stopNoSleepLoop } from "@/lib/notificationSound";
 
 interface GPSPosition {
   lat: number;
@@ -352,6 +353,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
 
     // Request wake lock to keep GPS active even if user doesn't touch screen
     requestWakeLock();
+    startNoSleepLoop();
 
     // Clear any existing watch before starting a new one
     if (watchIdRef.current !== null) {
@@ -436,6 +438,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
 
   const stopTracking = useCallback(() => {
     releaseWakeLock();
+    stopNoSleepLoop();
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;

@@ -6,6 +6,8 @@ let globalVolume = 1.0;
 let standbyInterval: ReturnType<typeof setInterval> | null = null;
 let standbyEnabled = false;
 let standbyIntervalMs = 30000; // 30 seconds default
+let noSleepInterval: ReturnType<typeof setInterval> | null = null;
+let noSleepEnabled = false;
 
 // Singleton AudioContext to handle browser autoplay policies better
 let sharedCtx: AudioContext | null = null;
@@ -214,3 +216,37 @@ export const setStandbyInterval = (ms: number) => {
 };
 
 export const getStandbyInterval = () => standbyIntervalMs;
+
+// No-sleep loop: plays a silent sound to keep the tab alive
+export const startNoSleepLoop = () => {
+  if (noSleepEnabled) return;
+  noSleepEnabled = true;
+  
+  const playSilent = () => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === "suspended") ctx.resume();
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 100; // Low freq
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime); // Almost silent
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.1);
+    } catch {}
+  };
+
+  playSilent();
+  noSleepInterval = setInterval(playSilent, 15000);
+};
+
+export const stopNoSleepLoop = () => {
+  noSleepEnabled = false;
+  if (noSleepInterval) {
+    clearInterval(noSleepInterval);
+    noSleepInterval = null;
+  }
+};
