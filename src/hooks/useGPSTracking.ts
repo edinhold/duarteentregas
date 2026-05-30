@@ -79,6 +79,11 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
   const lastMovingPosRef = useRef<GPSPosition | null>(null);
   const lastAcceptedPosRef = useRef<GPSPosition | null>(null);
   const totalDistanceRef = useRef(0);
+  const lastReadingTsRef = useRef<number>(0);
+  const errorToastShownRef = useRef<Record<number, number>>({});
+  const watchdogRef = useRef<number | null>(null);
+  const restartTimeoutRef = useRef<number | null>(null);
+
 
   // Sync refs
   useEffect(() => {
