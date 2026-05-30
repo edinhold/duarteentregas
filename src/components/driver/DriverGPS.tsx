@@ -87,7 +87,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
   } = trackingData;
 
   const [autoFollow, setAutoFollow] = useState(true);
-  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
 
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -372,14 +372,14 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const types: (keyof typeof MAP_LAYERS)[] = ["google", "googleHybrid", "streets", "satellite"];
+                    const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
                     const next = types[(types.indexOf(mapType) + 1) % types.length];
                     setMapType(next);
                   }}
                   className="gap-1 text-xs h-7"
                 >
                   <Layers className="w-3 h-3" />
-                  {mapType === "google" ? "Google" : mapType === "googleHybrid" ? "Híbrido" : mapType === "streets" ? "OSM" : "Satélite"}
+                  {mapType === "streets" ? "OSM" : "Satélite"}
                 </Button>
                 <Button
                   variant={autoFollow ? "default" : "outline"}
