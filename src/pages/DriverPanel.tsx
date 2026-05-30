@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -453,6 +453,15 @@ const DriverPanel = () => {
       <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
         <h1 className="font-bold text-lg flex-1">Painel do Entregador</h1>
+        {trackingData.watching ? (
+          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6">
+            <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6">
+            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
+          </Badge>
+        )}
         <ThemeToggle />
       </header>
 
