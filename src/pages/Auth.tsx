@@ -32,15 +32,18 @@ const Auth = () => {
         if (loginData.user) {
           const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", loginData.user.id);
           const userRoles = roles?.map(r => r.role) || [];
+          
+          let targetPath = "/";
           if (userRoles.includes("admin")) {
-            navigate("/admin");
+            targetPath = "/admin";
           } else if (userRoles.includes("store_owner")) {
-            navigate("/lojista");
+            targetPath = "/lojista";
           } else if (userRoles.includes("driver")) {
-            navigate("/entregador");
-          } else {
-            navigate("/");
+            targetPath = "/entregador";
           }
+          
+          localStorage.setItem("lastRoute", targetPath);
+          navigate(targetPath);
         } else {
           navigate("/");
         }
