@@ -417,15 +417,21 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     watchIdRef.current = id;
     setWatching(true);
 
-    // 3) Watchdog: if no new reading in 45s, restart watch
+    // 3) Watchdog: if no new reading in 30s, restart watch
     if (watchdogRef.current) window.clearInterval(watchdogRef.current);
     watchdogRef.current = window.setInterval(() => {
       const sinceLast = Date.now() - lastReadingTsRef.current;
-      if (sinceLast > 45_000) {
-        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Restarting watch.");
+      if (sinceLast > 30_000) {
+        console.warn("[GPS] Watchdog: no readings for", sinceLast, "ms. Restarting watch and poking GPS.");
+        // Poke GPS with a direct request
+        navigator.geolocation.getCurrentPosition(
+          processReading,
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+        );
         startTracking();
       }
-    }, 15_000);
+    }, 10_000);
   }, [processReading, maybeToastError]);
 
   const stopTracking = useCallback(() => {
