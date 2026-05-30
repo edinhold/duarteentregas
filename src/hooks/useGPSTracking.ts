@@ -50,7 +50,10 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
     stationarySpeedThreshold = 0.2,
   } = options;
 
-  const [position, setPosition] = useState<GPSPosition | null>(null);
+  const [position, setPosition] = useState<GPSPosition | null>(() => {
+    const saved = localStorage.getItem("last_gps_position");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [accuracy, setAccuracy] = useState(0);
   const [heading, setHeading] = useState<number | null>(null);
   const [speed, setSpeed] = useState<number | null>(null);
@@ -280,6 +283,7 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       setIsStationary(stationary);
       setSampleCount((c) => c + 1);
       setPosition(finalPos);
+      localStorage.setItem("last_gps_position", JSON.stringify(finalPos));
       setAccuracy(acc);
       setHeading(hdg);
       setSpeed(spd);
@@ -330,8 +334,8 @@ export const useGPSTracking = (options: GPSTrackingOptions = {}) => {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 500,    // reduced from 1000 — fresher data
-        timeout: 10000,     // increased from 8000 — more tolerance
+        maximumAge: 0,      // Forces the device to get a fresh position
+        timeout: 15000,     // Allow more time for first fix
       }
     );
 

@@ -299,15 +299,16 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest }: Dri
             </div>
           )}
           <div className="flex flex-col gap-2">
-            {!watching ? (
-              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1 font-bold"><Locate className="w-4 h-4 mr-1" /> Ativar GPS</Button>
-            ) : (
+            {!watching && (
+              <Button onClick={() => { resumeAudioContext(); startTracking(); }} size="sm" className="flex-1 font-bold"><Locate className="w-4 h-4 mr-1" /> Reativar GPS</Button>
+            )}
+            {watching && (
               <div className="flex gap-2 w-full">
                 <Button onClick={startTracking} size="sm" variant="outline" className="flex-1 gap-1 text-xs">
-                  <RotateCcw className="w-3 h-3" /> Atualizar
+                  <RotateCcw className="w-3 h-3" /> Reiniciar
                 </Button>
                 <Button onClick={stopTracking} size="sm" variant="secondary" className="flex-1 gap-1 text-xs text-destructive">
-                  <Pause className="w-3 h-3" /> Pausar
+                  <Pause className="w-3 h-3" /> Desativar
                 </Button>
               </div>
             )}
