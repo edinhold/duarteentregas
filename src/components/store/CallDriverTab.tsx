@@ -905,58 +905,71 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           </div>
           <div className="space-y-2">
             <Label>Endereço de entrega *</Label>
-            <div className="relative" ref={suggestionsRef}>
-              <Input
-                value={callForm.delivery}
-                onChange={(e) => handleDeliveryAddressChange(e.target.value)}
-                onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
-                placeholder="Digite o endereço do cliente..."
-              />
-              {searchingAddress && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Search className="w-4 h-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
-              {/* Autocomplete dropdown */}
-              {showSuggestions && addressSuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                  {addressSuggestions.map((item: any, idx: number) => {
-                    const formatted = formatAddress(item);
-                    const dist = storeLat && storeLng
-                      ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
-                      : null;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
-                        onClick={() => selectSuggestion(item)}
-                      >
-                        <p className="text-sm font-medium leading-tight">{formatted}</p>
-                        {dist !== null && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
-              </p>
-              {deliveryLatLng && user?.id && (
-                <ReportLocationButton
-                  latitude={deliveryLatLng[0]}
-                  longitude={deliveryLatLng[1]}
-                  address={callForm.delivery}
-                  userId={user.id}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-3 space-y-2">
+              <Label>Endereço de entrega *</Label>
+              <div className="relative" ref={suggestionsRef}>
+                <Input
+                  value={callForm.delivery}
+                  onChange={(e) => handleDeliveryAddressChange(e.target.value)}
+                  onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
+                  placeholder="Digite o endereço do cliente..."
                 />
-              )}
+                {searchingAddress && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Search className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {/* Autocomplete dropdown */}
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                    {addressSuggestions.map((item: any, idx: number) => {
+                      const formatted = formatAddress(item);
+                      const dist = storeLat && storeLng
+                        ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
+                        : null;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
+                          onClick={() => selectSuggestion(item)}
+                        >
+                          <p className="text-sm font-medium leading-tight">{formatted}</p>
+                          {dist !== null && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
+            <div className="space-y-2">
+              <Label>Número *</Label>
+              <Input
+                value={callForm.delivery_number}
+                onChange={(e) => setCallForm(f => ({ ...f, delivery_number: e.target.value }))}
+                placeholder="Nº"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              📍 Digite o endereço, selecione uma sugestão, e coloque o número
+            </p>
+            {deliveryLatLng && user?.id && (
+              <ReportLocationButton
+                latitude={deliveryLatLng[0]}
+                longitude={deliveryLatLng[1]}
+                address={`${callForm.delivery}, ${callForm.delivery_number}`}
+                userId={user.id}
+              />
+            )}
+          </div>
           </div>
           <div className="space-y-2">
             <Label>Observações</Label>
