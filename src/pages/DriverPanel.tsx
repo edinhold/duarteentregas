@@ -505,6 +505,15 @@ const DriverPanel = () => {
             <h1 className="font-bold text-lg flex-1 truncate">Painel do Entregador</h1>
             
             <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground" 
+                onClick={() => { playUrgentNotification(); toast.info("Testando som de alerta..."); }}
+                title="Testar som de alerta"
+              >
+                <Signal className="w-4 h-4" />
+              </Button>
               {trackingData.watching ? (
                 <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6 hidden sm:flex">
                   <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
