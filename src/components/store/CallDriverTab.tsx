@@ -125,7 +125,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       if (!restaurant?.id) return [];
       const { data, error } = await supabase
         .from("store_driver_favorites")
-        .select("driver_id, driver:drivers(id, full_name, driver_code)")
+        .select("driver_id, driver:drivers(id, user_id, full_name, driver_code)")
         .eq("restaurant_id", restaurant.id);
       if (error) return [];
       return data;
