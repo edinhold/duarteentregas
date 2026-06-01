@@ -12,7 +12,7 @@ import MapErrorBoundary from "./MapErrorBoundary";
 const getIcon = (status: DriverStatus) => {
   let color = "#94a3b8"; // Gray for inactive
   if (status === "available") color = "#22c55e"; // Green
-  if (status === "in_delivery") color = "#f97316"; // Orange/Red
+  if (status === "in_delivery") color = "#ef4444"; // Red
 
   return new L.Icon({
     iconUrl: "data:image/svg+xml," + encodeURIComponent(
