@@ -12,6 +12,7 @@ import CallDriverTab from "@/components/store/CallDriverTab";
 import MenuTab from "@/components/store/MenuTab";
 import CreditsTab from "@/components/store/CreditsTab";
 import StoreInfoTab from "@/components/store/StoreInfoTab";
+import GlobalDriverMap from "@/components/GlobalDriverMap";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
