@@ -80,12 +80,14 @@ const DriverPanel = () => {
 
   // Get pending delivery requests
   const { data: pendingRequests = [] } = useQuery({
-    queryKey: ["driver-pending-requests"],
+    queryKey: ["driver-pending-requests", user?.id],
     queryFn: async () => {
+      // Fetch requests that are pending AND (not directed to anyone OR directed to me)
       const { data, error } = await supabase
         .from("delivery_requests")
         .select("*, restaurants(name, address, logo, latitude, longitude)")
         .eq("status", "pending")
+        .or(`driver_id.is.null,driver_id.eq.${user!.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
