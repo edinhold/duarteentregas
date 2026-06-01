@@ -635,13 +635,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   };
 
   const handleCallDriver = async () => {
-    if (!callForm.pickup.trim() || !callForm.delivery.trim()) {
-      toast.error("Preencha endereço de coleta e entrega");
+    if (!callForm.pickup.trim() || !callForm.delivery.trim() || !callForm.delivery_number.trim()) {
+      toast.error("Preencha endereço de coleta, entrega e número");
       return;
     }
 
     let finalDistance = distanceKm;
     let finalLatLng = deliveryLatLng;
+    const finalDeliveryAddress = `${callForm.delivery}, ${callForm.delivery_number}`;
 
     // If no coordinates yet, try to use the first suggestion if available
     if (!finalLatLng && addressSuggestions.length > 0) {
@@ -666,7 +667,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     try {
       const { data: requestId, error } = await supabase.rpc("deduct_credits_for_delivery", {
         p_pickup_address: callForm.pickup,
-        p_delivery_address: callForm.delivery,
+        p_delivery_address: finalDeliveryAddress,
         p_notes: callForm.notes || null,
         p_restaurant_id: restaurant?.id || null,
         p_distance_km: finalDistance,
@@ -695,7 +696,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
       
       const pickupAddr = restaurant?.address || callForm.pickup;
-      setCallForm({ pickup: pickupAddr, delivery: "", notes: "" });
+      setCallForm({ pickup: pickupAddr, delivery: "", delivery_number: "", notes: "" });
       setDeliveryLatLng(null);
       setRoadDistanceKm(0);
       setRoadDurationMin(0);
