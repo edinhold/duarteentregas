@@ -41,36 +41,36 @@ export const setNotificationVolume = (vol: number) => {
 
 export const getNotificationVolume = () => globalVolume;
 
-// Generate a simple notification beep
+// Catchy message notification sound
 export const playNotificationSound = () => {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
     
-    // Resume if suspended (browser policy)
     if (ctx.state === "suspended") ctx.resume();
 
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.frequency.value = 880;
-    osc1.type = "sine";
-    gain1.gain.setValueAtTime(0.3 * globalVolume, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.3);
+    const vol = globalVolume * 0.6;
+    const startTime = ctx.currentTime;
 
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.frequency.value = 1100;
-    osc2.type = "sine";
-    gain2.gain.setValueAtTime(0.3 * globalVolume, ctx.currentTime + 0.15);
-    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
-    osc2.start(ctx.currentTime + 0.15);
-    osc2.stop(ctx.currentTime + 0.45);
+    // A pleasant double-beep
+    const frequencies = [523.25, 659.25]; // C5, E5
+    
+    frequencies.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      
+      const time = startTime + i * 0.12;
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.3 * vol, time + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
+      
+      osc.start(time);
+      osc.stop(time + 0.25);
+    });
   } catch (e) {
     // Silently fail
   }
