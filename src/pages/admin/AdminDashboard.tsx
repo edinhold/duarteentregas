@@ -353,7 +353,18 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="map">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Monitoramento de Entregadores em Tempo Real</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GlobalDriverMap />
+              </CardContent>
+            </Card>
+          </TabsContent>
           <TabsContent value="drivers"><DriversTab /></TabsContent>
+
           <TabsContent value="storeowners"><StoreOwnersTab /></TabsContent>
           <TabsContent value="fees"><FeesConfigTab /></TabsContent>
           <TabsContent value="credits"><CreditsTab /></TabsContent>
