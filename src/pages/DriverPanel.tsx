@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar, PanelLeft } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -22,6 +22,9 @@ import DriverNotificationSettings from "@/components/driver/DriverNotificationSe
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
+import AppSidebar from "@/components/AppSidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -35,6 +38,8 @@ const DriverPanel = () => {
   const [withdrawing, setWithdrawing] = useState(false);
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [activeTab, setActiveTab] = useState("home");
+  const isMobile = useIsMobile();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -487,30 +492,48 @@ const DriverPanel = () => {
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg flex-1">Painel do Entregador</h1>
-        {trackingData.watching ? (
-          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6">
-            <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6 animate-pulse">
-            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
-          </Badge>
-        )}
-        {!isOnline && (
-          <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 gap-1 px-2 py-0 h-6 animate-bounce">
-            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">OFFLINE</span>
-          </Badge>
-        )}
-        <ThemeToggle />
-      </header>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar role="driver" currentTab={activeTab} onTabChange={setActiveTab} />
+        
+        <SidebarInset className="flex-1">
+          <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
+            <SidebarTrigger className="md:flex" />
+            <button onClick={() => navigate("/")} className="hover:bg-muted p-1 rounded-full transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-lg flex-1 truncate">Painel do Entregador</h1>
+            
+            <div className="flex items-center gap-2">
+              {trackingData.watching ? (
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6 hidden xs:flex">
+                  <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6 animate-pulse hidden xs:flex">
+                  <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
+                </Badge>
+              )}
+              {!isOnline && (
+                <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 gap-1 px-2 py-0 h-6 animate-bounce">
+                  <SignalZero className="w-3 h-3" /> <span className="text-[10px]">OFFLINE</span>
+                </Badge>
+              )}
+              <ThemeToggle />
+            </div>
+          </header>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
+          <main className="p-4 max-w-4xl mx-auto w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
+              {isMobile && (
+                <TabsList className="grid w-full grid-cols-5 bg-muted/50 p-1 rounded-xl">
+                  <TabsTrigger value="home" className="rounded-lg"><Home className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="radar" className="rounded-lg"><Radar className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="finance" className="rounded-lg"><Wallet className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="settings" className="rounded-lg"><Settings className="w-4 h-4" /></TabsTrigger>
+                </TabsList>
+              )}
             <TabsTrigger value="home" className="flex items-center gap-1 py-2">
               <Home className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Início</span>
             </TabsTrigger>
