@@ -227,23 +227,40 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return () => { cancelled = true; };
   }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1], routeProfile]);
 
-  const formatAddress = useCallback((data: any): string => {
+  const formatAddress = useCallback((data: any, includeNumber = false): string => {
     if (!data?.address) return data?.display_name ?? "";
     const a = data.address;
     const parts: string[] = [];
-    // Street + number
-    const road = a.road || a.pedestrian || a.footway || a.street || "";
-    if (road) {
-      parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
+    
+    // Check if it's Google Maps format (array) or Nominatim (object)
+    if (Array.isArray(a)) {
+      // Google Maps components
+      const getComp = (type: string) => a.find((c: any) => c.types.includes(type))?.long_name || "";
+      const route = getComp("route");
+      const streetNumber = getComp("street_number");
+      
+      if (route) {
+        parts.push(includeNumber && streetNumber ? `${route}, ${streetNumber}` : route);
+      }
+      const neighborhood = getComp("sublocality") || getComp("neighborhood");
+      if (neighborhood) parts.push(neighborhood);
+      const city = getComp("locality");
+      if (city) parts.push(city);
+      const state = getComp("administrative_area_level_1");
+      if (state) parts.push(state);
+    } else {
+      // Nominatim format
+      const road = a.road || a.pedestrian || a.footway || a.street || "";
+      if (road) {
+        parts.push(includeNumber && a.house_number ? `${road}, ${a.house_number}` : road);
+      }
+      const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
+      if (neighborhood) parts.push(neighborhood);
+      const city = a.city || a.town || a.village || a.municipality || "";
+      if (city) parts.push(city);
+      if (a.state) parts.push(a.state);
     }
-    // Neighborhood
-    const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
-    if (neighborhood) parts.push(neighborhood);
-    // City
-    const city = a.city || a.town || a.village || a.municipality || "";
-    if (city) parts.push(city);
-    // State
-    if (a.state) parts.push(a.state);
+    
     return parts.length > 0 ? parts.join(", ") : data.display_name;
   }, []);
 
