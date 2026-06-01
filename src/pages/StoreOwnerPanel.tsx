@@ -138,9 +138,14 @@ const StoreOwnerPanel = () => {
             <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
           </TabsContent>
 
+          <TabsContent value="map" className="mt-4">
+            <GlobalDriverMap />
+          </TabsContent>
+
           <TabsContent value="credits" className="mt-4">
             <CreditsTab credits={credits} />
           </TabsContent>
+
         </Tabs>
       </motion.div>
     </div>
