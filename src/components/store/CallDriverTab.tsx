@@ -106,7 +106,7 @@ interface CallDriverTabProps {
 
 const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages }: CallDriverTabProps) => {
   const queryClient = useQueryClient();
-  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
+  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", delivery_number: "", notes: "" });
   const [calling, setCalling] = useState(false);
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
   const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
@@ -227,23 +227,40 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return () => { cancelled = true; };
   }, [storeLat, storeLng, deliveryLatLng?.[0], deliveryLatLng?.[1], routeProfile]);
 
-  const formatAddress = useCallback((data: any): string => {
+  const formatAddress = useCallback((data: any, includeNumber = false): string => {
     if (!data?.address) return data?.display_name ?? "";
     const a = data.address;
     const parts: string[] = [];
-    // Street + number
-    const road = a.road || a.pedestrian || a.footway || a.street || "";
-    if (road) {
-      parts.push(a.house_number ? `${road}, ${a.house_number}` : road);
+    
+    // Check if it's Google Maps format (array) or Nominatim (object)
+    if (Array.isArray(a)) {
+      // Google Maps components
+      const getComp = (type: string) => a.find((c: any) => c.types.includes(type))?.long_name || "";
+      const route = getComp("route");
+      const streetNumber = getComp("street_number");
+      
+      if (route) {
+        parts.push(includeNumber && streetNumber ? `${route}, ${streetNumber}` : route);
+      }
+      const neighborhood = getComp("sublocality") || getComp("neighborhood");
+      if (neighborhood) parts.push(neighborhood);
+      const city = getComp("locality");
+      if (city) parts.push(city);
+      const state = getComp("administrative_area_level_1");
+      if (state) parts.push(state);
+    } else {
+      // Nominatim format
+      const road = a.road || a.pedestrian || a.footway || a.street || "";
+      if (road) {
+        parts.push(includeNumber && a.house_number ? `${road}, ${a.house_number}` : road);
+      }
+      const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
+      if (neighborhood) parts.push(neighborhood);
+      const city = a.city || a.town || a.village || a.municipality || "";
+      if (city) parts.push(city);
+      if (a.state) parts.push(a.state);
     }
-    // Neighborhood
-    const neighborhood = a.suburb || a.neighbourhood || a.quarter || "";
-    if (neighborhood) parts.push(neighborhood);
-    // City
-    const city = a.city || a.town || a.village || a.municipality || "";
-    if (city) parts.push(city);
-    // State
-    if (a.state) parts.push(a.state);
+    
     return parts.length > 0 ? parts.join(", ") : data.display_name;
   }, []);
 
@@ -260,8 +277,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
       const data = await res.json();
       if (data) {
-        const formatted = formatAddress(data);
-        setCallForm(f => ({ ...f, pickup: formatted }));
+        const formatted = formatAddress(data, true); // Include number for pickup address
+        setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });
       }
     } catch (err) {
       console.error("Reverse geocode error:", err);
@@ -410,8 +427,24 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
     setDeliveryLatLng([lat, lng]);
-    const formatted = formatAddress(item);
-    setCallForm(f => ({ ...f, delivery: formatted }));
+    
+    // Extract number if present
+    let houseNumber = "";
+    if (item.address) {
+      if (Array.isArray(item.address)) {
+        houseNumber = item.address.find((c: any) => c.types.includes("street_number"))?.long_name || "";
+      } else {
+        houseNumber = item.address.house_number || "";
+      }
+    }
+
+    const formatted = formatAddress(item, false); // Format without number
+    setCallForm(f => ({ 
+      ...f, 
+      delivery: formatted,
+      delivery_number: houseNumber 
+    }));
+    
     setAddressSuggestions([]);
     setShowSuggestions(false);
     setManualDistanceEnabled(false);
@@ -459,7 +492,19 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
           const data = await res.json();
           if (data.status === "OK" && data.results?.[0]) {
-            setCallForm(f => ({ ...f, delivery: data.results[0].formatted_address }));
+            const first = data.results[0];
+            const comps = first.address_components;
+            const streetNumber = comps.find((c: any) => c.types.includes("street_number"))?.long_name || "";
+            
+            // Format without number for the main field
+            const itemForFormat = { ...first, address: comps };
+            const formatted = formatAddress(itemForFormat, false);
+            
+            setCallForm(f => ({ 
+              ...f, 
+              delivery: formatted,
+              delivery_number: streetNumber 
+            }));
             return;
           }
         }
@@ -468,8 +513,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
         const data = await res.json();
         if (data) {
-          const formatted = formatAddress(data);
-          setCallForm(f => ({ ...f, delivery: formatted }));
+          const formatted = formatAddress(data, false);
+          const streetNumber = data.address?.house_number || "";
+          setCallForm(f => ({ 
+            ...f, 
+            delivery: formatted,
+            delivery_number: streetNumber 
+          }));
         }
       } catch (err) {
         console.error("Map click geocode error:", err);
@@ -491,7 +541,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         map.removeLayer(tileLayerRef.current);
         tileLayerRef.current = L.tileLayer(currentUrl, {
           attribution: MAP_LAYERS[mapType].attribution,
-          maxZoom: mapType.includes("satellite") || mapType.includes("google") ? 20 : 19,
+          maxZoom: String(mapType).includes("satellite") || String(mapType).includes("google") ? 20 : 19,
         }).addTo(map);
       }
     }
@@ -635,13 +685,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   };
 
   const handleCallDriver = async () => {
-    if (!callForm.pickup.trim() || !callForm.delivery.trim()) {
-      toast.error("Preencha endereço de coleta e entrega");
+    if (!callForm.pickup.trim() || !callForm.delivery.trim() || !callForm.delivery_number.trim()) {
+      toast.error("Preencha endereço de coleta, entrega e número");
       return;
     }
 
     let finalDistance = distanceKm;
     let finalLatLng = deliveryLatLng;
+    const finalDeliveryAddress = callForm.delivery_number.trim() 
+      ? `${callForm.delivery}, ${callForm.delivery_number}` 
+      : callForm.delivery;
 
     // If no coordinates yet, try to use the first suggestion if available
     if (!finalLatLng && addressSuggestions.length > 0) {
@@ -666,7 +719,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     try {
       const { data: requestId, error } = await supabase.rpc("deduct_credits_for_delivery", {
         p_pickup_address: callForm.pickup,
-        p_delivery_address: callForm.delivery,
+        p_delivery_address: finalDeliveryAddress,
         p_notes: callForm.notes || null,
         p_restaurant_id: restaurant?.id || null,
         p_distance_km: finalDistance,
@@ -695,7 +748,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
       
       const pickupAddr = restaurant?.address || callForm.pickup;
-      setCallForm({ pickup: pickupAddr, delivery: "", notes: "" });
+      setCallForm({ pickup: pickupAddr, delivery: "", delivery_number: "", notes: "" });
       setDeliveryLatLng(null);
       setRoadDistanceKm(0);
       setRoadDurationMin(0);
@@ -902,56 +955,68 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               <p className="text-[10px] text-green-600 dark:text-green-400">✓ Localização detectada automaticamente</p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label>Endereço de entrega *</Label>
-            <div className="relative" ref={suggestionsRef}>
-              <Input
-                value={callForm.delivery}
-                onChange={(e) => handleDeliveryAddressChange(e.target.value)}
-                onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
-                placeholder="Digite o endereço do cliente..."
-              />
-              {searchingAddress && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Search className="w-4 h-4 animate-spin text-muted-foreground" />
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="md:col-span-3 space-y-2">
+                <Label>Endereço de entrega *</Label>
+                <div className="relative" ref={suggestionsRef}>
+                  <Input
+                    value={callForm.delivery}
+                    onChange={(e) => handleDeliveryAddressChange(e.target.value)}
+                    onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
+                    placeholder="Digite o endereço do cliente..."
+                  />
+                  {searchingAddress && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Search className="w-4 h-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {/* Autocomplete dropdown */}
+                  {showSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      {addressSuggestions.map((item: any, idx: number) => {
+                        const formatted = formatAddress(item);
+                        const dist = storeLat && storeLng
+                          ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
+                          : null;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
+                            onClick={() => selectSuggestion(item)}
+                          >
+                            <p className="text-sm font-medium leading-tight">{formatted}</p>
+                            {dist !== null && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-              {/* Autocomplete dropdown */}
-              {showSuggestions && addressSuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                  {addressSuggestions.map((item: any, idx: number) => {
-                    const formatted = formatAddress(item);
-                    const dist = storeLat && storeLng
-                      ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
-                      : null;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
-                        onClick={() => selectSuggestion(item)}
-                      >
-                        <p className="text-sm font-medium leading-tight">{formatted}</p>
-                        {dist !== null && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              </div>
+              <div className="space-y-2">
+                <Label>Número *</Label>
+                <Input
+                  value={callForm.delivery_number}
+                  onChange={(e) => setCallForm(f => ({ ...f, delivery_number: e.target.value }))}
+                  placeholder="Nº"
+                />
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                📍 Digite o endereço, selecione uma sugestão, ou clique/arraste no mapa
+                📍 Digite o endereço, selecione uma sugestão, e coloque o número
               </p>
               {deliveryLatLng && user?.id && (
                 <ReportLocationButton
                   latitude={deliveryLatLng[0]}
                   longitude={deliveryLatLng[1]}
-                  address={callForm.delivery}
+                  address={callForm.delivery_number.trim() ? `${callForm.delivery}, ${callForm.delivery_number}` : callForm.delivery}
                   userId={user.id}
                 />
               )}
