@@ -215,7 +215,9 @@ const AdminDashboard = () => {
               <TabsTrigger value="restaurants"><Store className="w-4 h-4 mr-1" /> Restaurantes</TabsTrigger>
               <TabsTrigger value="products"><Package className="w-4 h-4 mr-1" /> Produtos</TabsTrigger>
               <TabsTrigger value="orders"><ShoppingCart className="w-4 h-4 mr-1" /> Pedidos</TabsTrigger>
+              <TabsTrigger value="map"><MapIcon className="w-4 h-4 mr-1" /> Mapa Geral</TabsTrigger>
               <TabsTrigger value="drivers"><Truck className="w-4 h-4 mr-1" /> Motoristas</TabsTrigger>
+
               <TabsTrigger value="storeowners"><Users className="w-4 h-4 mr-1" /> Lojistas</TabsTrigger>
               <TabsTrigger value="fees"><Settings className="w-4 h-4 mr-1" /> Taxas</TabsTrigger>
               <TabsTrigger value="credits"><Ticket className="w-4 h-4 mr-1" /> Créditos</TabsTrigger>
