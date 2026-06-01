@@ -28,7 +28,7 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
         .select(`
           id,
           driver_id,
-          driver:drivers(id, full_name, driver_code, phone)
+          driver:drivers(id, user_id, full_name, driver_code, phone)
         `)
         .eq("restaurant_id", restaurant.id);
       
