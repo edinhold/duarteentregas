@@ -886,8 +886,10 @@ const DriverPanel = () => {
             {/* Notification Settings */}
             <DriverNotificationSettings />
           </TabsContent>
-        </Tabs>
-      </motion.div>
+            </Tabs>
+          </main>
+        </SidebarInset>
+      </div>
 
       <AlertDialog open={!!cancelRequestId} onOpenChange={(open) => !open && setCancelRequestId(null)}>
         <AlertDialogContent>
@@ -909,7 +911,7 @@ const DriverPanel = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SidebarProvider>
   );
 };
 
