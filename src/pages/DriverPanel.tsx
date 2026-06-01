@@ -510,7 +510,7 @@ const DriverPanel = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
             <TabsTrigger value="home" className="flex items-center gap-1 py-2">
               <Home className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Início</span>
             </TabsTrigger>
@@ -520,11 +520,8 @@ const DriverPanel = () => {
             <TabsTrigger value="radar" className="flex items-center gap-1 py-2">
               <Radar className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Radar</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1 py-2">
-              <History className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Histórico</span>
-            </TabsTrigger>
             <TabsTrigger value="finance" className="flex items-center gap-1 py-2">
-              <DollarSign className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ganhos</span>
+              <Wallet className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ganhos</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1 py-2">
               <Settings className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ajustes</span>
@@ -663,41 +660,6 @@ const DriverPanel = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4 outline-none">
-
-            {/* Completed deliveries */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" /> Pedidos Finalizados
-                  <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {completedRequests.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
-                ) : (
-                  <div className="space-y-3">
-                    {completedRequests.map((r: any) => (
-                      <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
-                          <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
-                          ✅ Entregue
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="finance" className="space-y-4 outline-none">
             {/* Earnings Summary */}
             <div className="grid grid-cols-2 gap-3">
@@ -740,6 +702,37 @@ const DriverPanel = () => {
               </CardContent>
             </Card>
 
+            {/* Completed deliveries */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
+                  <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {completedRequests.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
+                ) : (
+                  <div className="space-y-3">
+                    {completedRequests.map((r: any) => (
+                      <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
+                          <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                          ✅ Entregue
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* PIX Key */}
             <Card>
