@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -21,6 +21,7 @@ import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
+import GlobalDriverMap from "@/components/GlobalDriverMap";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -509,23 +510,27 @@ const DriverPanel = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm">
-            <TabsTrigger value="home" className="flex items-center gap-1">
-              <Home className="w-4 h-4" /> <span className="hidden xs:inline">Início</span>
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
+            <TabsTrigger value="home" className="flex items-center gap-1 py-2">
+              <Home className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Início</span>
             </TabsTrigger>
-            <TabsTrigger value="map" className="flex items-center gap-1">
-              <MapIcon className="w-4 h-4" /> <span className="hidden xs:inline">Mapa</span>
+            <TabsTrigger value="map" className="flex items-center gap-1 py-2">
+              <MapIcon className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">GPS</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1">
-              <History className="w-4 h-4" /> <span className="hidden xs:inline">Histórico</span>
+            <TabsTrigger value="radar" className="flex items-center gap-1 py-2">
+              <Radar className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Radar</span>
             </TabsTrigger>
-            <TabsTrigger value="finance" className="flex items-center gap-1">
-              <DollarSign className="w-4 h-4" /> <span className="hidden xs:inline">Financeiro</span>
+            <TabsTrigger value="history" className="flex items-center gap-1 py-2">
+              <History className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Histórico</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="w-4 h-4" /> <span className="hidden xs:inline">Ajustes</span>
+            <TabsTrigger value="finance" className="flex items-center gap-1 py-2">
+              <DollarSign className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ganhos</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-1 py-2">
+              <Settings className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ajustes</span>
             </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="home" className="space-y-4 outline-none">
             {/* GPS Tracking & Map */}
@@ -645,7 +650,21 @@ const DriverPanel = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="radar" className="space-y-4 outline-none">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Radar className="w-4 h-4 text-primary" /> Radar de Entregadores
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 sm:p-6">
+                <GlobalDriverMap />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="history" className="space-y-4 outline-none">
+
             {/* Completed deliveries */}
             <Card>
               <CardHeader className="pb-2">
