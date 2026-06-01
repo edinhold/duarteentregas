@@ -427,8 +427,24 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
     setDeliveryLatLng([lat, lng]);
-    const formatted = formatAddress(item);
-    setCallForm(f => ({ ...f, delivery: formatted }));
+    
+    // Extract number if present
+    let houseNumber = "";
+    if (item.address) {
+      if (Array.isArray(item.address)) {
+        houseNumber = item.address.find((c: any) => c.types.includes("street_number"))?.long_name || "";
+      } else {
+        houseNumber = item.address.house_number || "";
+      }
+    }
+
+    const formatted = formatAddress(item, false); // Format without number
+    setCallForm(f => ({ 
+      ...f, 
+      delivery: formatted,
+      delivery_number: houseNumber 
+    }));
+    
     setAddressSuggestions([]);
     setShowSuggestions(false);
     setManualDistanceEnabled(false);
