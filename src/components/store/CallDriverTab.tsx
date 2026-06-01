@@ -106,7 +106,7 @@ interface CallDriverTabProps {
 
 const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages }: CallDriverTabProps) => {
   const queryClient = useQueryClient();
-  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", notes: "" });
+  const [callForm, setCallForm] = useState({ pickup: "", delivery: "", delivery_number: "", notes: "" });
   const [calling, setCalling] = useState(false);
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
   const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
