@@ -108,19 +108,23 @@ const StoreOwnerPanel = () => {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="store" className="w-full">
           <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="store" className="flex items-center gap-1.5 text-xs">
-              <Store className="w-4 h-4" /> Loja
+            <TabsTrigger value="store" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
+              <Store className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Loja
             </TabsTrigger>
-            <TabsTrigger value="menu" className="flex items-center gap-1.5 text-xs">
-              <UtensilsCrossed className="w-4 h-4" /> Cardápio
+            <TabsTrigger value="menu" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
+              <UtensilsCrossed className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Cardápio
             </TabsTrigger>
-            <TabsTrigger value="driver" className="flex items-center gap-1.5 text-xs">
-              <Truck className="w-4 h-4" /> Entregador
+            <TabsTrigger value="driver" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
+              <Truck className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Entregador
             </TabsTrigger>
-            <TabsTrigger value="credits" className="flex items-center gap-1.5 text-xs">
-              <CreditCard className="w-4 h-4" /> Recarga
+            <TabsTrigger value="map" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
+              <MapIcon className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Mapa
+            </TabsTrigger>
+            <TabsTrigger value="credits" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
+              <CreditCard className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Recarga
             </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="store" className="mt-4">
             <StoreInfoTab restaurant={restaurant} userId={user.id} />
