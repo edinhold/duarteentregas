@@ -146,9 +146,10 @@ const GlobalDriverMapContent = () => {
               <span className="text-xs font-medium">Disponível</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#f97316]" />
+              <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
               <span className="text-xs font-medium">Em Entrega</span>
             </div>
+
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-[#94a3b8]" />
               <span className="text-xs font-medium">Inativo / Desativado</span>
