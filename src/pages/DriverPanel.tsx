@@ -650,7 +650,21 @@ const DriverPanel = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="radar" className="space-y-4 outline-none">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Radar className="w-4 h-4 text-primary" /> Radar de Entregadores
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 sm:p-6">
+                <GlobalDriverMap />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="history" className="space-y-4 outline-none">
+
             {/* Completed deliveries */}
             <Card>
               <CardHeader className="pb-2">
