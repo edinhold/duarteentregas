@@ -692,7 +692,9 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     let finalDistance = distanceKm;
     let finalLatLng = deliveryLatLng;
-    const finalDeliveryAddress = `${callForm.delivery}, ${callForm.delivery_number}`;
+    const finalDeliveryAddress = callForm.delivery_number.trim() 
+      ? `${callForm.delivery}, ${callForm.delivery_number}` 
+      : callForm.delivery;
 
     // If no coordinates yet, try to use the first suggestion if available
     if (!finalLatLng && addressSuggestions.length > 0) {
