@@ -510,23 +510,27 @@ const DriverPanel = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm">
-            <TabsTrigger value="home" className="flex items-center gap-1">
-              <Home className="w-4 h-4" /> <span className="hidden xs:inline">Início</span>
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
+            <TabsTrigger value="home" className="flex items-center gap-1 py-2">
+              <Home className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Início</span>
             </TabsTrigger>
-            <TabsTrigger value="map" className="flex items-center gap-1">
-              <MapIcon className="w-4 h-4" /> <span className="hidden xs:inline">Mapa</span>
+            <TabsTrigger value="map" className="flex items-center gap-1 py-2">
+              <MapIcon className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">GPS</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1">
-              <History className="w-4 h-4" /> <span className="hidden xs:inline">Histórico</span>
+            <TabsTrigger value="radar" className="flex items-center gap-1 py-2">
+              <Radar className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Radar</span>
             </TabsTrigger>
-            <TabsTrigger value="finance" className="flex items-center gap-1">
-              <DollarSign className="w-4 h-4" /> <span className="hidden xs:inline">Financeiro</span>
+            <TabsTrigger value="history" className="flex items-center gap-1 py-2">
+              <History className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Histórico</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="w-4 h-4" /> <span className="hidden xs:inline">Ajustes</span>
+            <TabsTrigger value="finance" className="flex items-center gap-1 py-2">
+              <DollarSign className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ganhos</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-1 py-2">
+              <Settings className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ajustes</span>
             </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="home" className="space-y-4 outline-none">
             {/* GPS Tracking & Map */}
