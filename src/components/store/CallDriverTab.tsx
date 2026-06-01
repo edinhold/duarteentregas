@@ -125,7 +125,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       if (!restaurant?.id) return [];
       const { data, error } = await supabase
         .from("store_driver_favorites")
-        .select("driver_id, driver:drivers(id, full_name, driver_code)")
+        .select("driver_id, driver:drivers(id, user_id, full_name, driver_code)")
         .eq("restaurant_id", restaurant.id);
       if (error) return [];
       return data;
@@ -1047,7 +1047,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 <option value="">Qualquer entregador disponível</option>
                 <optgroup label="Seus Favoritos Online">
                   {favoriteDrivers.filter((f: any) => driverLocations.some((dl: any) => dl.driver_id === f.driver_id)).map((f: any) => (
-                    <option key={f.driver_id} value={f.driver_id}>
+                    <option key={f.driver_id} value={f.driver?.user_id}>
                       ⭐ {f.driver?.full_name} ({f.driver?.driver_code})
                     </option>
                   ))}
@@ -1056,7 +1056,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                   {driverLocations
                     .filter((dl: any) => !favoriteDrivers.some((f: any) => f.driver_id === dl.driver_id))
                     .map((dl: any) => (
-                      <option key={dl.driver_id} value={dl.driver_id}>
+                      <option key={dl.driver_id} value={dl.user_id}>
                         {dl.driver?.full_name || "Entregador"} ({dl.driver?.driver_code || "N/A"})
                       </option>
                     ))}

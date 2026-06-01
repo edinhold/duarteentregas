@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Truck, UtensilsCrossed, CreditCard, Store, Map as MapIcon } from "lucide-react";
+import { ArrowLeft, Truck, UtensilsCrossed, CreditCard, Store, Map as MapIcon, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import CallDriverTab from "@/components/store/CallDriverTab";
 import MenuTab from "@/components/store/MenuTab";
 import CreditsTab from "@/components/store/CreditsTab";
 import StoreInfoTab from "@/components/store/StoreInfoTab";
+import FavoritesTab from "@/components/store/FavoritesTab";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
@@ -120,10 +121,11 @@ const StoreOwnerPanel = () => {
           <main className="p-4 max-w-4xl mx-auto w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {isMobile && (
-                <TabsList className="grid w-full grid-cols-5 bg-muted/50 p-1 rounded-xl mb-4">
+                <TabsList className="grid w-full grid-cols-6 bg-muted/50 p-1 rounded-xl mb-4">
                   <TabsTrigger value="store" className="rounded-lg"><Store className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="menu" className="rounded-lg"><UtensilsCrossed className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="driver" className="rounded-lg"><Truck className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="favorites" className="rounded-lg"><Star className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="credits" className="rounded-lg"><CreditCard className="w-4 h-4" /></TabsTrigger>
                 </TabsList>
@@ -145,6 +147,10 @@ const StoreOwnerPanel = () => {
 
                 <TabsContent value="driver" className="mt-0 outline-none">
                   <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
+                </TabsContent>
+
+                <TabsContent value="favorites" className="mt-0 outline-none">
+                  <FavoritesTab restaurant={restaurant} />
                 </TabsContent>
 
                 <TabsContent value="map" className="mt-0 outline-none">

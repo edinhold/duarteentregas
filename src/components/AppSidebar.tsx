@@ -1,4 +1,4 @@
-import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut, Star } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -43,6 +43,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "store", label: "Loja", icon: Store },
           { id: "menu", label: "Cardápio", icon: UtensilsCrossed },
           { id: "driver", label: "Entregador", icon: Truck },
+          { id: "favorites", label: "Favoritos", icon: Star },
           { id: "map", label: "Mapa", icon: MapIcon },
           { id: "credits", label: "Recarga", icon: CreditCard },
         ];
