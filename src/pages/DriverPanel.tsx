@@ -660,41 +660,6 @@ const DriverPanel = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4 outline-none">
-
-            {/* Completed deliveries */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" /> Pedidos Finalizados
-                  <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {completedRequests.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
-                ) : (
-                  <div className="space-y-3">
-                    {completedRequests.map((r: any) => (
-                      <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
-                          <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
-                          ✅ Entregue
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="finance" className="space-y-4 outline-none">
             {/* Earnings Summary */}
             <div className="grid grid-cols-2 gap-3">
@@ -737,6 +702,37 @@ const DriverPanel = () => {
               </CardContent>
             </Card>
 
+            {/* Completed deliveries */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
+                  <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {completedRequests.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
+                ) : (
+                  <div className="space-y-3">
+                    {completedRequests.map((r: any) => (
+                      <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
+                          <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                          ✅ Entregue
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* PIX Key */}
             <Card>
