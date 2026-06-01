@@ -25,6 +25,7 @@ import ChatTab from "@/components/admin/ChatTab";
 import PasswordResetTab from "@/components/admin/PasswordResetTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import GlobalDriverMap from "@/components/GlobalDriverMap";
 
 const statusOptions = [
   { value: "pending", label: "Pendente" },
