@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { playNotificationSound } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification } from "@/lib/notificationSound";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/hooks/useData";
