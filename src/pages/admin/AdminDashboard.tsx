@@ -84,7 +84,7 @@ const AdminDashboard = () => {
         { event: "INSERT", schema: "public", table: "withdrawal_requests" },
         (payload) => {
           const w = payload.new as any;
-          playNotificationSound();
+          playUrgentNotification();
           toast.info(`💰 Novo pedido de saque: R$ ${Number(w.amount).toFixed(2)}`, {
             description: "Um motorista solicitou saque/antecipação.",
             duration: 10000,
