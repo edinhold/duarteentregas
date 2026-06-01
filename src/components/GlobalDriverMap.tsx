@@ -121,8 +121,9 @@ const GlobalDriverMapContent = () => {
   }, [drivers, isLoading]);
 
   return (
-    <div className="relative w-full h-[500px] rounded-xl overflow-hidden border">
+    <div className="relative w-full h-[400px] sm:h-[600px] rounded-xl overflow-hidden border">
       <div ref={containerRef} className="w-full h-full z-0" />
+
       
       {/* Legend & Controls */}
       <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2">
