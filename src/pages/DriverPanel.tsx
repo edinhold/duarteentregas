@@ -886,6 +886,7 @@ const DriverPanel = () => {
             {/* Notification Settings */}
             <DriverNotificationSettings />
           </TabsContent>
+              </motion.div>
             </Tabs>
           </main>
         </SidebarInset>
