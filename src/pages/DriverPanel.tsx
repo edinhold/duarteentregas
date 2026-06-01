@@ -21,6 +21,7 @@ import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
+import GlobalDriverMap from "@/components/GlobalDriverMap";
 
 const DriverPanel = () => {
   const { user } = useAuth();
