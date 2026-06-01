@@ -277,8 +277,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
       const data = await res.json();
       if (data) {
-        const formatted = formatAddress(data);
-        setCallForm(f => ({ ...f, pickup: formatted }));
+        const formatted = formatAddress(data, true); // Include number for pickup address
+        setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });
       }
     } catch (err) {
       console.error("Reverse geocode error:", err);
