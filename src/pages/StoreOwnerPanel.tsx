@@ -149,6 +149,10 @@ const StoreOwnerPanel = () => {
                   <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
                 </TabsContent>
 
+                <TabsContent value="favorites" className="mt-0 outline-none">
+                  <FavoritesTab restaurant={restaurant} />
+                </TabsContent>
+
                 <TabsContent value="map" className="mt-0 outline-none">
                   <GlobalDriverMap />
                 </TabsContent>
