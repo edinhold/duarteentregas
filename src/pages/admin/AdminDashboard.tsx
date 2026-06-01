@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { playNotificationSound } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification } from "@/lib/notificationSound";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/hooks/useData";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon, ChevronLeft, ChevronRight, PanelLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
@@ -26,6 +26,10 @@ import PasswordResetTab from "@/components/admin/PasswordResetTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
+import AppSidebar from "@/components/AppSidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { motion } from "framer-motion";
 
 const statusOptions = [
   { value: "pending", label: "Pendente" },
@@ -41,6 +45,8 @@ const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const { data: categories = [] } = useCategories();
   const [authChecked, setAuthChecked] = useState(false);
+  const [activeTab, setActiveTab] = useState("restaurants");
+  const isMobile = useIsMobile();
 
   // Protect admin route
   useEffect(() => {
@@ -78,7 +84,7 @@ const AdminDashboard = () => {
         { event: "INSERT", schema: "public", table: "withdrawal_requests" },
         (payload) => {
           const w = payload.new as any;
-          playNotificationSound();
+          playUrgentNotification();
           toast.info(`💰 Novo pedido de saque: R$ ${Number(w.amount).toFixed(2)}`, {
             description: "Um motorista solicitou saque/antecipação.",
             duration: 10000,
@@ -187,48 +193,63 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg flex-1">Painel Administrativo</h1>
-        <ThemeToggle />
-      </header>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background overflow-hidden">
+        <AppSidebar role="admin" currentTab={activeTab} onTabChange={setActiveTab} />
+        
+        <SidebarInset className="flex-1 overflow-y-auto">
+          <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
+            <SidebarTrigger />
+            <button onClick={() => navigate("/")} className="hover:bg-muted p-1 rounded-full transition-colors ml-1">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-lg flex-1 truncate">Painel Administrativo</h1>
+            <ThemeToggle />
+          </header>
 
-      <div className="p-4 max-w-5xl mx-auto space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {stats.map((stat) => (
-            <Card key={stat.label} className="border-border/50">
-              <CardContent className="p-4 flex items-center gap-3">
-                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-                <div>
-                  <p className="text-2xl font-extrabold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          <main className="p-4 max-w-6xl mx-auto w-full space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {stats.map((stat) => (
+                <Card key={stat.label} className="border-border/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <stat.icon className={`w-8 h-8 ${stat.color}`} />
+                    <div>
+                      <p className="text-2xl font-extrabold">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-        <Tabs defaultValue="restaurants">
-          <ScrollArea className="w-full">
-            <TabsList className="w-max">
-              <TabsTrigger value="restaurants"><Store className="w-4 h-4 mr-1" /> Restaurantes</TabsTrigger>
-              <TabsTrigger value="products"><Package className="w-4 h-4 mr-1" /> Produtos</TabsTrigger>
-              <TabsTrigger value="orders"><ShoppingCart className="w-4 h-4 mr-1" /> Pedidos</TabsTrigger>
-              <TabsTrigger value="map"><MapIcon className="w-4 h-4 mr-1" /> Mapa Geral</TabsTrigger>
-              <TabsTrigger value="drivers"><Truck className="w-4 h-4 mr-1" /> Motoristas</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              {isMobile && (
+                <ScrollArea className="w-full mb-4">
+                  <TabsList className="w-max bg-muted/50 p-1 rounded-xl">
+                    <TabsTrigger value="restaurants"><Store className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="products"><Package className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="orders"><ShoppingCart className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="map"><MapIcon className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="drivers"><Truck className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="storeowners"><Users className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="fees"><Settings className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="credits"><Ticket className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="financial"><DollarSign className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="admins"><ShieldCheck className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="chat"><MessageSquare className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="password-reset"><KeyRound className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="customers"><UserCheck className="w-4 h-4 mr-1" /></TabsTrigger>
+                  </TabsList>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+              )}
 
-              <TabsTrigger value="storeowners"><Users className="w-4 h-4 mr-1" /> Lojistas</TabsTrigger>
-              <TabsTrigger value="fees"><Settings className="w-4 h-4 mr-1" /> Taxas</TabsTrigger>
-              <TabsTrigger value="credits"><Ticket className="w-4 h-4 mr-1" /> Créditos</TabsTrigger>
-              <TabsTrigger value="financial"><DollarSign className="w-4 h-4 mr-1" /> Financeiro</TabsTrigger>
-              <TabsTrigger value="admins"><ShieldCheck className="w-4 h-4 mr-1" /> Admins</TabsTrigger>
-              <TabsTrigger value="chat"><MessageSquare className="w-4 h-4 mr-1" /> Chat</TabsTrigger>
-              <TabsTrigger value="password-reset"><KeyRound className="w-4 h-4 mr-1" /> Senhas</TabsTrigger>
-              <TabsTrigger value="customers"><UserCheck className="w-4 h-4 mr-1" /> Clientes</TabsTrigger>
-            </TabsList>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+              <motion.div 
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="mt-0"
+              >
 
           <TabsContent value="restaurants">
             <Card>
@@ -372,15 +393,17 @@ const AdminDashboard = () => {
           <TabsContent value="admins"><AdminsTab /></TabsContent>
           <TabsContent value="chat"><ChatTab /></TabsContent>
           <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
-          <TabsContent value="customers"><CustomersTab /></TabsContent>
-        </Tabs>
-      </div>
-
-      <RestaurantForm open={restaurantFormOpen} onOpenChange={setRestaurantFormOpen} restaurant={editingRestaurant} categories={categories} />
-      <ProductForm open={productFormOpen} onOpenChange={setProductFormOpen} product={editingProduct} restaurants={restaurants} />
-      <DeleteConfirm open={!!deleteRestaurant} onOpenChange={(o) => !o && setDeleteRestaurant(null)} onConfirm={handleDeleteRestaurant} title={deleteRestaurant?.name || "restaurante"} loading={deletingRestaurant} />
-      <DeleteConfirm open={!!deleteProduct} onOpenChange={(o) => !o && setDeleteProduct(null)} onConfirm={handleDeleteProduct} title={deleteProduct?.name || "produto"} loading={deletingProduct} />
+            </motion.div>
+          </Tabs>
+        </main>
+      </SidebarInset>
     </div>
+
+    <RestaurantForm open={restaurantFormOpen} onOpenChange={setRestaurantFormOpen} restaurant={editingRestaurant} categories={categories} />
+    <ProductForm open={productFormOpen} onOpenChange={setProductFormOpen} product={editingProduct} restaurants={restaurants} />
+    <DeleteConfirm open={!!deleteRestaurant} onOpenChange={(o) => !o && setDeleteRestaurant(null)} onConfirm={handleDeleteRestaurant} title={deleteRestaurant?.name || "restaurante"} loading={deletingRestaurant} />
+    <DeleteConfirm open={!!deleteProduct} onOpenChange={(o) => !o && setDeleteProduct(null)} onConfirm={handleDeleteProduct} title={deleteProduct?.name || "produto"} loading={deletingProduct} />
+    </SidebarProvider>
   );
 };
 

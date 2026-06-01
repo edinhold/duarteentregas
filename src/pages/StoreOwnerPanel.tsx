@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,11 +13,16 @@ import MenuTab from "@/components/store/MenuTab";
 import CreditsTab from "@/components/store/CreditsTab";
 import StoreInfoTab from "@/components/store/StoreInfoTab";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
+import AppSidebar from "@/components/AppSidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("store");
+  const isMobile = useIsMobile();
 
   const { data: restaurant } = useQuery({
     queryKey: ["my-restaurant", user?.id],
@@ -98,57 +103,63 @@ const StoreOwnerPanel = () => {
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg flex-1">Painel do Lojista</h1>
-        <ThemeToggle />
-      </header>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background overflow-hidden">
+        <AppSidebar role="store" currentTab={activeTab} onTabChange={setActiveTab} />
+        
+        <SidebarInset className="flex-1 overflow-y-auto">
+          <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
+            <SidebarTrigger />
+            <button onClick={() => navigate("/")} className="hover:bg-muted p-1 rounded-full transition-colors ml-1">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-lg flex-1 truncate">Painel do Lojista</h1>
+            <ThemeToggle />
+          </header>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue="store" className="w-full">
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="store" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
-              <Store className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Loja
-            </TabsTrigger>
-            <TabsTrigger value="menu" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
-              <UtensilsCrossed className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Cardápio
-            </TabsTrigger>
-            <TabsTrigger value="driver" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
-              <Truck className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Entregador
-            </TabsTrigger>
-            <TabsTrigger value="map" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
-              <MapIcon className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Mapa
-            </TabsTrigger>
-            <TabsTrigger value="credits" className="flex items-center gap-1.5 text-[10px] xs:text-xs">
-              <CreditCard className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> Recarga
-            </TabsTrigger>
-          </TabsList>
+          <main className="p-4 max-w-4xl mx-auto w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              {isMobile && (
+                <TabsList className="grid w-full grid-cols-5 bg-muted/50 p-1 rounded-xl mb-4">
+                  <TabsTrigger value="store" className="rounded-lg"><Store className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="menu" className="rounded-lg"><UtensilsCrossed className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="driver" className="rounded-lg"><Truck className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="credits" className="rounded-lg"><CreditCard className="w-4 h-4" /></TabsTrigger>
+                </TabsList>
+              )}
 
+              <motion.div 
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                className="mt-0"
+              >
+                <TabsContent value="store" className="mt-0 outline-none">
+                  <StoreInfoTab restaurant={restaurant} userId={user.id} />
+                </TabsContent>
 
-          <TabsContent value="store" className="mt-4">
-            <StoreInfoTab restaurant={restaurant} userId={user.id} />
-          </TabsContent>
+                <TabsContent value="menu" className="mt-0 outline-none">
+                  <MenuTab restaurant={restaurant} />
+                </TabsContent>
 
-          <TabsContent value="menu" className="mt-4">
-            <MenuTab restaurant={restaurant} />
-          </TabsContent>
+                <TabsContent value="driver" className="mt-0 outline-none">
+                  <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
+                </TabsContent>
 
-          <TabsContent value="driver" className="mt-4">
-            <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
-          </TabsContent>
+                <TabsContent value="map" className="mt-0 outline-none">
+                  <GlobalDriverMap />
+                </TabsContent>
 
-          <TabsContent value="map" className="mt-4">
-            <GlobalDriverMap />
-          </TabsContent>
-
-          <TabsContent value="credits" className="mt-4">
-            <CreditsTab credits={credits} />
-          </TabsContent>
-
-        </Tabs>
-      </motion.div>
-    </div>
+                <TabsContent value="credits" className="mt-0 outline-none">
+                  <CreditsTab credits={credits} />
+                </TabsContent>
+              </motion.div>
+            </Tabs>
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 };
 

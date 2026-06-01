@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar, PanelLeft } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -22,6 +22,9 @@ import DriverNotificationSettings from "@/components/driver/DriverNotificationSe
 import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
+import AppSidebar from "@/components/AppSidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -35,6 +38,8 @@ const DriverPanel = () => {
   const [withdrawing, setWithdrawing] = useState(false);
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [activeTab, setActiveTab] = useState("home");
+  const isMobile = useIsMobile();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -487,384 +492,375 @@ const DriverPanel = () => {
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="font-bold text-lg flex-1">Painel do Entregador</h1>
-        {trackingData.watching ? (
-          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6">
-            <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6 animate-pulse">
-            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
-          </Badge>
-        )}
-        {!isOnline && (
-          <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 gap-1 px-2 py-0 h-6 animate-bounce">
-            <SignalZero className="w-3 h-3" /> <span className="text-[10px]">OFFLINE</span>
-          </Badge>
-        )}
-        <ThemeToggle />
-      </header>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background overflow-hidden">
+        <AppSidebar role="driver" currentTab={activeTab} onTabChange={setActiveTab} />
+        
+        <SidebarInset className="flex-1 overflow-y-auto">
+          <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
+            <SidebarTrigger />
+            <button onClick={() => navigate("/")} className="hover:bg-muted p-1 rounded-full transition-colors ml-1">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-lg flex-1 truncate">Painel do Entregador</h1>
+            
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground" 
+                onClick={() => { playUrgentNotification(); toast.info("Testando som de alerta..."); }}
+                title="Testar som de alerta"
+              >
+                <Signal className="w-4 h-4" />
+              </Button>
+              {trackingData.watching ? (
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1 px-2 py-0 h-6 hidden sm:flex">
+                  <Signal className="w-3 h-3" /> <span className="text-[10px]">GPS OK</span>
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 gap-1 px-2 py-0 h-6 animate-pulse hidden sm:flex">
+                  <SignalZero className="w-3 h-3" /> <span className="text-[10px]">GPS OFF</span>
+                </Badge>
+              )}
+              {!isOnline && (
+                <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 gap-1 px-2 py-0 h-6 animate-bounce">
+                  <SignalZero className="w-3 h-3" /> <span className="text-[10px]">OFFLINE</span>
+                </Badge>
+              )}
+              <ThemeToggle />
+            </div>
+          </header>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue="home" className="w-full space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 sticky top-16 z-20 bg-background/80 backdrop-blur-sm border shadow-sm h-auto">
-            <TabsTrigger value="home" className="flex items-center gap-1 py-2">
-              <Home className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Início</span>
-            </TabsTrigger>
-            <TabsTrigger value="map" className="flex items-center gap-1 py-2">
-              <MapIcon className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">GPS</span>
-            </TabsTrigger>
-            <TabsTrigger value="radar" className="flex items-center gap-1 py-2">
-              <Radar className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Radar</span>
-            </TabsTrigger>
-            <TabsTrigger value="finance" className="flex items-center gap-1 py-2">
-              <Wallet className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ganhos</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1 py-2">
-              <Settings className="w-4 h-4" /> <span className="text-[10px] xs:text-xs">Ajustes</span>
-            </TabsTrigger>
-          </TabsList>
+          <main className="p-4 max-w-4xl mx-auto w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
+              {isMobile && (
+                <TabsList className="grid w-full grid-cols-5 bg-muted/50 p-1 rounded-xl">
+                  <TabsTrigger value="home" className="rounded-lg"><Home className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="radar" className="rounded-lg"><Radar className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="finance" className="rounded-lg"><Wallet className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="settings" className="rounded-lg"><Settings className="w-4 h-4" /></TabsTrigger>
+                </TabsList>
+              )}
 
+              <motion.div 
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                className="space-y-4 outline-none"
+              >
+                <TabsContent value="home" className="space-y-4 outline-none m-0">
+                  {/* GPS Tracking & Map */}
+                  <DriverGPS
+                    activeRequest={activeRequest}
+                    pendingRequests={pendingRequests}
+                    onAcceptRequest={acceptRequest}
+                    trackingData={trackingData}
+                  />
 
-          <TabsContent value="home" className="space-y-4 outline-none">
-            {/* GPS Tracking & Map */}
-            <DriverGPS
-              activeRequest={activeRequest}
-              pendingRequests={pendingRequests}
-              onAcceptRequest={acceptRequest}
-              trackingData={trackingData}
-            />
+                  {/* Active delivery */}
+                  {activeRequest && (
+                    <Card className="border-primary shadow-md">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-primary" /> Entrega Ativa
+                          <Badge className="ml-auto">R$ {Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                          <p className="font-bold">{activeRequest.restaurants?.name || "Loja"}</p>
+                          {storeOwnerProfile && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-3 h-3" />
+                              <a href={`tel:${storeOwnerProfile.phone}`} className="text-primary underline">{storeOwnerProfile.phone || "Sem telefone"}</a>
+                              <span className="text-muted-foreground">({storeOwnerProfile.full_name})</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">📍 Coleta: {activeRequest.pickup_address}</p>
+                          <p className="text-xs text-muted-foreground">🏠 Entrega: {activeRequest.delivery_address}</p>
+                          {activeRequest.notes && <p className="text-xs">📝 {activeRequest.notes}</p>}
+                        </div>
 
-            {/* Active delivery */}
-            {activeRequest && (
-              <Card className="border-primary shadow-md">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-primary" /> Entrega Ativa
-                    <Badge className="ml-auto">R$ {Number((activeRequest as any).driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                    <p className="font-bold">{activeRequest.restaurants?.name || "Loja"}</p>
-                    {storeOwnerProfile && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-3 h-3" />
-                        <a href={`tel:${storeOwnerProfile.phone}`} className="text-primary underline">{storeOwnerProfile.phone || "Sem telefone"}</a>
-                        <span className="text-muted-foreground">({storeOwnerProfile.full_name})</span>
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">📍 Coleta: {activeRequest.pickup_address}</p>
-                    <p className="text-xs text-muted-foreground">🏠 Entrega: {activeRequest.delivery_address}</p>
-                    {activeRequest.notes && <p className="text-xs">📝 {activeRequest.notes}</p>}
-                  </div>
+                        <div className="flex gap-2">
+                          {activeRequest.status === "accepted" && (
+                            <>
+                              <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
+                                📦 Coletei
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setCancelRequestId(activeRequest.id)}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" /> Cancelar
+                              </Button>
+                            </>
+                          )}
+                          {activeRequest.status === "picked_up" && (
+                            <Button onClick={() => updateStatus(activeRequest.id, "delivered")} className="flex-1" size="sm">
+                              ✅ Entreguei
+                            </Button>
+                          )}
+                        </div>
 
-                  <div className="flex gap-2">
-                    {activeRequest.status === "accepted" && (
-                      <>
-                        <Button onClick={() => updateStatus(activeRequest.id, "picked_up")} className="flex-1" size="sm">
-                          📦 Coletei
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setCancelRequestId(activeRequest.id)}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" /> Cancelar
-                        </Button>
-                      </>
-                    )}
-                    {activeRequest.status === "picked_up" && (
-                      <Button onClick={() => updateStatus(activeRequest.id, "delivered")} className="flex-1" size="sm">
-                        ✅ Entreguei
-                      </Button>
-                    )}
-                  </div>
+                        {/* Chat */}
+                        <div className="border-t pt-3">
+                          <ChatWidget
+                            deliveryRequestId={activeRequest.id}
+                            currentUserId={user.id}
+                            title="Chat com Lojista"
+                            maxHeight="max-h-48"
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  {/* Chat */}
-                  <div className="border-t pt-3">
-                    <ChatWidget
-                      deliveryRequestId={activeRequest.id}
-                      currentUserId={user.id}
-                      title="Chat com Lojista"
-                      maxHeight="max-h-48"
+                  {/* Pending requests list */}
+                  <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center justify-between">
+                        <span>Entregas Disponíveis</span>
+                        <Badge variant="secondary">{pendingRequests.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {pendingRequests.length === 0 ? (
+                        <div className="text-center py-8 space-y-2">
+                          <p className="text-muted-foreground">Nenhuma entrega disponível no momento</p>
+                          <p className="text-xs text-muted-foreground italic">Mantenha a tela aberta para receber notificações</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {pendingRequests.map((r: any) => (
+                            <div key={r.id} className="p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors space-y-3">
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">📍 {r.pickup_address}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">🏠 {r.delivery_address}</p>
+                                </div>
+                                <p className="text-sm font-bold text-primary whitespace-nowrap">
+                                  R$ {Number(r.driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}
+                                </p>
+                              </div>
+                              <Button className="w-full" size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
+                                <Check className="w-4 h-4 mr-1" /> Aceitar Entrega
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="map" className="space-y-4 outline-none m-0 -mx-4">
+                  <div className="h-[calc(100vh-160px)] w-full">
+                    <DriverGPS
+                      activeRequest={activeRequest}
+                      pendingRequests={pendingRequests}
+                      onAcceptRequest={acceptRequest}
+                      trackingData={trackingData}
                     />
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </TabsContent>
 
-            {/* Pending requests list */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>Entregas Disponíveis</span>
-                  <Badge variant="secondary">{pendingRequests.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pendingRequests.length === 0 ? (
-                  <div className="text-center py-8 space-y-2">
-                    <p className="text-muted-foreground">Nenhuma entrega disponível no momento</p>
-                    <p className="text-xs text-muted-foreground italic">Mantenha a tela aberta para receber notificações</p>
+                <TabsContent value="radar" className="space-y-4 outline-none m-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Radar className="w-4 h-4 text-primary" /> Radar de Entregadores
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      <GlobalDriverMap />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="finance" className="space-y-4 outline-none m-0">
+                  {/* Earnings Summary */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-extrabold text-primary">R$ {totalEarnings.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">Total Ganho</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-accent/5 border-accent/20">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-extrabold text-accent">R$ {pendingBalance.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                      </CardContent>
+                    </Card>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingRequests.map((r: any) => (
-                      <div key={r.id} className="p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors space-y-3">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0">
-                            <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">📍 {r.pickup_address}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">🏠 {r.delivery_address}</p>
+
+                  {/* Earnings Report */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-primary" /> Relatório de Ganhos
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Hoje</p>
+                          <p className="text-sm font-bold text-primary">R$ {dailyEarnings.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Semana</p>
+                          <p className="text-sm font-bold text-primary">R$ {weeklyEarnings.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-muted/50 border">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Mês</p>
+                          <p className="text-sm font-bold text-primary">R$ {monthlyEarnings.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Completed deliveries */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
+                        <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {completedRequests.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {completedRequests.map((r: any) => (
+                            <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
+                                <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
+                              <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                                ✅ Entregue
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* PIX Key */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2"><Key className="w-4 h-4" /> Chave PIX para Recebimento</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-1">
+                          <Select value={pixKeyType} onValueChange={setPixKeyType}>
+                            <SelectTrigger className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cpf">CPF</SelectItem>
+                              <SelectItem value="phone">Telefone</SelectItem>
+                              <SelectItem value="email">E-mail</SelectItem>
+                              <SelectItem value="random">Aleatória</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="Sua chave PIX" />
+                        </div>
+                      </div>
+                      <Button onClick={savePixKey} disabled={savingPix} size="sm" className="w-full">
+                        {savingPix ? "Salvando..." : "Salvar Configurações PIX"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Withdrawal */}
+                  {pendingBalance > 0 && (
+                    <Card className="border-accent/30 bg-accent/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Solicitar Saque</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {isPaymentDay ? (
+                          <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-center">
+                            <p className="text-sm font-bold text-accent">🎉 Hoje é dia de pagamento!</p>
+                            <p className="text-xs text-muted-foreground">Saque sem taxa de antecipação</p>
                           </div>
-                          <p className="text-sm font-bold text-primary whitespace-nowrap">
-                            R$ {Number(r.driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}
-                          </p>
+                        ) : (
+                          <div className="bg-muted border rounded-lg p-3 text-center">
+                            <p className="text-xs text-muted-foreground">
+                              Dia de pagamento sem taxa: <strong>dia {paymentDay}</strong>
+                            </p>
+                          </div>
+                        )}
+                        <div className="bg-background rounded-lg p-3 space-y-1 border">
+                          <div className="flex justify-between text-sm">
+                            <span>Saldo disponível</span>
+                            <span className="font-bold">R$ {pendingBalance.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Taxa {isPaymentDay ? "(isento)" : `de antecipação (${feePercent}%)`}</span>
+                            <span>- R$ {(pendingBalance * feePercent / 100).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
+                            <span>Valor a receber</span>
+                            <span className="text-primary text-lg">R$ {netPreview.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <Button className="w-full" size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
-                          <Check className="w-4 h-4 mr-1" /> Aceitar Entrega
+                        <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="default">
+                          {withdrawing ? "Processando..." : "Confirmar Solicitação de Saque"}
                         </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="map" className="space-y-4 outline-none -mx-4 -mt-4">
-            <div className="h-[calc(100vh-120px)] w-full">
-               <DriverGPS
-                activeRequest={activeRequest}
-                pendingRequests={pendingRequests}
-                onAcceptRequest={acceptRequest}
-                trackingData={trackingData}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="radar" className="space-y-4 outline-none">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Radar className="w-4 h-4 text-primary" /> Radar de Entregadores
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 sm:p-6">
-                <GlobalDriverMap />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="finance" className="space-y-4 outline-none">
-            {/* Earnings Summary */}
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-extrabold text-primary">R$ {totalEarnings.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Total Ganho</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-accent/5 border-accent/20">
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-extrabold text-accent">R$ {pendingBalance.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Saldo Atual</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Earnings Report */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" /> Relatório de Ganhos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Hoje</p>
-                    <p className="text-sm font-bold text-primary">R$ {dailyEarnings.toFixed(2)}</p>
-                  </div>
-                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Semana</p>
-                    <p className="text-sm font-bold text-primary">R$ {weeklyEarnings.toFixed(2)}</p>
-                  </div>
-                  <div className="text-center p-2 rounded-lg bg-muted/50 border">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold text-[8px] sm:text-[10px]">Mês</p>
-                    <p className="text-sm font-bold text-primary">R$ {monthlyEarnings.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Completed deliveries */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
-                  <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {completedRequests.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
-                ) : (
-                  <div className="space-y-3">
-                    {completedRequests.map((r: any) => (
-                      <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
-                          <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
-                          ✅ Entregue
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* PIX Key */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2"><Key className="w-4 h-4" /> Chave PIX para Recebimento</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1">
-                    <Select value={pixKeyType} onValueChange={setPixKeyType}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cpf">CPF</SelectItem>
-                        <SelectItem value="phone">Telefone</SelectItem>
-                        <SelectItem value="email">E-mail</SelectItem>
-                        <SelectItem value="random">Aleatória</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="Sua chave PIX" />
-                  </div>
-                </div>
-                <Button onClick={savePixKey} disabled={savingPix} size="sm" className="w-full">
-                  {savingPix ? "Salvando..." : "Salvar Configurações PIX"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Withdrawal */}
-            {pendingBalance > 0 && (
-              <Card className="border-accent/30 bg-accent/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Solicitar Saque</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {isPaymentDay ? (
-                    <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-center">
-                      <p className="text-sm font-bold text-accent">🎉 Hoje é dia de pagamento!</p>
-                      <p className="text-xs text-muted-foreground">Saque sem taxa de antecipação</p>
-                    </div>
-                  ) : (
-                    <div className="bg-muted border rounded-lg p-3 text-center">
-                      <p className="text-xs text-muted-foreground">
-                        Dia de pagamento sem taxa: <strong>dia {paymentDay}</strong>
-                      </p>
-                    </div>
+                      </CardContent>
+                    </Card>
                   )}
-                  <div className="bg-background rounded-lg p-3 space-y-1 border">
-                    <div className="flex justify-between text-sm">
-                      <span>Saldo disponível</span>
-                      <span className="font-bold">R$ {pendingBalance.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Taxa {isPaymentDay ? "(isento)" : `de antecipação (${feePercent}%)`}</span>
-                      <span>- R$ {(pendingBalance * feePercent / 100).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
-                      <span>Valor a receber</span>
-                      <span className="text-primary text-lg">R$ {netPreview.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="default">
-                    {withdrawing ? "Processando..." : isPaymentDay ? "💰 Solicitar Saque" : "💰 Solicitar Saque Antecipado"}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Earnings per delivery */}
-            {earnings.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4" /> Últimos Ganhos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {earnings.slice(0, 5).map((e: any) => (
-                      <div key={e.id} className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(e.created_at).toLocaleDateString("pt-BR")} às {new Date(e.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                  {/* Withdrawal History */}
+                  {withdrawals.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Histórico de Saques</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {withdrawals.map((w: any) => (
+                            <div key={w.id} className="p-3 rounded-lg border bg-muted/20 flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-bold">R$ {Number(w.net_amount).toFixed(2)}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {new Date(w.created_at).toLocaleDateString("pt-BR")} • Taxa: {w.fee_percent}%
+                                </p>
+                              </div>
+                              <Badge variant={w.status === "approved" ? "default" : w.status === "rejected" ? "destructive" : "secondary"} className="text-[10px]">
+                                {w.status === "approved" ? "Aprovado" : w.status === "rejected" ? "Rejeitado" : "Pendente"}
+                              </Badge>
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-primary">R$ {Number(e.amount).toFixed(2)}</p>
-                          <Badge variant={e.status === "paid" ? "default" : "secondary"} className="text-[10px] h-4">
-                            {e.status === "paid" ? "Pago" : "Pendente"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
 
-            {/* Withdrawal History */}
-            {withdrawals.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Histórico de Saques</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {withdrawals.map((w: any) => (
-                      <div key={w.id} className="p-3 rounded-lg border bg-muted/20 flex justify-between items-center">
-                        <div>
-                          <p className="text-sm font-bold">R$ {Number(w.net_amount).toFixed(2)}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {new Date(w.created_at).toLocaleDateString("pt-BR")} • Taxa: {w.fee_percent}%
-                          </p>
-                        </div>
-                        <Badge variant={w.status === "approved" ? "default" : w.status === "rejected" ? "destructive" : "secondary"} className="text-[10px]">
-                          {w.status === "approved" ? "Aprovado" : w.status === "rejected" ? "Rejeitado" : "Pendente"}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-4 outline-none">
-            {/* Notification Settings */}
-            <DriverNotificationSettings />
-          </TabsContent>
-        </Tabs>
-      </motion.div>
+                <TabsContent value="settings" className="space-y-4 outline-none m-0">
+                  {/* Notification Settings */}
+                  <DriverNotificationSettings />
+                </TabsContent>
+              </motion.div>
+            </Tabs>
+          </main>
+        </SidebarInset>
+      </div>
 
       <AlertDialog open={!!cancelRequestId} onOpenChange={(open) => !open && setCancelRequestId(null)}>
         <AlertDialogContent>
@@ -886,7 +882,7 @@ const DriverPanel = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SidebarProvider>
   );
 };
 
