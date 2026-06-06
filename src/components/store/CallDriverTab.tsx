@@ -125,13 +125,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       if (!restaurant?.id) return [];
       const { data, error } = await supabase
         .from("store_driver_favorites")
-        .select("driver_id, driver:drivers(id, user_id, full_name, driver_code)")
+        .select("driver_id, is_default, driver:drivers(id, user_id, full_name, driver_code)")
         .eq("restaurant_id", restaurant.id);
       if (error) return [];
       return data;
     },
     enabled: !!restaurant?.id,
   });
+
+  // Auto-select default favorite driver when available
+  useEffect(() => {
+    if (selectedDriverId) return;
+    const def = favoriteDrivers.find((f: any) => f.is_default);
+    if (def && def.driver?.user_id) {
+      setSelectedDriverId(def.driver.user_id);
+    }
+  }, [favoriteDrivers]);
+
+  // Determine if selected driver is currently online
+  const selectedDriverOnline = !!selectedDriverId && driverLocations.some((dl: any) => dl.user_id === selectedDriverId);
+  const selectedDriverName = (() => {
+    if (!selectedDriverId) return null;
+    const fav = favoriteDrivers.find((f: any) => f.driver?.user_id === selectedDriverId);
+    if (fav) return fav.driver?.full_name;
+    const dl = driverLocations.find((d: any) => d.user_id === selectedDriverId);
+    return dl?.driver?.full_name || "Entregador";
+  })();
   const gpsWatchRef = useRef<number | null>(null);
 
   // Route profile & road distance state
