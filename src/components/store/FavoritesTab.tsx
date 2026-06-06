@@ -185,7 +185,14 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                       {fav.driver?.full_name?.charAt(0) || <User className="w-5 h-5" />}
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{fav.driver?.full_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{fav.driver?.full_name}</p>
+                        {fav.is_default && (
+                          <Badge className="text-[10px] py-0 h-4 gap-1 bg-yellow-500 hover:bg-yellow-500">
+                            <Star className="w-2.5 h-2.5 fill-current" /> Padrão
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="outline" className="text-[10px] py-0 h-4 gap-1">
                           <Code className="w-2.5 h-2.5" />
@@ -197,14 +204,27 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                       </div>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRemoveFavorite(fav.id, fav.driver?.full_name)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {!fav.is_default && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/10 gap-1"
+                        onClick={() => handleSetDefault(fav.id, fav.driver?.full_name)}
+                      >
+                        <BadgeCheck className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs">Padrão</span>
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleRemoveFavorite(fav.id, fav.driver?.full_name)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
