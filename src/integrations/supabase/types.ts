@@ -865,69 +865,48 @@ export type Database = {
         }
         Relationships: []
       }
-      delivery_config_public: {
-        Row: {
-          base_fee: number | null
-          fee_per_km: number | null
-          id: string | null
-          max_km: number | null
-          min_km: number | null
-          round_km_up: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       public_delivery_config: {
         Row: {
-          app_fee_per_delivery: number | null
           base_fee: number | null
+          early_withdrawal_fee_percent: number | null
           fee_per_km: number | null
           id: string | null
           max_km: number | null
           min_km: number | null
+          payment_day: number | null
           promo_credit_percent: number | null
+          recharge_url: string | null
           round_km_up: boolean | null
           updated_at: string | null
+          whatsapp_number: string | null
         }
         Insert: {
-          app_fee_per_delivery?: number | null
           base_fee?: number | null
+          early_withdrawal_fee_percent?: number | null
           fee_per_km?: number | null
           id?: string | null
           max_km?: number | null
           min_km?: number | null
+          payment_day?: number | null
           promo_credit_percent?: number | null
+          recharge_url?: string | null
           round_km_up?: boolean | null
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
-          app_fee_per_delivery?: number | null
           base_fee?: number | null
+          early_withdrawal_fee_percent?: number | null
           fee_per_km?: number | null
           id?: string | null
           max_km?: number | null
           min_km?: number | null
+          payment_day?: number | null
           promo_credit_percent?: number | null
+          recharge_url?: string | null
           round_km_up?: boolean | null
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
