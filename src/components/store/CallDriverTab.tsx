@@ -1160,10 +1160,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                     ))}
                 </optgroup>
               </select>
-              {selectedDriverId && (
-                <p className="text-[10px] text-primary font-medium">
-                  Solicitação será enviada prioritariamente para este entregador.
+              {selectedDriverId && selectedDriverOnline && (
+                <p className="text-[10px] text-primary font-medium flex items-center gap-1">
+                  ✓ {selectedDriverName} está online. A solicitação será enviada prioritariamente a ele.
                 </p>
+              )}
+              {selectedDriverId && !selectedDriverOnline && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                      {selectedDriverName} está indisponível no momento
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Você pode chamar mesmo assim (será enviado quando ele voltar) ou liberar para qualquer entregador.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 mt-1 text-[10px]"
+                      onClick={() => setSelectedDriverId(null)}
+                    >
+                      Liberar para qualquer entregador
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
