@@ -6,13 +6,9 @@ const WhatsAppButton = () => {
   const { data: config } = useQuery({
     queryKey: ["delivery-config-whatsapp"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("public_delivery_config")
-        .select("whatsapp_number")
-        .limit(1)
-        .single();
+      const { data, error } = await (supabase as any).rpc("get_public_delivery_config");
       if (error) throw error;
-      return data;
+      return Array.isArray(data) ? data[0] : data;
     },
     staleTime: 60000,
   });

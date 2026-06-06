@@ -158,13 +158,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
     queryFn: async () => {
-      const { data } = await supabase.from("public_delivery_config").select("*").limit(1).single();
-      return data;
+      const { data } = await (supabase as any).rpc("get_public_delivery_config");
+      return Array.isArray(data) ? data[0] : data;
     },
   });
 
-  const baseFee = deliveryConfig?.base_fee ?? 5;
-  const feePerKm = deliveryConfig?.fee_per_km ?? 1.5;
+  const baseFee = (deliveryConfig as any)?.base_fee ?? 5;
+  const feePerKm = (deliveryConfig as any)?.fee_per_km ?? 1.5;
   const minKm = (deliveryConfig as any)?.min_km ?? 0;
   const maxKm = (deliveryConfig as any)?.max_km ?? 0;
   const roundKmUp = !!(deliveryConfig as any)?.round_km_up;
