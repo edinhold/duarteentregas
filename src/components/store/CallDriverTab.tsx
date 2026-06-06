@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code, XCircle } from "lucide-react";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
@@ -766,6 +766,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   };
 
+  const handleCancelRequest = async (requestId: string) => {
+    if (!confirm("Cancelar esta corrida? Os créditos descontados serão devolvidos à sua loja.")) return;
+    try {
+      const { data, error } = await (supabase as any).rpc("cancel_delivery_request", { p_request_id: requestId });
+      if (error) throw error;
+      if (!data) throw new Error("Não foi possível cancelar");
+      toast.success("Corrida cancelada. Créditos devolvidos!");
+      queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["my-credits"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cancelar corrida");
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* GPS Status Bar */}
@@ -1160,17 +1174,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <p className="text-muted-foreground text-center py-4">Nenhuma entrega solicitada</p>
           ) : (
             <div className="space-y-2">
-              {requests.map((r: any) => (
-                <div key={r.id} className="p-3 rounded-lg bg-muted/50 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-bold">#{r.id.slice(0, 8)}</p>
-                    <Badge variant={r.status === "delivered" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>
-                      {statusLabels[r.status] || r.status}
-                    </Badge>
+              {requests.map((r: any) => {
+                const canCancel = ["pending", "accepted", "picked_up"].includes(r.status);
+                return (
+                  <div key={r.id} className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <div className="flex justify-between items-center gap-2">
+                      <p className="text-sm font-bold">#{r.id.slice(0, 8)}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={r.status === "delivered" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>
+                          {statusLabels[r.status] || r.status}
+                        </Badge>
+                        {canCancel && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 px-2"
+                            onClick={() => handleCancelRequest(r.id)}
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-1" /> Cancelar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
