@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Star, UserPlus, Trash2, Search, Code, User } from "lucide-react";
+import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck } from "lucide-react";
 
 interface FavoritesTabProps {
   restaurant: any;
@@ -28,6 +28,7 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
         .select(`
           id,
           driver_id,
+          is_default,
           driver:drivers(id, user_id, full_name, driver_code, phone)
         `)
         .eq("restaurant_id", restaurant.id);
@@ -106,6 +107,17 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
     } catch (err: any) {
       console.error("Error removing favorite:", err);
       toast.error("Erro ao remover favorito");
+    }
+  };
+
+  const handleSetDefault = async (favoriteId: string, name: string) => {
+    try {
+      const { error } = await (supabase as any).rpc("set_default_favorite_driver", { p_favorite_id: favoriteId });
+      if (error) throw error;
+      toast.success(`${name} definido como favorito padrão`);
+      queryClient.invalidateQueries({ queryKey: ["favorite-drivers", restaurant.id] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao definir padrão");
     }
   };
 
