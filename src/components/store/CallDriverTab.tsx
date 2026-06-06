@@ -149,7 +149,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     const fav = favoriteDrivers.find((f: any) => f.driver?.user_id === selectedDriverId);
     if (fav) return fav.driver?.full_name;
     const dl = driverLocations.find((d: any) => d.user_id === selectedDriverId);
-    return dl?.driver?.full_name || "Entregador";
+    return (dl as any)?.driver?.full_name || "Entregador";
   })();
   const gpsWatchRef = useRef<number | null>(null);
 
