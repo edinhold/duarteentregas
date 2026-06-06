@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Star, UserPlus, Trash2, Search, Code, User } from "lucide-react";
+import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck } from "lucide-react";
 
 interface FavoritesTabProps {
   restaurant: any;
@@ -28,6 +28,7 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
         .select(`
           id,
           driver_id,
+          is_default,
           driver:drivers(id, user_id, full_name, driver_code, phone)
         `)
         .eq("restaurant_id", restaurant.id);
@@ -109,6 +110,17 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
     }
   };
 
+  const handleSetDefault = async (favoriteId: string, name: string) => {
+    try {
+      const { error } = await (supabase as any).rpc("set_default_favorite_driver", { p_favorite_id: favoriteId });
+      if (error) throw error;
+      toast.success(`${name} definido como favorito padrão`);
+      queryClient.invalidateQueries({ queryKey: ["favorite-drivers", restaurant.id] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao definir padrão");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -173,7 +185,14 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                       {fav.driver?.full_name?.charAt(0) || <User className="w-5 h-5" />}
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{fav.driver?.full_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{fav.driver?.full_name}</p>
+                        {fav.is_default && (
+                          <Badge className="text-[10px] py-0 h-4 gap-1 bg-yellow-500 hover:bg-yellow-500">
+                            <Star className="w-2.5 h-2.5 fill-current" /> Padrão
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="outline" className="text-[10px] py-0 h-4 gap-1">
                           <Code className="w-2.5 h-2.5" />
@@ -185,14 +204,27 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                       </div>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRemoveFavorite(fav.id, fav.driver?.full_name)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {!fav.is_default && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/10 gap-1"
+                        onClick={() => handleSetDefault(fav.id, fav.driver?.full_name)}
+                      >
+                        <BadgeCheck className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs">Padrão</span>
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleRemoveFavorite(fav.id, fav.driver?.full_name)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

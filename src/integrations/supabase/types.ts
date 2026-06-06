@@ -725,18 +725,21 @@ export type Database = {
           created_at: string
           driver_id: string
           id: string
+          is_default: boolean
           restaurant_id: string
         }
         Insert: {
           created_at?: string
           driver_id: string
           id?: string
+          is_default?: boolean
           restaurant_id: string
         }
         Update: {
           created_at?: string
           driver_id?: string
           id?: string
+          is_default?: boolean
           restaurant_id?: string
         }
         Relationships: [
@@ -991,8 +994,16 @@ export type Database = {
         }
         Returns: string
       }
+      reassign_delivery_driver: {
+        Args: { p_driver_user_id: string; p_request_id: string }
+        Returns: boolean
+      }
       redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
       request_withdrawal: { Args: never; Returns: boolean }
+      set_default_favorite_driver: {
+        Args: { p_favorite_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "driver" | "store_owner"
