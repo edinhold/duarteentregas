@@ -865,72 +865,6 @@ export type Database = {
         }
         Relationships: []
       }
-      delivery_config_public: {
-        Row: {
-          base_fee: number | null
-          fee_per_km: number | null
-          id: string | null
-          max_km: number | null
-          min_km: number | null
-          round_km_up: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      public_delivery_config: {
-        Row: {
-          app_fee_per_delivery: number | null
-          base_fee: number | null
-          fee_per_km: number | null
-          id: string | null
-          max_km: number | null
-          min_km: number | null
-          promo_credit_percent: number | null
-          round_km_up: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          app_fee_per_delivery?: number | null
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          promo_credit_percent?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          app_fee_per_delivery?: number | null
-          base_fee?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          promo_credit_percent?: number | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       restaurants_public: {
         Row: {
           address: string | null
@@ -1015,6 +949,23 @@ export type Database = {
         Returns: string
       }
       delete_all_chat_messages: { Args: never; Returns: undefined }
+      get_public_delivery_config: {
+        Args: never
+        Returns: {
+          base_fee: number
+          early_withdrawal_fee_percent: number
+          fee_per_km: number
+          id: string
+          max_km: number
+          min_km: number
+          payment_day: number
+          promo_credit_percent: number
+          recharge_url: string
+          round_km_up: boolean
+          updated_at: string
+          whatsapp_number: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -190,8 +190,8 @@ const DriverPanel = () => {
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
     queryFn: async () => {
-      const { data } = await supabase.from("public_delivery_config").select("*").limit(1).single();
-      return data;
+      const { data } = await (supabase as any).rpc("get_public_delivery_config");
+      return Array.isArray(data) ? data[0] : data;
     },
   });
 
