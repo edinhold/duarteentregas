@@ -1174,17 +1174,32 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <p className="text-muted-foreground text-center py-4">Nenhuma entrega solicitada</p>
           ) : (
             <div className="space-y-2">
-              {requests.map((r: any) => (
-                <div key={r.id} className="p-3 rounded-lg bg-muted/50 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-bold">#{r.id.slice(0, 8)}</p>
-                    <Badge variant={r.status === "delivered" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>
-                      {statusLabels[r.status] || r.status}
-                    </Badge>
+              {requests.map((r: any) => {
+                const canCancel = ["pending", "accepted", "picked_up"].includes(r.status);
+                return (
+                  <div key={r.id} className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <div className="flex justify-between items-center gap-2">
+                      <p className="text-sm font-bold">#{r.id.slice(0, 8)}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={r.status === "delivered" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>
+                          {statusLabels[r.status] || r.status}
+                        </Badge>
+                        {canCancel && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 px-2"
+                            onClick={() => handleCancelRequest(r.id)}
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-1" /> Cancelar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">📍 {r.pickup_address} → {r.delivery_address}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
