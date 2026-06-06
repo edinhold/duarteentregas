@@ -936,6 +936,10 @@ export type Database = {
       }
     }
     Functions: {
+      cancel_delivery_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
       deduct_credits_for_delivery: {
         Args: {
