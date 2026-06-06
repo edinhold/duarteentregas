@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code, XCircle } from "lucide-react";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
@@ -763,6 +763,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       toast.error(err.message || "Erro ao chamar entregador. Verifique seus créditos.");
     } finally {
       setCalling(false);
+    }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    if (!confirm("Cancelar esta corrida? Os créditos descontados serão devolvidos à sua loja.")) return;
+    try {
+      const { data, error } = await (supabase as any).rpc("cancel_delivery_request", { p_request_id: requestId });
+      if (error) throw error;
+      if (!data) throw new Error("Não foi possível cancelar");
+      toast.success("Corrida cancelada. Créditos devolvidos!");
+      queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["my-credits"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cancelar corrida");
     }
   };
 
