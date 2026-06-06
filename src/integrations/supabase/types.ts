@@ -865,51 +865,6 @@ export type Database = {
         }
         Relationships: []
       }
-      public_delivery_config: {
-        Row: {
-          base_fee: number | null
-          early_withdrawal_fee_percent: number | null
-          fee_per_km: number | null
-          id: string | null
-          max_km: number | null
-          min_km: number | null
-          payment_day: number | null
-          promo_credit_percent: number | null
-          recharge_url: string | null
-          round_km_up: boolean | null
-          updated_at: string | null
-          whatsapp_number: string | null
-        }
-        Insert: {
-          base_fee?: number | null
-          early_withdrawal_fee_percent?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          payment_day?: number | null
-          promo_credit_percent?: number | null
-          recharge_url?: string | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-          whatsapp_number?: string | null
-        }
-        Update: {
-          base_fee?: number | null
-          early_withdrawal_fee_percent?: number | null
-          fee_per_km?: number | null
-          id?: string | null
-          max_km?: number | null
-          min_km?: number | null
-          payment_day?: number | null
-          promo_credit_percent?: number | null
-          recharge_url?: string | null
-          round_km_up?: boolean | null
-          updated_at?: string | null
-          whatsapp_number?: string | null
-        }
-        Relationships: []
-      }
       restaurants_public: {
         Row: {
           address: string | null
@@ -994,6 +949,23 @@ export type Database = {
         Returns: string
       }
       delete_all_chat_messages: { Args: never; Returns: undefined }
+      get_public_delivery_config: {
+        Args: never
+        Returns: {
+          base_fee: number
+          early_withdrawal_fee_percent: number
+          fee_per_km: number
+          id: string
+          max_km: number
+          min_km: number
+          payment_day: number
+          promo_credit_percent: number
+          recharge_url: string
+          round_km_up: boolean
+          updated_at: string
+          whatsapp_number: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
