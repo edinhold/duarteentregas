@@ -167,7 +167,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
+  const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("google");
   const storeMarkerRef = useRef<L.Marker | null>(null);
   const deliveryMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
@@ -837,6 +837,31 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         </Card>
       )}
 
+      {/* Active Delivery — Cancel banner */}
+      {activeRequest && ["pending", "accepted", "picked_up"].includes(activeRequest.status) && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Truck className="w-5 h-5 text-destructive shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">
+                Entrega em andamento #{activeRequest.id.slice(0, 8)}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                Status: {statusLabels[activeRequest.status] || activeRequest.status} • {activeRequest.delivery_address}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleCancelRequest(activeRequest.id)}
+              className="shrink-0"
+            >
+              <XCircle className="w-4 h-4 mr-1" /> Cancelar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Map */}
       <Card>
         <CardHeader className="pb-2">
@@ -848,14 +873,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               variant="outline"
               size="sm"
               onClick={() => {
-                const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+                const types: (keyof typeof MAP_LAYERS)[] = ["google", "streets", "satellite"];
                 const next = types[(types.indexOf(mapType) + 1) % types.length];
                 setMapType(next);
               }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "streets" ? "Mapa" : "Satélite"}
+              {mapType === "google" ? "Google" : mapType === "streets" ? "OSM" : "Satélite"}
             </Button>
           </div>
         </CardHeader>
