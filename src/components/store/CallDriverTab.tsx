@@ -837,6 +837,31 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         </Card>
       )}
 
+      {/* Active Delivery — Cancel banner */}
+      {activeRequest && ["pending", "accepted", "picked_up"].includes(activeRequest.status) && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Truck className="w-5 h-5 text-destructive shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">
+                Entrega em andamento #{activeRequest.id.slice(0, 8)}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                Status: {statusLabels[activeRequest.status] || activeRequest.status} • {activeRequest.delivery_address}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleCancelRequest(activeRequest.id)}
+              className="shrink-0"
+            >
+              <XCircle className="w-4 h-4 mr-1" /> Cancelar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Map */}
       <Card>
         <CardHeader className="pb-2">
