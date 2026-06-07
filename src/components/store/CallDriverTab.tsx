@@ -848,14 +848,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               variant="outline"
               size="sm"
               onClick={() => {
-                const types: (keyof typeof MAP_LAYERS)[] = ["streets", "satellite"];
+                const types: (keyof typeof MAP_LAYERS)[] = ["google", "streets", "satellite"];
                 const next = types[(types.indexOf(mapType) + 1) % types.length];
                 setMapType(next);
               }}
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "streets" ? "Mapa" : "Satélite"}
+              {mapType === "google" ? "Google" : mapType === "streets" ? "OSM" : "Satélite"}
             </Button>
           </div>
         </CardHeader>
