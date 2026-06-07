@@ -147,43 +147,65 @@ export const playUrgentNotification = () => {
   }
 };
 
-// Standby alert: gentle reminder beep + short vibration
+// Standby alert: loud two-tone whistle (fiu-fiu) + vibration
 export const playStandbyAlert = () => {
   try {
     if ("vibrate" in navigator) {
-      navigator.vibrate([200, 100, 200]);
+      navigator.vibrate([250, 120, 350]);
     }
   } catch {}
 
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    
     if (ctx.state === "suspended") ctx.resume();
 
-    const vol = globalVolume * 0.5;
+    // Volume well above the old gentle beep
+    const vol = Math.max(0.6, globalVolume) * 0.9;
+    const now = ctx.currentTime;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 700;
-    osc.type = "sine";
-    gain.gain.setValueAtTime(0.25 * vol, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
+    // A whistle = fast pitch sweep on a sine wave, with a subtle higher harmonic
+    const whistle = (startOffset: number, freqStart: number, freqEnd: number, duration: number) => {
+      const t0 = now + startOffset;
+      const t1 = t0 + duration;
 
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.frequency.value = 900;
-    osc2.type = "sine";
-    gain2.gain.setValueAtTime(0.2 * vol, ctx.currentTime + 0.25);
-    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-    osc2.start(ctx.currentTime + 0.25);
-    osc2.stop(ctx.currentTime + 0.5);
+      // Fundamental sweep
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freqStart, t0);
+      osc.frequency.exponentialRampToValueAtTime(freqEnd, t1);
+
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.9 * vol, t0 + 0.04);
+      gain.gain.setValueAtTime(0.9 * vol, t1 - 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t1);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t1 + 0.02);
+
+      // Soft second harmonic to give the airy "whistle" timbre
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(freqStart * 2, t0);
+      osc2.frequency.exponentialRampToValueAtTime(freqEnd * 2, t1);
+
+      gain2.gain.setValueAtTime(0.0001, t0);
+      gain2.gain.exponentialRampToValueAtTime(0.25 * vol, t0 + 0.04);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, t1);
+
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(t0);
+      osc2.stop(t1 + 0.02);
+    };
+
+    // "Fiu" subindo, "fiu" descendo — assovio clássico de chamada
+    whistle(0.0, 900, 1800, 0.28);
+    whistle(0.35, 1800, 900, 0.32);
   } catch {}
 };
 
