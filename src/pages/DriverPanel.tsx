@@ -202,15 +202,29 @@ const DriverPanel = () => {
     }
   }, []);
 
-  // Standby mode: activate when no active request, deactivate when busy
+  // Standby mode: gentle beep when idle; urgent repeated alert when there are pending pickups
   useEffect(() => {
     const settings = JSON.parse(localStorage.getItem("driver-notification-settings") || "{}");
-    if (settings.standbyEnabled && !activeRequest && pendingRequests.length === 0) {
-      startStandbyMode(settings.standbyIntervalMs || 30000);
-    } else {
-      stopStandbyMode();
+    const standbyEnabled = !!settings.standbyEnabled;
+    const intervalMs = settings.standbyIntervalMs || 30000;
+
+    stopStandbyMode();
+    let pendingAlertTimer: ReturnType<typeof setInterval> | null = null;
+
+    if (!activeRequest && pendingRequests.length > 0) {
+      // There are deliveries to pick up — keep ringing the urgent alert until accepted
+      const repeatMs = Math.min(intervalMs, 15000); // cap at 15s so motorista não perde
+      pendingAlertTimer = setInterval(() => {
+        playUrgentNotification();
+      }, repeatMs);
+    } else if (standbyEnabled && !activeRequest && pendingRequests.length === 0) {
+      startStandbyMode(intervalMs);
     }
-    return () => stopStandbyMode();
+
+    return () => {
+      stopStandbyMode();
+      if (pendingAlertTimer) clearInterval(pendingAlertTimer);
+    };
   }, [activeRequest, pendingRequests.length]);
 
   // Realtime
