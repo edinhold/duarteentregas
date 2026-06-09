@@ -95,6 +95,24 @@ const DriverPanel = () => {
     enabled: !!user,
   });
 
+  // Track locally-rejected request ids (so this driver stops seeing them)
+  const [rejectedIds, setRejectedIds] = useState<string[]>([]);
+
+  // Periodically release stale directed requests (>30s without acceptance)
+  // so they become visible to all eligible drivers.
+  useEffect(() => {
+    if (!user) return;
+    const tick = async () => {
+      try {
+        await (supabase as any).rpc("release_stale_directed_requests");
+        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+      } catch {}
+    };
+    tick();
+    const id = setInterval(tick, 10000);
+    return () => clearInterval(id);
+  }, [user, queryClient]);
+
   // Get my accepted requests
   const { data: myRequests = [] } = useQuery({
     queryKey: ["driver-my-requests", user?.id],
@@ -650,21 +668,32 @@ const DriverPanel = () => {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {pendingRequests.map((r: any) => (
+                          {pendingRequests.filter((r: any) => !rejectedIds.includes(r.id)).map((r: any) => (
                             <div key={r.id} className="p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors space-y-3">
                               <div className="flex justify-between items-start gap-2">
                                 <div className="min-w-0">
                                   <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
                                   <p className="text-xs text-muted-foreground line-clamp-1">📍 {r.pickup_address}</p>
                                   <p className="text-xs text-muted-foreground line-clamp-1">🏠 {r.delivery_address}</p>
+                                  {r.driver_id === user?.id && (
+                                    <p className="text-[10px] text-primary font-semibold mt-1">⭐ Direcionada a você (favorito)</p>
+                                  )}
                                 </div>
                                 <p className="text-sm font-bold text-primary whitespace-nowrap">
                                   R$ {Number(r.driver_fee || deliveryConfig?.base_fee || 5).toFixed(2)}
                                 </p>
                               </div>
-                              <Button className="w-full" size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
-                                <Check className="w-4 h-4 mr-1" /> Aceitar Entrega
-                              </Button>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  setRejectedIds((prev) => [...prev, r.id]);
+                                  toast.info("Entrega recusada. Continuará disponível para outros motoristas.");
+                                }}>
+                                  Recusar
+                                </Button>
+                                <Button size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
+                                  <Check className="w-4 h-4 mr-1" /> Aceitar
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
