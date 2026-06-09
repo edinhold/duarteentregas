@@ -95,6 +95,24 @@ const DriverPanel = () => {
     enabled: !!user,
   });
 
+  // Track locally-rejected request ids (so this driver stops seeing them)
+  const [rejectedIds, setRejectedIds] = useState<string[]>([]);
+
+  // Periodically release stale directed requests (>30s without acceptance)
+  // so they become visible to all eligible drivers.
+  useEffect(() => {
+    if (!user) return;
+    const tick = async () => {
+      try {
+        await (supabase as any).rpc("release_stale_directed_requests");
+        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+      } catch {}
+    };
+    tick();
+    const id = setInterval(tick, 10000);
+    return () => clearInterval(id);
+  }, [user, queryClient]);
+
   // Get my accepted requests
   const { data: myRequests = [] } = useQuery({
     queryKey: ["driver-my-requests", user?.id],
