@@ -22,6 +22,7 @@ import OrderTracking from "./pages/OrderTracking";
 import NotFound from "./pages/NotFound";
 import RouteRestorer from "./components/RouteRestorer";
 import SplashScreen from "./components/SplashScreen";
+import UpdatePrompt from "./components/UpdatePrompt";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
         <CartProvider>
           <Toaster />
           <SplashScreen />
+          <UpdatePrompt />
           <Sonner />
           <BrowserRouter>
             <RouteRestorer />
