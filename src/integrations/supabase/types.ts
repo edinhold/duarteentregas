@@ -999,6 +999,7 @@ export type Database = {
         Returns: boolean
       }
       redeem_credit_code: { Args: { p_code: string }; Returns: boolean }
+      release_stale_directed_requests: { Args: never; Returns: number }
       request_withdrawal: { Args: never; Returns: boolean }
       set_default_favorite_driver: {
         Args: { p_favorite_id: string }
