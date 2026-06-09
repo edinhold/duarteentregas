@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import logoDuarte from "@/assets/logo-duarte.jpeg";
 import { useNavigate } from "react-router-dom";
 import { useCategories, useRestaurants } from "@/hooks/useData";
@@ -42,6 +42,55 @@ const Index = () => {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const deferredPromptRef = useRef<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [installing, setInstalling] = useState(false);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      // @ts-ignore iOS Safari
+      window.navigator.standalone === true;
+    setIsInstalled(standalone);
+
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setCanInstall(true);
+    };
+    const onInstalled = () => {
+      setIsInstalled(true);
+      setCanInstall(false);
+      deferredPromptRef.current = null;
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const prompt = deferredPromptRef.current;
+    if (prompt) {
+      setInstalling(true);
+      try {
+        await prompt.prompt();
+        await prompt.userChoice;
+      } catch (err) {
+        console.error("Install prompt error:", err);
+      } finally {
+        deferredPromptRef.current = null;
+        setCanInstall(false);
+        setInstalling(false);
+      }
+      return;
+    }
+    navigate("/instalar");
+  };
 
   const { data: categories = [] } = useCategories();
   const { data: restaurants = [] } = useRestaurants();
@@ -83,21 +132,31 @@ const Index = () => {
 
       <div className="px-4 mt-5 space-y-6 max-w-2xl mx-auto">
         {/* Install App Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-card border border-border/50 rounded-2xl p-4 flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md transition-shadow"
-          onClick={() => navigate("/instalar")}
-        >
-          <img src={logoDuarteFull} alt="Duarte Delivery" className="h-12 object-contain" />
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm">Instale o app Duarte Delivery</p>
-            <p className="text-xs text-muted-foreground">Acesse direto da tela inicial do seu celular</p>
-          </div>
-          <Button size="sm" className="rounded-xl shrink-0 gap-1">
-            <Download className="w-4 h-4" /> Instalar
-          </Button>
-        </motion.div>
+        {!isInstalled && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card border border-border/50 rounded-2xl p-4 flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md transition-shadow"
+            onClick={() => navigate("/instalar")}
+          >
+            <img src={logoDuarteFull} alt="Duarte Delivery" className="h-12 object-contain" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Instale o app Duarte Delivery</p>
+              <p className="text-xs text-muted-foreground">
+                {canInstall ? "Toque em Instalar para adicionar agora" : "Acesse direto da tela inicial do seu celular"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="rounded-xl shrink-0 gap-1"
+              onClick={handleInstallClick}
+              disabled={installing}
+            >
+              <Download className="w-4 h-4" />
+              {installing ? "Instalando..." : canInstall ? "Instalar" : "Como instalar"}
+            </Button>
+          </motion.div>
+        )}
 
         <section>
           <h2 className="text-lg font-bold mb-3">Categorias</h2>
