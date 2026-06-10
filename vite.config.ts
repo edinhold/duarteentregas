@@ -6,6 +6,8 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Relative base so the same /dist works in Electron (file://) and Android (Capacitor) without breaking web hosting at root.
+  base: "./",
   server: {
     host: "::",
     port: 8080,
