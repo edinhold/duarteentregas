@@ -13,6 +13,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@hookform/resolvers": "^3.10.0",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -70,6 +74,8 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",
