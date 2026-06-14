@@ -160,7 +160,7 @@ const StoreOwnerPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="map" className="mt-0 outline-none">
-                  <GlobalDriverMap />
+                  <RadarTab restaurant={restaurant} userId={user.id} />
                 </TabsContent>
 
                 <TabsContent value="credits" className="mt-0 outline-none">
