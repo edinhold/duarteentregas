@@ -14,7 +14,7 @@ import CreditsTab from "@/components/store/CreditsTab";
 import StoreInfoTab from "@/components/store/StoreInfoTab";
 import FavoritesTab from "@/components/store/FavoritesTab";
 import ReassignDriverTab from "@/components/store/ReassignDriverTab";
-import GlobalDriverMap from "@/components/GlobalDriverMap";
+import RadarTab from "@/components/store/RadarTab";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
