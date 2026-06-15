@@ -108,8 +108,10 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 5000,
   });
+
 
   // Active delivery for this store
   const { data: activeDelivery } = useQuery({
