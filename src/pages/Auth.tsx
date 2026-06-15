@@ -30,9 +30,10 @@ const Auth = () => {
         
         // Check user role and redirect accordingly
         if (loginData.user) {
-          const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", loginData.user.id);
+          const uid = loginData.user.id;
+          const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
           const userRoles = roles?.map(r => r.role) || [];
-          
+
           let targetPath = "/";
           if (userRoles.includes("admin")) {
             targetPath = "/admin";
@@ -41,15 +42,22 @@ const Auth = () => {
           } else if (userRoles.includes("driver")) {
             targetPath = "/entregador";
           } else {
-            // Se não tiver role específica mas for motorista, tenta encontrar
-            const { data: driverProfile } = await supabase.from("drivers").select("id").eq("user_id", loginData.user.id).maybeSingle();
+            // Fallback: detect by associated data (driver profile or owned restaurant)
+            const [{ data: driverProfile }, { data: ownedRest }] = await Promise.all([
+              supabase.from("drivers").select("id").eq("user_id", uid).maybeSingle(),
+              supabase.from("restaurants").select("id").eq("owner_id", uid).maybeSingle(),
+            ]);
             if (driverProfile) {
               targetPath = "/entregador";
+              await supabase.from("user_roles").insert({ user_id: uid, role: "driver" as any }).then(() => {}, () => {});
+            } else if (ownedRest) {
+              targetPath = "/lojista";
+              await supabase.from("user_roles").insert({ user_id: uid, role: "store_owner" as any }).then(() => {}, () => {});
             }
           }
-          
+
           localStorage.setItem("lastRoute", targetPath);
-          navigate(targetPath);
+          navigate(targetPath, { replace: true });
         } else {
           navigate("/");
         }
