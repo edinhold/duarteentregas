@@ -973,6 +973,18 @@ export type Database = {
           whatsapp_number: string
         }[]
       }
+      get_radar_drivers: {
+        Args: never
+        Returns: {
+          driver_code: string
+          full_name: string
+          id: string
+          is_active: boolean
+          user_id: string
+          vehicle_plate: string
+          vehicle_type: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
