@@ -87,15 +87,13 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
   const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Available drivers + their locations
+  // Available drivers (safe RPC — no PIX/CPF/phone exposed)
   const { data: drivers = [] } = useQuery({
     queryKey: ["radar-drivers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("drivers")
-        .select("id, user_id, full_name, driver_code, vehicle_plate, vehicle_type, is_active");
+      const { data, error } = await (supabase as any).rpc("get_radar_drivers");
       if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
     refetchInterval: 30000,
   });
