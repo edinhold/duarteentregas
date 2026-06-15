@@ -81,6 +81,9 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const extraMarkersRef = useRef<L.Marker[]>([]);
   const routeLineRef = useRef<L.Polyline | null>(null);
+  const didInitialFitRef = useRef(false);
+  const lastAssignedRef = useRef<string | null>(null);
+
   const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>("streets");
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
 
