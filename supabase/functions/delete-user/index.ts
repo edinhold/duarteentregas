@@ -38,12 +38,49 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "ID do usuário é obrigatório" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Delete related data
+    // Get driver internal id (for FK cleanup on driver_earnings/withdrawal_requests)
+    const { data: driverRow } = await adminClient.from("drivers").select("id").eq("user_id", user_id).maybeSingle();
+    const driverId = driverRow?.id;
+
+    // Get restaurants owned by this user
+    const { data: ownedRestaurants } = await adminClient.from("restaurants").select("id").eq("owner_id", user_id);
+    const restaurantIds = (ownedRestaurants || []).map((r: any) => r.id);
+
+    // Delete dependent rows (order matters for FKs)
+    await adminClient.from("chat_messages").delete().eq("sender_id", user_id);
+    await adminClient.from("driver_locations").delete().eq("user_id", user_id);
+    await adminClient.from("location_reports").delete().eq("user_id", user_id).then(() => {}, () => {});
+    await adminClient.from("admin_requests").delete().eq("user_id", user_id);
+    await adminClient.from("admin_requests").update({ reviewed_by: null }).eq("reviewed_by", user_id);
+    await adminClient.from("credit_codes").update({ used_by: null }).eq("used_by", user_id);
+    await adminClient.from("store_driver_favorites").delete().eq("driver_user_id", user_id).then(() => {}, () => {});
+
+    // Delivery requests where user is store owner or driver
+    await adminClient.from("delivery_requests").delete().eq("store_owner_id", user_id);
+    await adminClient.from("delivery_requests").update({ driver_id: null }).eq("driver_id", user_id);
+
+    // Orders placed by user
+    await adminClient.from("orders").delete().eq("user_id", user_id);
+
+    // Driver-related financial data
+    if (driverId) {
+      await adminClient.from("withdrawal_requests").delete().eq("driver_id", driverId);
+      await adminClient.from("driver_earnings").delete().eq("driver_id", driverId);
+    }
+    await adminClient.from("withdrawal_requests").delete().eq("driver_user_id", user_id);
+
+    // Restaurants owned by user (and their products/categories cascade via FK if configured)
+    if (restaurantIds.length > 0) {
+      await adminClient.from("products").delete().in("restaurant_id", restaurantIds);
+      await adminClient.from("delivery_requests").delete().in("restaurant_id", restaurantIds);
+      await adminClient.from("orders").delete().in("restaurant_id", restaurantIds);
+      await adminClient.from("restaurants").delete().in("id", restaurantIds);
+    }
+
     await adminClient.from("drivers").delete().eq("user_id", user_id);
-    await adminClient.from("user_roles").delete().eq("user_id", user_id);
     await adminClient.from("store_credits").delete().eq("user_id", user_id);
+    await adminClient.from("user_roles").delete().eq("user_id", user_id);
     await adminClient.from("profiles").delete().eq("user_id", user_id);
-    await adminClient.from("restaurants").update({ owner_id: null }).eq("owner_id", user_id);
 
     const { error } = await adminClient.auth.admin.deleteUser(user_id);
     if (error) {
