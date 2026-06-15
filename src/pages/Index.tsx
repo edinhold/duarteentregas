@@ -20,24 +20,45 @@ import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
 const Index = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
-  
+  const [roleChecking, setRoleChecking] = useState(false);
+
   // Se o usuário estiver logado, redirecionar para o painel correspondente
   useEffect(() => {
-    if (!loading && user) {
-      const checkRole = async () => {
-        const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-        const userRoles = roles?.map(r => r.role) || [];
-        
-        if (userRoles.includes("driver")) {
-          navigate("/entregador", { replace: true });
-        } else if (userRoles.includes("store_owner")) {
-          navigate("/lojista", { replace: true });
-        } else if (userRoles.includes("admin")) {
-          navigate("/admin", { replace: true });
+    if (loading) return;
+    if (!user) return;
+    let cancelled = false;
+    setRoleChecking(true);
+    (async () => {
+      const uid = user.id;
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
+      const userRoles = roles?.map(r => r.role) || [];
+
+      let target: string | null = null;
+      if (userRoles.includes("admin")) target = "/admin";
+      else if (userRoles.includes("store_owner")) target = "/lojista";
+      else if (userRoles.includes("driver")) target = "/entregador";
+      else {
+        const [{ data: driverProfile }, { data: ownedRest }] = await Promise.all([
+          supabase.from("drivers").select("id").eq("user_id", uid).maybeSingle(),
+          supabase.from("restaurants").select("id").eq("owner_id", uid).maybeSingle(),
+        ]);
+        if (driverProfile) {
+          target = "/entregador";
+          await supabase.from("user_roles").insert({ user_id: uid, role: "driver" as any }).then(() => {}, () => {});
+        } else if (ownedRest) {
+          target = "/lojista";
+          await supabase.from("user_roles").insert({ user_id: uid, role: "store_owner" as any }).then(() => {}, () => {});
         }
-      };
-      checkRole();
-    }
+      }
+
+      if (cancelled) return;
+      if (target) {
+        navigate(target, { replace: true });
+      } else {
+        setRoleChecking(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user, loading, navigate]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -108,6 +129,14 @@ const Index = () => {
   }, [search, selectedCategory, restaurants]);
 
   const featured = restaurants.filter((r) => r.is_featured && r.is_open);
+
+  if (loading || (user && roleChecking)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Carregando seu painel...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">
