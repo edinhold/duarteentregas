@@ -347,15 +347,24 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
         [assignedDriver.location.latitude, assignedDriver.location.longitude],
         [tracking.target.lat, tracking.target.lng],
       ]);
-      map.fitBounds(bounds.pad(0.3));
+      if (!didInitialFitRef.current || lastAssignedRef.current !== assignedDriver.user_id) {
+        map.fitBounds(bounds.pad(0.3));
+        didInitialFitRef.current = true;
+        lastAssignedRef.current = assignedDriver.user_id;
+      }
     } else if (markersRef.current.size > 0) {
       const grp = L.featureGroup([
         ...Array.from(markersRef.current.values()),
         ...extraMarkersRef.current,
       ]);
-      if (grp.getBounds().isValid()) map.fitBounds(grp.getBounds().pad(0.2));
+      if (!didInitialFitRef.current && grp.getBounds().isValid()) {
+        map.fitBounds(grp.getBounds().pad(0.2));
+        didInitialFitRef.current = true;
+      }
+      lastAssignedRef.current = null;
     }
   }, [drivers, locationMap, busySet, assignedDriver, tracking, restaurant]);
+
 
   const availableCount = useMemo(
     () =>
