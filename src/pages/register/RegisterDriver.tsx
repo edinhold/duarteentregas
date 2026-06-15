@@ -71,7 +71,7 @@ const RegisterDriver = () => {
         await supabase.from("user_roles").insert({ user_id: data.user.id, role: "driver" as any });
       }
       toast.success("Cadastro de entregador realizado com sucesso!");
-      navigate("/entregador");
+      navigate("/entregador", { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {
