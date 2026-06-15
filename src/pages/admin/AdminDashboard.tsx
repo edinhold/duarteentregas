@@ -393,6 +393,7 @@ const AdminDashboard = () => {
           <TabsContent value="admins"><AdminsTab /></TabsContent>
           <TabsContent value="chat"><ChatTab /></TabsContent>
           <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
+          <TabsContent value="customers"><CustomersTab /></TabsContent>
             </motion.div>
           </Tabs>
         </main>
