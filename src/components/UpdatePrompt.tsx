@@ -18,10 +18,32 @@ const UpdatePrompt = () => {
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
       if (!registration) return;
-      // Periodically check for updates (every 30 min)
-      setInterval(() => {
-        registration.update().catch(() => {});
-      }, 30 * 60 * 1000);
+      console.log("[UpdatePrompt] SW registered:", swUrl);
+
+      const check = () => registration.update().catch(() => {});
+
+      // Initial check, then poll frequently so new versions appear fast
+      check();
+      const interval = window.setInterval(check, 60 * 1000); // every 60s
+
+      const onFocus = () => check();
+      const onVisible = () => { if (document.visibilityState === "visible") check(); };
+      const onOnline = () => check();
+      window.addEventListener("focus", onFocus);
+      document.addEventListener("visibilitychange", onVisible);
+      window.addEventListener("online", onOnline);
+
+      // Cleanup is not strictly required (SW lives for app lifetime),
+      // but expose for HMR safety.
+      (window as any).__updatePromptCleanup = () => {
+        window.clearInterval(interval);
+        window.removeEventListener("focus", onFocus);
+        document.removeEventListener("visibilitychange", onVisible);
+        window.removeEventListener("online", onOnline);
+      };
+    },
+    onNeedRefresh() {
+      console.log("[UpdatePrompt] new version available");
     },
   });
 
