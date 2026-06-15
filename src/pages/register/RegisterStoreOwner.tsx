@@ -71,10 +71,6 @@ const RegisterStoreOwner = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Assign store_owner role FIRST so RLS-failures abort early
-        const { error: roleError } = await supabase.from("user_roles").insert({ user_id: data.user.id, role: "store_owner" as any });
-        if (roleError) throw roleError;
-
         await supabase.from("profiles").update({ phone: form.phone }).eq("user_id", data.user.id);
 
         // Upload images
@@ -96,10 +92,14 @@ const RegisterStoreOwner = () => {
           image: imageUrl,
         });
         if (restError) throw restError;
+
+        // Assign store_owner role
+        const { error: roleError } = await supabase.from("user_roles").insert({ user_id: data.user.id, role: "store_owner" as any });
+        if (roleError) throw roleError;
       }
 
       toast.success("Cadastro de lojista realizado com sucesso!");
-      navigate("/lojista", { replace: true });
+      navigate("/lojista");
     } catch (error: any) {
       toast.error(error.message || "Erro no cadastro");
     } finally {
