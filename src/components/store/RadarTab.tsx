@@ -145,12 +145,33 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
     refetchInterval: 15000,
   });
 
-  // Realtime
+  // Realtime — patch cache directly for instant map updates
   useEffect(() => {
     const channel = supabase
       .channel("radar-tab-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, () =>
-        queryClient.invalidateQueries({ queryKey: ["radar-locations"] })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "driver_locations" },
+        (payload) => {
+          const row: any = payload.new ?? payload.old;
+          if (!row?.user_id) return;
+          queryClient.setQueryData<any[]>(["radar-locations"], (prev = []) => {
+            if (payload.eventType === "DELETE") {
+              return prev.filter((l) => l.user_id !== row.user_id);
+            }
+            const next = {
+              user_id: row.user_id,
+              latitude: Number(row.latitude),
+              longitude: Number(row.longitude),
+              updated_at: row.updated_at ?? new Date().toISOString(),
+            };
+            const idx = prev.findIndex((l) => l.user_id === row.user_id);
+            if (idx === -1) return [...prev, next];
+            const copy = prev.slice();
+            copy[idx] = { ...copy[idx], ...next };
+            return copy;
+          });
+        }
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "delivery_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["radar-active-delivery", userId] });
@@ -159,11 +180,14 @@ const RadarTabContent = ({ restaurant, userId }: Props) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "drivers" }, () =>
         queryClient.invalidateQueries({ queryKey: ["radar-drivers"] })
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[RadarTab] realtime status", status);
+      });
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient, userId]);
+
 
   const locationMap = useMemo(
     () => new Map(locations.map((l) => [l.user_id, l])),
