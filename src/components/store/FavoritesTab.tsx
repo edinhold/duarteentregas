@@ -130,26 +130,55 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="driver-search">Nome ou Código do Entregador</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="driver-search"
-                  placeholder="Ex: ABC123 ou João Silva"
-                  value={driverCode}
-                  onChange={(e) => setDriverCode(e.target.value)}
-                  className="pl-9"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddFavorite()}
-                />
-              </div>
-              <Button onClick={handleAddFavorite} disabled={adding}>
-                {adding ? "Adicionando..." : "Adicionar"}
-              </Button>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="driver-search"
+                placeholder="Digite o nome ou código (ex: João, ABC123)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                autoComplete="off"
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              Você pode encontrar o código no perfil do motorista ou pesquisar pelo nome completo.
+              Comece a digitar para ver os entregadores disponíveis e clique em adicionar.
             </p>
+
+            {search.trim() && (
+              <div className="mt-2 border border-border rounded-lg divide-y divide-border bg-card">
+                {matches.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    Nenhum entregador encontrado.
+                  </div>
+                ) : (
+                  matches.map((d: any) => (
+                    <div key={d.id} className="flex items-center justify-between p-3 hover:bg-muted/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                          {d.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{d.full_name}</p>
+                          <p className="text-[11px] text-muted-foreground">{d.driver_code}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddFavorite(d)}
+                        disabled={adding === d.id}
+                        className="gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {adding === d.id ? "..." : "Adicionar"}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
+
         </CardContent>
       </Card>
 
