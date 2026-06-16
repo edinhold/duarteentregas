@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck } from "lucide-react";
+import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck, Plus } from "lucide-react";
 
 interface FavoritesTabProps {
   restaurant: any;
@@ -15,9 +15,8 @@ interface FavoritesTabProps {
 
 const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
   const queryClient = useQueryClient();
-  const [driverCode, setDriverCode] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState("");
+  const [adding, setAdding] = useState<string | null>(null);
 
   const { data: favorites = [], isLoading } = useQuery({
     queryKey: ["favorite-drivers", restaurant?.id],
@@ -42,37 +41,35 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
     enabled: !!restaurant?.id,
   });
 
-  const handleAddFavorite = async () => {
-    if (!driverCode.trim()) {
-      toast.error("Digite o código ou nome do motorista");
-      return;
-    }
+  // Load all active drivers (via SECURITY DEFINER RPC accessible to store_owners)
+  const { data: allDrivers = [] } = useQuery({
+    queryKey: ["radar-drivers-favorites"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_radar_drivers");
+      if (error) {
+        console.error("Error loading drivers:", error);
+        return [];
+      }
+      return data || [];
+    },
+  });
 
-    setAdding(true);
+  const matches = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return [];
+    const favIds = new Set(favorites.map((f: any) => f.driver_id));
+    return allDrivers
+      .filter((d: any) =>
+        (d.full_name?.toLowerCase().includes(term) ||
+          d.driver_code?.toLowerCase().includes(term)) &&
+        !favIds.has(d.id)
+      )
+      .slice(0, 8);
+  }, [search, allDrivers, favorites]);
+
+  const handleAddFavorite = async (driver: any) => {
+    setAdding(driver.id);
     try {
-      // 1. Search for driver by code or name
-      const { data: drivers, error: searchError } = await supabase
-        .from("drivers")
-        .select("id, full_name, driver_code")
-        .or(`driver_code.eq.${driverCode.trim()},full_name.ilike.%${driverCode.trim()}%`)
-        .limit(1);
-
-      if (searchError) throw searchError;
-      if (!drivers || drivers.length === 0) {
-        toast.error("Motorista não encontrado com este código ou nome");
-        return;
-      }
-
-      const driver = drivers[0];
-
-      // 2. Check if already favorite
-      const isAlreadyFavorite = favorites.some((f: any) => f.driver_id === driver.id);
-      if (isAlreadyFavorite) {
-        toast.info("Este motorista já está nos seus favoritos");
-        return;
-      }
-
-      // 3. Add to favorites
       const { error: insertError } = await supabase
         .from("store_driver_favorites")
         .insert({
@@ -83,13 +80,13 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
       if (insertError) throw insertError;
 
       toast.success(`${driver.full_name} adicionado aos favoritos!`);
-      setDriverCode("");
+      setSearch("");
       queryClient.invalidateQueries({ queryKey: ["favorite-drivers", restaurant.id] });
     } catch (err: any) {
       console.error("Error adding favorite:", err);
       toast.error("Erro ao adicionar favorito");
     } finally {
-      setAdding(false);
+      setAdding(null);
     }
   };
 
@@ -133,26 +130,55 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="driver-search">Nome ou Código do Entregador</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="driver-search"
-                  placeholder="Ex: ABC123 ou João Silva"
-                  value={driverCode}
-                  onChange={(e) => setDriverCode(e.target.value)}
-                  className="pl-9"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddFavorite()}
-                />
-              </div>
-              <Button onClick={handleAddFavorite} disabled={adding}>
-                {adding ? "Adicionando..." : "Adicionar"}
-              </Button>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="driver-search"
+                placeholder="Digite o nome ou código (ex: João, ABC123)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                autoComplete="off"
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              Você pode encontrar o código no perfil do motorista ou pesquisar pelo nome completo.
+              Comece a digitar para ver os entregadores disponíveis e clique em adicionar.
             </p>
+
+            {search.trim() && (
+              <div className="mt-2 border border-border rounded-lg divide-y divide-border bg-card">
+                {matches.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    Nenhum entregador encontrado.
+                  </div>
+                ) : (
+                  matches.map((d: any) => (
+                    <div key={d.id} className="flex items-center justify-between p-3 hover:bg-muted/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                          {d.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{d.full_name}</p>
+                          <p className="text-[11px] text-muted-foreground">{d.driver_code}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddFavorite(d)}
+                        disabled={adding === d.id}
+                        className="gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {adding === d.id ? "..." : "Adicionar"}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
+
         </CardContent>
       </Card>
 
