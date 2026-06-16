@@ -14,16 +14,19 @@ export const useCategories = () =>
     },
   });
 
+const RESTAURANT_PUBLIC_COLUMNS =
+  "id,name,image,logo,address,latitude,longitude,category_id,category_name,rating,delivery_time,delivery_fee,min_order,distance,is_open,is_featured,created_at,updated_at";
+
 export const useRestaurants = () =>
   useQuery({
     queryKey: ["restaurants"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("*")
+        .select(RESTAURANT_PUBLIC_COLUMNS)
         .order("name");
       if (error) throw error;
-      return data;
+      return (data ?? []).map((r: any) => ({ ...r, owner_id: r.owner_id ?? "" }));
     },
   });
 
