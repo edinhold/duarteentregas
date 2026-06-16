@@ -53,6 +53,30 @@ type RestaurantWithMapPosition = Restaurant & {
   mapLongitude: number;
 };
 
+const getCoordinateKey = (restaurant: RestaurantWithMapPosition) =>
+  `${restaurant.mapLatitude.toFixed(5)}:${restaurant.mapLongitude.toFixed(5)}`;
+
+const offsetStackedCoordinate = (
+  latitude: number,
+  longitude: number,
+  index: number,
+  total: number
+) => {
+  if (total <= 1) return { latitude, longitude };
+
+  const angle = (Math.PI * 2 * index) / total;
+  const radiusMeters = Math.min(22, 10 + total * 2);
+  const latitudeOffset = (Math.sin(angle) * radiusMeters) / 111_320;
+  const longitudeOffset =
+    (Math.cos(angle) * radiusMeters) /
+    (111_320 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.1));
+
+  return {
+    latitude: latitude + latitudeOffset,
+    longitude: longitude + longitudeOffset,
+  };
+};
+
 const isValidCoordinate = (lat?: number | null, lng?: number | null) =>
   typeof lat === "number" &&
   typeof lng === "number" &&
@@ -135,8 +159,33 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     return [...positioned, ...fallbackMarkers];
   }, [restaurants, geocodedMarkers]);
 
-  const center: [number, number] = markers.length > 0
-    ? [markers[0].mapLatitude, markers[0].mapLongitude]
+  const visibleMarkers = useMemo<RestaurantWithMapPosition[]>(() => {
+    const groups = new Map<string, RestaurantWithMapPosition[]>();
+    markers.forEach((restaurant) => {
+      const key = getCoordinateKey(restaurant);
+      groups.set(key, [...(groups.get(key) ?? []), restaurant]);
+    });
+
+    return markers.map((restaurant) => {
+      const group = groups.get(getCoordinateKey(restaurant)) ?? [restaurant];
+      const markerIndex = group.findIndex((item) => item.id === restaurant.id);
+      const shifted = offsetStackedCoordinate(
+        restaurant.mapLatitude,
+        restaurant.mapLongitude,
+        Math.max(markerIndex, 0),
+        group.length
+      );
+
+      return {
+        ...restaurant,
+        mapLatitude: shifted.latitude,
+        mapLongitude: shifted.longitude,
+      };
+    });
+  }, [markers]);
+
+  const center: [number, number] = visibleMarkers.length > 0
+    ? [visibleMarkers[0].mapLatitude, visibleMarkers[0].mapLongitude]
     : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
   useEffect(() => {
@@ -148,6 +197,8 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     L.tileLayer(MAP_LAYERS.streets.url, {
       attribution: MAP_LAYERS.streets.attribution,
     }).addTo(map);
+
+    requestAnimationFrame(() => map.invalidateSize());
 
     return () => {
       map.remove();
@@ -208,18 +259,23 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     });
 
     // Restaurant markers
-    markers.forEach((r) => {
+    visibleMarkers.forEach((r) => {
       const marker = L.marker([r.mapLatitude, r.mapLongitude], {
         icon: r.is_open ? openIcon : closedIcon,
         title: r.name,
+        zIndexOffset: 1000,
       }).addTo(map);
 
       marker.bindTooltip(r.name, {
         direction: "top",
         offset: [0, -28],
         opacity: 0.95,
+        sticky: true,
         className: "restaurant-map-tooltip",
       });
+
+      marker.on("mouseover", () => marker.openTooltip());
+      marker.on("mouseout", () => marker.closeTooltip());
 
       marker.bindPopup(`
         <div style="min-width:160px">
@@ -238,12 +294,14 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
       marker.on("click", () => navigate(`/restaurant/${r.id}`));
     });
 
-    if (markers.length > 1) {
-      const bounds = L.latLngBounds(markers.map((r) => [r.mapLatitude, r.mapLongitude]));
+    if (visibleMarkers.length > 1) {
+      const bounds = L.latLngBounds(visibleMarkers.map((r) => [r.mapLatitude, r.mapLongitude]));
       map.fitBounds(bounds, { padding: [28, 28], maxZoom: DEFAULT_ZOOM });
-    } else if (markers.length === 1) {
-      map.setView([markers[0].mapLatitude, markers[0].mapLongitude], DEFAULT_ZOOM);
+    } else if (visibleMarkers.length === 1) {
+      map.setView([visibleMarkers[0].mapLatitude, visibleMarkers[0].mapLongitude], DEFAULT_ZOOM);
     }
+
+    requestAnimationFrame(() => map.invalidateSize());
 
     // Driver markers
     driverLocations.forEach((d: any) => {
@@ -275,7 +333,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
         }).addTo(map);
       }
     });
-  }, [markers, navigate, driverLocations]);
+  }, [visibleMarkers, navigate, driverLocations]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 };
