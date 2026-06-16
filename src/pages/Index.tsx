@@ -219,7 +219,7 @@ const Index = () => {
           {showMap ? (
             <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
               <MapErrorBoundary fallbackHeight="400px">
-                <RestaurantMap restaurants={filtered} />
+                <RestaurantMap restaurants={restaurants} />
               </MapErrorBoundary>
             </div>
           ) : filtered.length === 0 ? (

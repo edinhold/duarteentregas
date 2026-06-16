@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAP_LAYERS } from "@/config/maps";
 import { useNavigate } from "react-router-dom";
@@ -48,15 +48,95 @@ interface RestaurantMapProps {
   restaurants: Restaurant[];
 }
 
+type RestaurantWithMapPosition = Restaurant & {
+  mapLatitude: number;
+  mapLongitude: number;
+};
+
+const isValidCoordinate = (lat?: number | null, lng?: number | null) =>
+  typeof lat === "number" &&
+  typeof lng === "number" &&
+  Number.isFinite(lat) &&
+  Number.isFinite(lng) &&
+  lat >= -90 &&
+  lat <= 90 &&
+  lng >= -180 &&
+  lng <= 180 &&
+  !(lat === 0 && lng === 0);
+
+const getGeocodeAddress = (restaurant: Restaurant) => {
+  const address = restaurant.address?.trim();
+  if (!address) return "";
+  return /primavera do leste|\bmt\b|mato grosso/i.test(address)
+    ? `${address}, Brasil`
+    : `${address}, Primavera do Leste, MT, Brasil`;
+};
+
+const getCachedPosition = (restaurant: Restaurant): RestaurantWithMapPosition | null => {
+  const cacheKey = `restaurant-map-position:${restaurant.id}:${restaurant.address ?? ""}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (!cached) return null;
+
+  try {
+    const position = JSON.parse(cached) as { latitude: number; longitude: number };
+    if (!isValidCoordinate(position.latitude, position.longitude)) return null;
+    return { ...restaurant, mapLatitude: position.latitude, mapLongitude: position.longitude };
+  } catch {
+    return null;
+  }
+};
+
+const cachePosition = (restaurant: Restaurant, latitude: number, longitude: number) => {
+  const cacheKey = `restaurant-map-position:${restaurant.id}:${restaurant.address ?? ""}`;
+  localStorage.setItem(cacheKey, JSON.stringify({ latitude, longitude }));
+};
+
+const geocodeRestaurant = async (restaurant: Restaurant): Promise<RestaurantWithMapPosition | null> => {
+  const cached = getCachedPosition(restaurant);
+  if (cached) return cached;
+
+  const address = getGeocodeAddress(restaurant);
+  if (!address) return null;
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("countrycodes", "br");
+  url.searchParams.set("q", address);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) return null;
+  const [result] = await response.json();
+  const latitude = Number(result?.lat);
+  const longitude = Number(result?.lon);
+  if (!isValidCoordinate(latitude, longitude)) return null;
+
+  cachePosition(restaurant, latitude, longitude);
+  return { ...restaurant, mapLatitude: latitude, mapLongitude: longitude };
+};
+
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [geocodedMarkers, setGeocodedMarkers] = useState<RestaurantWithMapPosition[]>([]);
   const { data: driverLocations = [] } = useDriverLocations();
 
-  const markers = restaurants.filter((r) => r.latitude && r.longitude);
+  const markers = useMemo<RestaurantWithMapPosition[]>(() => {
+    const positioned = restaurants
+      .filter((r) => isValidCoordinate(r.latitude, r.longitude))
+      .map((r) => ({ ...r, mapLatitude: r.latitude!, mapLongitude: r.longitude! }));
+
+    const positionedIds = new Set(positioned.map((r) => r.id));
+    const fallbackMarkers = geocodedMarkers.filter((r) =>
+      restaurants.some((restaurant) => restaurant.id === r.id) && !positionedIds.has(r.id)
+    );
+
+    return [...positioned, ...fallbackMarkers];
+  }, [restaurants, geocodedMarkers]);
+
   const center: [number, number] = markers.length > 0
-    ? [markers[0].latitude!, markers[0].longitude!]
+    ? [markers[0].mapLatitude, markers[0].mapLongitude]
     : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
 
   useEffect(() => {
@@ -76,6 +156,49 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const missingCoordinates = restaurants.filter(
+      (r) => !isValidCoordinate(r.latitude, r.longitude) && !!r.address?.trim()
+    );
+
+    if (missingCoordinates.length === 0) {
+      setGeocodedMarkers([]);
+      return;
+    }
+
+    const cachedMarkers = missingCoordinates
+      .map(getCachedPosition)
+      .filter((marker): marker is RestaurantWithMapPosition => !!marker);
+    setGeocodedMarkers(cachedMarkers);
+
+    const uncachedRestaurants = missingCoordinates.filter(
+      (r) => !cachedMarkers.some((marker) => marker.id === r.id)
+    );
+
+    if (uncachedRestaurants.length === 0) return;
+
+    (async () => {
+      const resolved: RestaurantWithMapPosition[] = [];
+      for (const restaurant of uncachedRestaurants) {
+        const marker = await geocodeRestaurant(restaurant).catch(() => null);
+        if (cancelled) return;
+        if (marker) {
+          resolved.push(marker);
+          setGeocodedMarkers((current) => [
+            ...current.filter((item) => item.id !== marker.id),
+            marker,
+          ]);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurants]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -86,7 +209,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
     // Restaurant markers
     markers.forEach((r) => {
-      const marker = L.marker([r.latitude!, r.longitude!], {
+      const marker = L.marker([r.mapLatitude, r.mapLongitude], {
         icon: r.is_open ? openIcon : closedIcon,
         title: r.name,
       }).addTo(map);
@@ -114,6 +237,13 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
       marker.on("click", () => navigate(`/restaurant/${r.id}`));
     });
+
+    if (markers.length > 1) {
+      const bounds = L.latLngBounds(markers.map((r) => [r.mapLatitude, r.mapLongitude]));
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: DEFAULT_ZOOM });
+    } else if (markers.length === 1) {
+      map.setView([markers[0].mapLatitude, markers[0].mapLongitude], DEFAULT_ZOOM);
+    }
 
     // Driver markers
     driverLocations.forEach((d: any) => {
