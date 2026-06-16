@@ -871,41 +871,73 @@ export type Database = {
       restaurants_public: {
         Row: {
           address: string | null
+          category_id: string | null
+          category_name: string | null
+          created_at: string | null
           delivery_fee: number | null
           delivery_time: string | null
+          distance: string | null
           id: string | null
+          image: string | null
+          is_featured: boolean | null
           is_open: boolean | null
           latitude: number | null
+          logo: string | null
           longitude: number | null
           min_order: number | null
           name: string | null
+          rating: number | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          distance?: string | null
           id?: string | null
+          image?: string | null
+          is_featured?: boolean | null
           is_open?: boolean | null
           latitude?: number | null
+          logo?: string | null
           longitude?: number | null
           min_order?: number | null
           name?: string | null
+          rating?: number | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          distance?: string | null
           id?: string | null
+          image?: string | null
+          is_featured?: boolean | null
           is_open?: boolean | null
           latitude?: number | null
+          logo?: string | null
           longitude?: number | null
           min_order?: number | null
           name?: string | null
+          rating?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "restaurants_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_config: {
         Row: {

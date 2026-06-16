@@ -21,8 +21,8 @@ export const useRestaurants = () =>
   useQuery({
     queryKey: ["restaurants"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("restaurants")
+      const { data, error } = await (supabase as any)
+        .from("restaurants_public")
         .select(RESTAURANT_PUBLIC_COLUMNS)
         .order("name");
       if (error) throw error;
@@ -34,13 +34,13 @@ export const useRestaurant = (id: string) =>
   useQuery({
     queryKey: ["restaurant", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("restaurants")
-        .select("*")
+      const { data, error } = await (supabase as any)
+        .from("restaurants_public")
+        .select(RESTAURANT_PUBLIC_COLUMNS)
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data;
+      return { ...(data as any), owner_id: (data as any)?.owner_id ?? "" };
     },
     enabled: !!id,
   });
