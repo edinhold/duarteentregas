@@ -240,6 +240,7 @@ const AdminDashboard = () => {
                     <TabsTrigger value="chat"><MessageSquare className="w-4 h-4 mr-1" /></TabsTrigger>
                     <TabsTrigger value="password-reset"><KeyRound className="w-4 h-4 mr-1" /></TabsTrigger>
                     <TabsTrigger value="customers"><UserCheck className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="privacy"><Shield className="w-4 h-4 mr-1" /></TabsTrigger>
                   </TabsList>
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
