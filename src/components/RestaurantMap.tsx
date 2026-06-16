@@ -156,6 +156,49 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const missingCoordinates = restaurants.filter(
+      (r) => !isValidCoordinate(r.latitude, r.longitude) && !!r.address?.trim()
+    );
+
+    if (missingCoordinates.length === 0) {
+      setGeocodedMarkers([]);
+      return;
+    }
+
+    const cachedMarkers = missingCoordinates
+      .map(getCachedPosition)
+      .filter((marker): marker is RestaurantWithMapPosition => !!marker);
+    setGeocodedMarkers(cachedMarkers);
+
+    const uncachedRestaurants = missingCoordinates.filter(
+      (r) => !cachedMarkers.some((marker) => marker.id === r.id)
+    );
+
+    if (uncachedRestaurants.length === 0) return;
+
+    (async () => {
+      const resolved: RestaurantWithMapPosition[] = [];
+      for (const restaurant of uncachedRestaurants) {
+        const marker = await geocodeRestaurant(restaurant).catch(() => null);
+        if (cancelled) return;
+        if (marker) {
+          resolved.push(marker);
+          setGeocodedMarkers((current) => [
+            ...current.filter((item) => item.id !== marker.id),
+            marker,
+          ]);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurants]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -166,7 +209,7 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
     // Restaurant markers
     markers.forEach((r) => {
-      const marker = L.marker([r.latitude!, r.longitude!], {
+      const marker = L.marker([r.mapLatitude, r.mapLongitude], {
         icon: r.is_open ? openIcon : closedIcon,
         title: r.name,
       }).addTo(map);
@@ -194,6 +237,13 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
 
       marker.on("click", () => navigate(`/restaurant/${r.id}`));
     });
+
+    if (markers.length > 1) {
+      const bounds = L.latLngBounds(markers.map((r) => [r.mapLatitude, r.mapLongitude]));
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: DEFAULT_ZOOM });
+    } else if (markers.length === 1) {
+      map.setView([markers[0].mapLatitude, markers[0].mapLongitude], DEFAULT_ZOOM);
+    }
 
     // Driver markers
     driverLocations.forEach((d: any) => {
