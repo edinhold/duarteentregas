@@ -16,6 +16,7 @@ const RegisterDriver = () => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     fullName: "", email: "", phone: "", cpf: "", password: "",
     vehicleType: "moto", vehiclePlate: "",
@@ -38,6 +39,10 @@ const RegisterDriver = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!photoFile) {
+      toast.error("Envie ou tire uma foto para concluir o cadastro");
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -95,8 +100,8 @@ const RegisterDriver = () => {
             {/* Photo upload */}
             <div className="flex flex-col items-center gap-3">
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                onClick={() => cameraInputRef.current?.click()}
+                className={`w-28 h-28 rounded-full bg-muted border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors overflow-hidden ${photoPreview ? "border-primary" : "border-destructive/60 hover:border-primary"}`}
               >
                 {photoPreview ? (
                   <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
@@ -105,16 +110,26 @@ const RegisterDriver = () => {
                 )}
               </div>
               <input
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="user"
                 className="hidden"
                 onChange={handlePhotoChange}
               />
-              <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Button type="button" variant="default" size="sm" className="rounded-xl gap-1" onClick={() => cameraInputRef.current?.click()}>
+                  <Camera className="w-3 h-3" /> Tirar foto
+                </Button>
                 <Button type="button" variant="outline" size="sm" className="rounded-xl gap-1" onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="w-3 h-3" /> {photoPreview ? "Trocar foto" : "Enviar foto"}
+                  <Upload className="w-3 h-3" /> Enviar do dispositivo
                 </Button>
                 {photoPreview && (
                   <Button type="button" variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}>
@@ -122,7 +137,9 @@ const RegisterDriver = () => {
                   </Button>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Tire uma selfie ou envie uma foto (máx. 5MB)</p>
+              <p className={`text-xs ${photoFile ? "text-muted-foreground" : "text-destructive"}`}>
+                {photoFile ? "Foto pronta para envio" : "Foto obrigatória (selfie ou imagem, máx. 5MB)"}
+              </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
