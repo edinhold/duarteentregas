@@ -26,7 +26,7 @@ export const useRestaurants = () =>
         .select(RESTAURANT_PUBLIC_COLUMNS)
         .order("name");
       if (error) throw error;
-      return data;
+      return (data ?? []).map((r: any) => ({ ...r, owner_id: r.owner_id ?? "" }));
     },
   });
 
