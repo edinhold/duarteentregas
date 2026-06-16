@@ -1,4 +1,4 @@
-import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut, Star, RefreshCw } from "lucide-react";
+import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut, Star, RefreshCw, Shield } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
