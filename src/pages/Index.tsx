@@ -62,7 +62,7 @@ const Index = () => {
   }, [user, loading, navigate]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const deferredPromptRef = useRef<any>(null);
   const [canInstall, setCanInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -218,7 +218,7 @@ const Index = () => {
 
           {showMap ? (
             <div className="h-[400px] rounded-2xl overflow-hidden border border-border/50">
-              <MapErrorBoundary fallbackHeight="400px">
+              <MapErrorBoundary key={restaurants.length} fallbackHeight="400px">
                 <RestaurantMap restaurants={restaurants} />
               </MapErrorBoundary>
             </div>
