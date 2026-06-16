@@ -63,6 +63,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "chat", label: "Chat", icon: MessageSquare },
           { id: "password-reset", label: "Senhas", icon: KeyRound },
           { id: "customers", label: "Clientes", icon: UserCheck },
+          { id: "privacy", label: "Privacidade", icon: Shield },
         ];
       default:
         return [];
