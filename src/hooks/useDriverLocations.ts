@@ -31,10 +31,7 @@ export const useDriverLocations = () => {
       const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("driver_locations")
-        .select(`
-          *,
-          driver:drivers(id, driver_code, full_name)
-        `)
+        .select("*")
         .gte("updated_at", tenMinAgo);
       if (error) throw error;
       return data;
