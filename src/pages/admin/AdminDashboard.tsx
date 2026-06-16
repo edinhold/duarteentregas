@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon, ChevronLeft, ChevronRight, PanelLeft } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon, ChevronLeft, ChevronRight, PanelLeft, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
@@ -24,6 +24,7 @@ import AdminsTab from "@/components/admin/AdminsTab";
 import ChatTab from "@/components/admin/ChatTab";
 import PasswordResetTab from "@/components/admin/PasswordResetTab";
 import CustomersTab from "@/components/admin/CustomersTab";
+import PrivacyPolicyTab from "@/components/admin/PrivacyPolicyTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
@@ -239,6 +240,7 @@ const AdminDashboard = () => {
                     <TabsTrigger value="chat"><MessageSquare className="w-4 h-4 mr-1" /></TabsTrigger>
                     <TabsTrigger value="password-reset"><KeyRound className="w-4 h-4 mr-1" /></TabsTrigger>
                     <TabsTrigger value="customers"><UserCheck className="w-4 h-4 mr-1" /></TabsTrigger>
+                    <TabsTrigger value="privacy"><Shield className="w-4 h-4 mr-1" /></TabsTrigger>
                   </TabsList>
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
@@ -394,6 +396,7 @@ const AdminDashboard = () => {
           <TabsContent value="chat"><ChatTab /></TabsContent>
           <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
           <TabsContent value="customers"><CustomersTab /></TabsContent>
+          <TabsContent value="privacy"><PrivacyPolicyTab /></TabsContent>
             </motion.div>
           </Tabs>
         </main>
