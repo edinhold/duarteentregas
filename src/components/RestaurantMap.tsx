@@ -88,7 +88,15 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
     markers.forEach((r) => {
       const marker = L.marker([r.latitude!, r.longitude!], {
         icon: r.is_open ? openIcon : closedIcon,
+        title: r.name,
       }).addTo(map);
+
+      marker.bindTooltip(r.name, {
+        direction: "top",
+        offset: [0, -28],
+        opacity: 0.95,
+        className: "restaurant-map-tooltip",
+      });
 
       marker.bindPopup(`
         <div style="min-width:160px">
