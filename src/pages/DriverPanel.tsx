@@ -23,6 +23,7 @@ import ChatWidget from "@/components/ChatWidget";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
+import DeliveryNotifications from "@/components/driver/DeliveryNotifications";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -527,8 +528,13 @@ const DriverPanel = () => {
 
   return (
     <SidebarProvider>
+      <DeliveryNotifications
+        standby={isOnline && !activeRequest}
+        onAccepted={() => setActiveTab("home")}
+      />
       <div className="flex min-h-screen w-full bg-background overflow-hidden">
         <AppSidebar role="driver" currentTab={activeTab} onTabChange={setActiveTab} />
+        
         
         <SidebarInset className="flex-1 overflow-y-auto">
           <header className="bg-card border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
