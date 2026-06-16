@@ -20,6 +20,7 @@ import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import Install from "./pages/Install";
 import OrderTracking from "./pages/OrderTracking";
 import NotFound from "./pages/NotFound";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RouteRestorer from "./components/RouteRestorer";
 import SplashScreen from "./components/SplashScreen";
 import UpdatePrompt from "./components/UpdatePrompt";
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/entregador" element={<DriverPanel />} />
               <Route path="/pedido/:id/rastreio" element={<OrderTracking />} />
               <Route path="/instalar" element={<Install />} />
+              <Route path="/privacidade" element={<PrivacyPolicy />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

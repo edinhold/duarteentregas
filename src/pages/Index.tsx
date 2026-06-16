@@ -234,6 +234,17 @@ const Index = () => {
             </div>
           )}
         </section>
+
+        <footer className="pt-6 mt-4 border-t border-border/50 text-center text-sm text-muted-foreground">
+          <button
+            onClick={() => navigate("/privacidade")}
+            className="underline hover:text-primary transition-colors"
+          >
+            Políticas de Privacidade
+          </button>
+          <span className="mx-2">•</span>
+          <span>© {new Date().getFullYear()} Duarte Entregas</span>
+        </footer>
       </div>
 
       <WhatsAppButton />
