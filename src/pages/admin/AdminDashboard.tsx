@@ -83,14 +83,25 @@ const AdminDashboard = () => {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "withdrawal_requests" },
-        (payload) => {
+        async (payload) => {
           const w = payload.new as any;
           playUrgentNotification();
-          toast.info(`💰 Novo pedido de saque: R$ ${Number(w.amount).toFixed(2)}`, {
-            description: "Um motorista solicitou saque/antecipação.",
-            duration: 10000,
+          // Fetch driver name for richer notification
+          let driverName = "Motorista";
+          try {
+            const { data: drv } = await supabase
+              .from("drivers")
+              .select("full_name")
+              .eq("user_id", w.driver_user_id)
+              .maybeSingle();
+            if (drv?.full_name) driverName = drv.full_name;
+          } catch {}
+          toast.info(`💰 Nova solicitação de saque`, {
+            description: `${driverName} solicitou R$ ${Number(w.amount).toFixed(2)} • PIX: ${w.pix_key}`,
+            duration: 15000,
           });
           queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-drivers-financial"] });
         }
       )
       .subscribe();
