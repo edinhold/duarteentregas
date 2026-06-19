@@ -265,7 +265,8 @@ const DriverPanel = () => {
 
   // Standby gate: beep only when there are deliveries available and the driver
   // is not already doing one.
-  const shouldStandbyAlert = isOnline && !activeRequest && pendingRequests.length > 0;
+  const hasAvailableStandbyRequest = pendingRequests.some((request: any) => !rejectedIds.includes(request.id));
+  const shouldStandbyAlert = isOnline && !activeRequest && hasAvailableStandbyRequest;
 
   useEffect(() => {
     setStandbyGate(() => shouldStandbyAlert);
