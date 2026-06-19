@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,58 +11,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   setNotificationVolume,
-  getNotificationVolume,
   playNotificationSound,
   playUrgentNotification,
   playStandbyAlert,
-  startStandbyMode,
-  stopStandbyMode,
-  isStandbyActive,
   setStandbyInterval,
-  getStandbyInterval,
-  setStandbyGate,
 } from "@/lib/notificationSound";
-
-const STORAGE_KEY = "driver-notification-settings";
-
-interface NotificationSettings {
-  volume: number;
-  standbyEnabled: boolean;
-  standbyIntervalMs: number;
-}
-
-const loadSettings = (): NotificationSettings => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return { volume: 1.0, standbyEnabled: false, standbyIntervalMs: 30000 };
-};
-
-const saveSettings = (settings: NotificationSettings) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {}
-};
+import {
+  DriverNotificationSettingsState,
+  loadDriverNotificationSettings,
+  saveDriverNotificationSettings,
+} from "@/lib/driverNotificationSettings";
 
 const DriverNotificationSettings = () => {
   const { user } = useAuth();
-  const [settings, setSettings] = useState<NotificationSettings>(loadSettings);
-  const pendingCountRef = useRef(0);
+  const [settings, setSettings] = useState<DriverNotificationSettingsState>(loadDriverNotificationSettings);
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Apply settings on mount. The standby gate is configured by DriverPanel
-  // (it knows when there are pending deliveries to accept).
+  // Apply sound controls while this tab is open. The standby loop itself is
+  // owned by DriverPanel, so it keeps working on mobile after leaving this tab.
   useEffect(() => {
     setNotificationVolume(settings.volume);
     setStandbyInterval(settings.standbyIntervalMs);
-    if (settings.standbyEnabled) {
-      startStandbyMode(settings.standbyIntervalMs);
-    }
-    return () => {
-      stopStandbyMode();
-    };
-  }, []);
+  }, [settings.volume, settings.standbyIntervalMs]);
 
   // Track count of pending (unassigned) delivery requests in realtime — only
   // used to show the "X pendente(s) agora" hint in the UI.
@@ -75,11 +45,9 @@ const DriverNotificationSettings = () => {
         .from("delivery_requests")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending")
-        .is("driver_id", null);
+        .or(`driver_id.is.null,driver_id.eq.${user.id}`);
       if (cancelled) return;
-      const n = count ?? 0;
-      pendingCountRef.current = n;
-      setPendingCount(n);
+      setPendingCount(count ?? 0);
     };
 
     refresh();
@@ -99,22 +67,10 @@ const DriverNotificationSettings = () => {
   }, [user]);
 
 
-  const updateSettings = useCallback((partial: Partial<NotificationSettings>) => {
+  const updateSettings = useCallback((partial: Partial<DriverNotificationSettingsState>) => {
     setSettings(prev => {
       const next = { ...prev, ...partial };
-      saveSettings(next);
-
-      // Apply immediately
-      if (partial.volume !== undefined) setNotificationVolume(partial.volume);
-      if (partial.standbyIntervalMs !== undefined) setStandbyInterval(partial.standbyIntervalMs);
-      if (partial.standbyEnabled !== undefined) {
-        if (partial.standbyEnabled) {
-          startStandbyMode(next.standbyIntervalMs);
-        } else {
-          stopStandbyMode();
-        }
-      }
-
+      saveDriverNotificationSettings(next);
       return next;
     });
   }, []);
