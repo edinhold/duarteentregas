@@ -28,6 +28,12 @@
     <div id="root"></div>
     <!-- Median JavaScript Bridge (only active inside Median-built native apps) -->
     <script src="https://median.co/static/median_library_v1.1.4.min.js"></script>
+    <script>
+      // Global helper to detect if the app is running inside a Median.co native wrapper.
+      window.isMedianApp = function () {
+        return navigator.userAgent.toLowerCase().indexOf('median') > -1;
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
