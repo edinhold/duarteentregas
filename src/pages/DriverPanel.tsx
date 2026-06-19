@@ -442,11 +442,6 @@ const DriverPanel = () => {
 
     setWithdrawing(true);
     try {
-      const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
-      const today = new Date().getDate();
-      const isPaymentDay = today === paymentDay;
-      const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
-      const feeAmount = (totalPending * feePercent) / 100;
       const { error } = await (supabase as any).rpc("request_withdrawal");
       if (error) throw error;
       toast.success(`Saque solicitado com sucesso!`);
@@ -458,6 +453,7 @@ const DriverPanel = () => {
       setWithdrawing(false);
     }
   };
+
 
   const sendMessage = async () => {
     if (!chatMessage.trim() || !activeRequest) return;
