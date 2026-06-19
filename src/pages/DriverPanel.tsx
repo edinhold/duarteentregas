@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { isToday, isThisWeek, isThisMonth } from "date-fns";
-import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext, setStandbyGate } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
