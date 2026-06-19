@@ -515,10 +515,12 @@ const DriverPanel = () => {
   const pendingBalance = earnings
     .filter((e: any) => e.status === "pending")
     .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-  const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
-  const isPaymentDay = new Date().getDate() === paymentDay;
-  const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
-  const netPreview = pendingBalance - (pendingBalance * feePercent) / 100;
+  const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 5);
+  const isPaymentDay = new Date().getDay() === paymentDay;
+  const fixedFee = Number((deliveryConfig as any)?.withdrawal_fixed_fee ?? 1.00);
+  const feePercent = 0;
+  const netPreview = Math.max(pendingBalance - fixedFee, 0);
+
 
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
