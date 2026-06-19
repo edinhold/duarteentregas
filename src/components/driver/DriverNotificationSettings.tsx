@@ -182,7 +182,10 @@ const DriverNotificationSettings = () => {
               <div>
                 <Label className="text-sm">Alerta em Standby</Label>
                 <p className="text-xs text-muted-foreground">
-                  Toque periódico quando não há entregas ativas
+                  Toca periodicamente apenas quando há entregas pendentes para aceitar
+                  {settings.standbyEnabled && (
+                    <> · <span className="font-medium text-foreground">{pendingCount}</span> pendente(s) agora</>
+                  )}
                 </p>
               </div>
             </div>
