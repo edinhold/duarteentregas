@@ -42,7 +42,7 @@ const FinancialTab = () => {
         .update({ payment_day: parseInt(day) } as any)
         .eq("id", deliveryConfig?.id || "");
       if (error) throw error;
-      toast.success(`Dia de pagamento atualizado para dia ${day}`);
+      toast.success(`Dia de pagamento atualizado`);
       queryClient.invalidateQueries({ queryKey: ["delivery-config"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar");
@@ -50,6 +50,9 @@ const FinancialTab = () => {
       setSavingPayDay(false);
     }
   };
+
+  const weekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["admin-drivers-financial"],
