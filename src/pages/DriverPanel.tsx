@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { isToday, isThisWeek, isThisMonth } from "date-fns";
-import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext, setStandbyGate } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
@@ -221,30 +221,14 @@ const DriverPanel = () => {
     }
   }, []);
 
-  // Standby mode: gentle beep when idle; urgent repeated alert when there are pending pickups
+  // Standby gate: the DriverNotificationSettings owns the standby loop.
+  // Here we only tell it WHEN it should beep (when there are deliveries to do
+  // and the driver is not currently on one).
   useEffect(() => {
-    const settings = JSON.parse(localStorage.getItem("driver-notification-settings") || "{}");
-    const standbyEnabled = !!settings.standbyEnabled;
-    const intervalMs = settings.standbyIntervalMs || 30000;
-
-    stopStandbyMode();
-    let pendingAlertTimer: ReturnType<typeof setInterval> | null = null;
-
-    if (!activeRequest && pendingRequests.length > 0) {
-      // There are deliveries to pick up — keep ringing the urgent alert until accepted
-      const repeatMs = Math.min(intervalMs, 15000); // cap at 15s so motorista não perde
-      pendingAlertTimer = setInterval(() => {
-        playUrgentNotification();
-      }, repeatMs);
-    } else if (standbyEnabled && !activeRequest && pendingRequests.length === 0) {
-      startStandbyMode(intervalMs);
-    }
-
-    return () => {
-      stopStandbyMode();
-      if (pendingAlertTimer) clearInterval(pendingAlertTimer);
-    };
+    setStandbyGate(() => !activeRequest && pendingRequests.length > 0);
+    return () => { setStandbyGate(null); };
   }, [activeRequest, pendingRequests.length]);
+
 
   // Realtime
   useEffect(() => {

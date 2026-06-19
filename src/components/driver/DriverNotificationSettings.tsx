@@ -51,22 +51,21 @@ const DriverNotificationSettings = () => {
   const pendingCountRef = useRef(0);
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Apply settings on mount
+  // Apply settings on mount. The standby gate is configured by DriverPanel
+  // (it knows when there are pending deliveries to accept).
   useEffect(() => {
     setNotificationVolume(settings.volume);
     setStandbyInterval(settings.standbyIntervalMs);
-    // Gate standby alerts to only fire when there are pending deliveries to do.
-    setStandbyGate(() => pendingCountRef.current > 0);
     if (settings.standbyEnabled) {
       startStandbyMode(settings.standbyIntervalMs);
     }
     return () => {
       stopStandbyMode();
-      setStandbyGate(null);
     };
   }, []);
 
-  // Track count of pending (unassigned) delivery requests in realtime.
+  // Track count of pending (unassigned) delivery requests in realtime — only
+  // used to show the "X pendente(s) agora" hint in the UI.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -98,6 +97,7 @@ const DriverNotificationSettings = () => {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
 
   const updateSettings = useCallback((partial: Partial<NotificationSettings>) => {
     setSettings(prev => {
