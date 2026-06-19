@@ -155,6 +155,7 @@ export type Database = {
           round_km_up: boolean
           updated_at: string
           whatsapp_number: string | null
+          withdrawal_fixed_fee: number
         }
         Insert: {
           app_fee_per_delivery?: number
@@ -171,6 +172,7 @@ export type Database = {
           round_km_up?: boolean
           updated_at?: string
           whatsapp_number?: string | null
+          withdrawal_fixed_fee?: number
         }
         Update: {
           app_fee_per_delivery?: number
@@ -187,6 +189,7 @@ export type Database = {
           round_km_up?: boolean
           updated_at?: string
           whatsapp_number?: string | null
+          withdrawal_fixed_fee?: number
         }
         Relationships: []
       }
@@ -1003,6 +1006,7 @@ export type Database = {
           round_km_up: boolean
           updated_at: string
           whatsapp_number: string
+          withdrawal_fixed_fee: number
         }[]
       }
       get_radar_drivers: {
