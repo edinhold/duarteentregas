@@ -518,8 +518,10 @@ const DriverPanel = () => {
   const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 5);
   const isPaymentDay = new Date().getDay() === paymentDay;
   const fixedFee = Number((deliveryConfig as any)?.withdrawal_fixed_fee ?? 1.00);
-  const feePercent = 0;
-  const netPreview = Math.max(pendingBalance - fixedFee, 0);
+  const earlyFeePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+  const feeAmountPreview = isPaymentDay ? fixedFee : (pendingBalance * earlyFeePercent) / 100;
+  const netPreview = Math.max(pendingBalance - feeAmountPreview, 0);
+
 
 
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
@@ -849,9 +851,12 @@ const DriverPanel = () => {
                               <p className="text-xs text-muted-foreground">Você pode solicitar seu saque agora (taxa fixa de R$ {fixedFee.toFixed(2)})</p>
                             </div>
                           ) : (
-                            <div className="bg-muted border rounded-lg p-3 text-center">
-                              <p className="text-xs text-muted-foreground">
-                                Saques liberados apenas às <strong>{weekdayNames[paymentDay]}</strong>
+                            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-center">
+                              <p className="text-xs text-foreground">
+                                Saque sem taxa de antecipação apenas às <strong>{weekdayNames[paymentDay]}</strong>.
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Sacando hoje será aplicada taxa de antecipação de <strong>{earlyFeePercent}%</strong>.
                               </p>
                             </div>
                           );
@@ -862,14 +867,19 @@ const DriverPanel = () => {
                             <span className="font-bold">R$ {pendingBalance.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Taxa fixa por saque</span>
-                            <span>- R$ {fixedFee.toFixed(2)}</span>
+                            <span>
+                              {isPaymentDay
+                                ? "Taxa fixa por saque"
+                                : `Taxa de antecipação (${earlyFeePercent}%)`}
+                            </span>
+                            <span>- R$ {feeAmountPreview.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
                             <span>Valor a receber</span>
                             <span className="text-primary text-lg">R$ {netPreview.toFixed(2)}</span>
                           </div>
                         </div>
+
 
                         <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="default">
                           {withdrawing ? "Processando..." : "Confirmar Solicitação de Saque"}
