@@ -442,11 +442,6 @@ const DriverPanel = () => {
 
     setWithdrawing(true);
     try {
-      const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
-      const today = new Date().getDate();
-      const isPaymentDay = today === paymentDay;
-      const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
-      const feeAmount = (totalPending * feePercent) / 100;
       const { error } = await (supabase as any).rpc("request_withdrawal");
       if (error) throw error;
       toast.success(`Saque solicitado com sucesso!`);
@@ -458,6 +453,7 @@ const DriverPanel = () => {
       setWithdrawing(false);
     }
   };
+
 
   const sendMessage = async () => {
     if (!chatMessage.trim() || !activeRequest) return;
@@ -519,10 +515,12 @@ const DriverPanel = () => {
   const pendingBalance = earnings
     .filter((e: any) => e.status === "pending")
     .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-  const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 15);
-  const isPaymentDay = new Date().getDate() === paymentDay;
-  const feePercent = isPaymentDay ? 0 : Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
-  const netPreview = pendingBalance - (pendingBalance * feePercent) / 100;
+  const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 5);
+  const isPaymentDay = new Date().getDay() === paymentDay;
+  const fixedFee = Number((deliveryConfig as any)?.withdrawal_fixed_fee ?? 1.00);
+  const feePercent = 0;
+  const netPreview = Math.max(pendingBalance - fixedFee, 0);
+
 
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
 
@@ -843,32 +841,36 @@ const DriverPanel = () => {
                         <CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Solicitar Saque</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
-                        {isPaymentDay ? (
-                          <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-center">
-                            <p className="text-sm font-bold text-accent">🎉 Hoje é dia de pagamento!</p>
-                            <p className="text-xs text-muted-foreground">Saque sem taxa de antecipação</p>
-                          </div>
-                        ) : (
-                          <div className="bg-muted border rounded-lg p-3 text-center">
-                            <p className="text-xs text-muted-foreground">
-                              Dia de pagamento sem taxa: <strong>dia {paymentDay}</strong>
-                            </p>
-                          </div>
-                        )}
+                        {(() => {
+                          const weekdayNames = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+                          return isPaymentDay ? (
+                            <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-center">
+                              <p className="text-sm font-bold text-accent">🎉 Hoje é dia de pagamento!</p>
+                              <p className="text-xs text-muted-foreground">Você pode solicitar seu saque agora (taxa fixa de R$ {fixedFee.toFixed(2)})</p>
+                            </div>
+                          ) : (
+                            <div className="bg-muted border rounded-lg p-3 text-center">
+                              <p className="text-xs text-muted-foreground">
+                                Saques liberados apenas às <strong>{weekdayNames[paymentDay]}</strong>
+                              </p>
+                            </div>
+                          );
+                        })()}
                         <div className="bg-background rounded-lg p-3 space-y-1 border">
                           <div className="flex justify-between text-sm">
                             <span>Saldo disponível</span>
                             <span className="font-bold">R$ {pendingBalance.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Taxa {isPaymentDay ? "(isento)" : `de antecipação (${feePercent}%)`}</span>
-                            <span>- R$ {(pendingBalance * feePercent / 100).toFixed(2)}</span>
+                            <span>Taxa fixa por saque</span>
+                            <span>- R$ {fixedFee.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
                             <span>Valor a receber</span>
                             <span className="text-primary text-lg">R$ {netPreview.toFixed(2)}</span>
                           </div>
                         </div>
+
                         <Button onClick={requestWithdrawal} disabled={withdrawing} className="w-full mt-2" variant="default">
                           {withdrawing ? "Processando..." : "Confirmar Solicitação de Saque"}
                         </Button>

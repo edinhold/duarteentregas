@@ -42,7 +42,7 @@ const FinancialTab = () => {
         .update({ payment_day: parseInt(day) } as any)
         .eq("id", deliveryConfig?.id || "");
       if (error) throw error;
-      toast.success(`Dia de pagamento atualizado para dia ${day}`);
+      toast.success(`Dia de pagamento atualizado`);
       queryClient.invalidateQueries({ queryKey: ["delivery-config"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar");
@@ -50,6 +50,9 @@ const FinancialTab = () => {
       setSavingPayDay(false);
     }
   };
+
+  const weekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
 
   const { data: drivers = [] } = useQuery({
     queryKey: ["admin-drivers-financial"],
@@ -297,34 +300,37 @@ const FinancialTab = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" /> Dia de Pagamento (sem taxa)
+            <CalendarDays className="w-4 h-4" /> Dia de Pagamento
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-3">
-            Defina o dia do mês em que os motoristas podem sacar sem cobrança de taxa de antecipação.
+            Defina o dia da semana em que os motoristas podem solicitar saque.
+            Será cobrada uma taxa fixa de <strong>R$ 1,00</strong> por saque.
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Select
-              value={String((deliveryConfig as any)?.payment_day ?? 15)}
+              value={String((deliveryConfig as any)?.payment_day ?? 5)}
               onValueChange={handlePaymentDayChange}
               disabled={savingPayDay}
             >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Dia" />
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Dia da semana" />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                  <SelectItem key={d} value={String(d)}>Dia {d}</SelectItem>
+                {weekdayLabels.map((label, idx) => (
+                  <SelectItem key={idx} value={String(idx)}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Badge variant="secondary">
-              Atual: Dia {(deliveryConfig as any)?.payment_day ?? 15}
+              Atual: {weekdayLabels[(deliveryConfig as any)?.payment_day ?? 5] || "—"}
             </Badge>
+            <Badge variant="outline">Taxa: R$ 1,00 por saque</Badge>
           </div>
         </CardContent>
       </Card>
+
 
       {/* Withdrawal Requests with checkboxes */}
       <Card>
