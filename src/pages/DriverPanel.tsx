@@ -518,8 +518,10 @@ const DriverPanel = () => {
   const paymentDay = Number((deliveryConfig as any)?.payment_day ?? 5);
   const isPaymentDay = new Date().getDay() === paymentDay;
   const fixedFee = Number((deliveryConfig as any)?.withdrawal_fixed_fee ?? 1.00);
-  const feePercent = 0;
-  const netPreview = Math.max(pendingBalance - fixedFee, 0);
+  const earlyFeePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+  const feeAmountPreview = isPaymentDay ? fixedFee : (pendingBalance * earlyFeePercent) / 100;
+  const netPreview = Math.max(pendingBalance - feeAmountPreview, 0);
+
 
 
   if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
