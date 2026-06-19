@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Volume2, Vibrate, Bell, BellOff } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   setNotificationVolume,
   getNotificationVolume,
@@ -18,6 +20,7 @@ import {
   isStandbyActive,
   setStandbyInterval,
   getStandbyInterval,
+  setStandbyGate,
 } from "@/lib/notificationSound";
 
 const STORAGE_KEY = "driver-notification-settings";
@@ -43,17 +46,58 @@ const saveSettings = (settings: NotificationSettings) => {
 };
 
 const DriverNotificationSettings = () => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettings>(loadSettings);
+  const pendingCountRef = useRef(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Apply settings on mount
   useEffect(() => {
     setNotificationVolume(settings.volume);
     setStandbyInterval(settings.standbyIntervalMs);
+    // Gate standby alerts to only fire when there are pending deliveries to do.
+    setStandbyGate(() => pendingCountRef.current > 0);
     if (settings.standbyEnabled) {
       startStandbyMode(settings.standbyIntervalMs);
     }
-    return () => stopStandbyMode();
+    return () => {
+      stopStandbyMode();
+      setStandbyGate(null);
+    };
   }, []);
+
+  // Track count of pending (unassigned) delivery requests in realtime.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      const { count } = await supabase
+        .from("delivery_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .is("driver_id", null);
+      if (cancelled) return;
+      const n = count ?? 0;
+      pendingCountRef.current = n;
+      setPendingCount(n);
+    };
+
+    refresh();
+    const channel = supabase
+      .channel("driver-standby-pending")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_requests" },
+        () => refresh()
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const updateSettings = useCallback((partial: Partial<NotificationSettings>) => {
     setSettings(prev => {
@@ -138,7 +182,10 @@ const DriverNotificationSettings = () => {
               <div>
                 <Label className="text-sm">Alerta em Standby</Label>
                 <p className="text-xs text-muted-foreground">
-                  Toque periódico quando não há entregas ativas
+                  Toca periodicamente apenas quando há entregas pendentes para aceitar
+                  {settings.standbyEnabled && (
+                    <> · <span className="font-medium text-foreground">{pendingCount}</span> pendente(s) agora</>
+                  )}
                 </p>
               </div>
             </div>

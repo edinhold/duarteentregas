@@ -209,14 +209,22 @@ export const playStandbyAlert = () => {
   } catch {}
 };
 
+let standbyGate: (() => boolean) | null = null;
+
+export const setStandbyGate = (fn: (() => boolean) | null) => {
+  standbyGate = fn;
+};
+
 export const startStandbyMode = (intervalMs?: number) => {
   stopStandbyMode();
   standbyEnabled = true;
   standbyIntervalMs = intervalMs || standbyIntervalMs;
   standbyInterval = setInterval(() => {
-    if (standbyEnabled) {
-      playStandbyAlert();
-    }
+    if (!standbyEnabled) return;
+    // Only alert when there's something pending (gate set by the driver panel).
+    // If no gate is configured, fall back to always alerting.
+    if (standbyGate && !standbyGate()) return;
+    playStandbyAlert();
   }, standbyIntervalMs);
 };
 
