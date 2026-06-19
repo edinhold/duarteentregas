@@ -46,17 +46,58 @@ const saveSettings = (settings: NotificationSettings) => {
 };
 
 const DriverNotificationSettings = () => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettings>(loadSettings);
+  const pendingCountRef = useRef(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Apply settings on mount
   useEffect(() => {
     setNotificationVolume(settings.volume);
     setStandbyInterval(settings.standbyIntervalMs);
+    // Gate standby alerts to only fire when there are pending deliveries to do.
+    setStandbyGate(() => pendingCountRef.current > 0);
     if (settings.standbyEnabled) {
       startStandbyMode(settings.standbyIntervalMs);
     }
-    return () => stopStandbyMode();
+    return () => {
+      stopStandbyMode();
+      setStandbyGate(null);
+    };
   }, []);
+
+  // Track count of pending (unassigned) delivery requests in realtime.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      const { count } = await supabase
+        .from("delivery_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .is("driver_id", null);
+      if (cancelled) return;
+      const n = count ?? 0;
+      pendingCountRef.current = n;
+      setPendingCount(n);
+    };
+
+    refresh();
+    const channel = supabase
+      .channel("driver-standby-pending")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_requests" },
+        () => refresh()
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const updateSettings = useCallback((partial: Partial<NotificationSettings>) => {
     setSettings(prev => {
