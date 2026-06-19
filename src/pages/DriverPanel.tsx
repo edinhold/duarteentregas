@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { isToday, isThisWeek, isThisMonth } from "date-fns";
-import { playNotificationSound, playUrgentNotification, startStandbyMode, stopStandbyMode, resumeAudioContext, setStandbyGate } from "@/lib/notificationSound";
+import { playNotificationSound, playUrgentNotification, playStandbyAlert, startStandbyMode, stopStandbyMode, resumeAudioContext, setNotificationVolume, setStandbyInterval, setStandbyGate } from "@/lib/notificationSound";
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
@@ -26,6 +26,11 @@ import AppSidebar from "@/components/AppSidebar";
 import DeliveryNotifications from "@/components/driver/DeliveryNotifications";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DRIVER_NOTIFICATION_SETTINGS_EVENT,
+  DriverNotificationSettingsState,
+  loadDriverNotificationSettings,
+} from "@/lib/driverNotificationSettings";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -42,6 +47,8 @@ const DriverPanel = () => {
   const [activeTab, setActiveTab] = useState("home");
   const isMobile = useIsMobile();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [notificationSettings, setNotificationSettings] = useState<DriverNotificationSettingsState>(loadDriverNotificationSettings);
+  const hadPendingStandbyRef = useRef(false);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); toast.success("Internet restabelecida"); };
@@ -221,13 +228,59 @@ const DriverPanel = () => {
     }
   }, []);
 
-  // Standby gate: the DriverNotificationSettings owns the standby loop.
-  // Here we only tell it WHEN it should beep (when there are deliveries to do
-  // and the driver is not currently on one).
+  // Keep standby settings active for the whole driver panel (including mobile),
+  // even when the settings tab is not mounted/open.
   useEffect(() => {
-    setStandbyGate(() => !activeRequest && pendingRequests.length > 0);
+    const applySettings = (settings: DriverNotificationSettingsState) => {
+      setNotificationVolume(settings.volume);
+      setStandbyInterval(settings.standbyIntervalMs);
+      if (settings.standbyEnabled) {
+        startStandbyMode(settings.standbyIntervalMs);
+      } else {
+        stopStandbyMode();
+      }
+    };
+
+    applySettings(notificationSettings);
+
+    const handleSettingsUpdate = (event: Event) => {
+      const next = (event as CustomEvent<DriverNotificationSettingsState>).detail ?? loadDriverNotificationSettings();
+      setNotificationSettings(next);
+      applySettings(next);
+    };
+
+    const handleStorage = () => handleSettingsUpdate(new CustomEvent(DRIVER_NOTIFICATION_SETTINGS_EVENT, {
+      detail: loadDriverNotificationSettings(),
+    }));
+
+    window.addEventListener(DRIVER_NOTIFICATION_SETTINGS_EVENT, handleSettingsUpdate);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(DRIVER_NOTIFICATION_SETTINGS_EVENT, handleSettingsUpdate);
+      window.removeEventListener("storage", handleStorage);
+      stopStandbyMode();
+    };
+  }, [notificationSettings]);
+
+  // Standby gate: beep only when there are deliveries available and the driver
+  // is not already doing one.
+  const shouldStandbyAlert = isOnline && !activeRequest && pendingRequests.length > 0;
+
+  useEffect(() => {
+    setStandbyGate(() => shouldStandbyAlert);
     return () => { setStandbyGate(null); };
-  }, [activeRequest, pendingRequests.length]);
+  }, [shouldStandbyAlert]);
+
+  // On phones the app may not keep waiting timers reliable in the background,
+  // so also play the standby alert immediately when pending deliveries appear.
+  useEffect(() => {
+    if (notificationSettings.standbyEnabled && shouldStandbyAlert && !hadPendingStandbyRef.current) {
+      resumeAudioContext();
+      playStandbyAlert();
+    }
+    hadPendingStandbyRef.current = shouldStandbyAlert;
+  }, [notificationSettings.standbyEnabled, shouldStandbyAlert]);
 
 
   // Realtime
