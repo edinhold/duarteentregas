@@ -39,6 +39,14 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
   const [delivery, setDelivery] = useState<OverlayDelivery | null>(null);
   const [state, setState] = useState<OverlayState>("empty");
   const [permissionWarning, setPermissionWarning] = useState(false);
+  const checkPermission = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setPermissionWarning(true);
+      return;
+    }
+    setPermissionWarning(Notification.permission !== "granted");
+  }, []);
   const dismissedRef = useRef<Set<string>>(new Set());
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
