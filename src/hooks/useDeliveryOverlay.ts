@@ -214,5 +214,5 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     close();
   }, [delivery, close]);
 
-  return { delivery, state, accept, reject, close, permissionWarning };
+  return { delivery, state, accept, reject, close, permissionWarning, requestPermission };
 }
