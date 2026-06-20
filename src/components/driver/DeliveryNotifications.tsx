@@ -14,15 +14,21 @@ interface Props {
  * entire app whenever a new pending delivery arrives.
  */
 const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
-  const { delivery, state, accept, reject, permissionWarning } = useDeliveryOverlay({
+  const { delivery, state, accept, reject, permissionWarning, requestPermission } = useDeliveryOverlay({
     standby,
     timeoutMs,
     onAccepted: () => onAccepted?.(),
   });
 
-  const requestPermission = () => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+  const handleRequestPermission = async () => {
+    const result = await requestPermission();
+    if (result === "denied") {
+      try {
+        const { toast } = await import("sonner");
+        toast.warning(
+          "Permissão bloqueada. Habilite notificações nas configurações do navegador/app para receber alertas com o app em segundo plano."
+        );
+      } catch {}
     }
   };
 
@@ -33,7 +39,7 @@ const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
       permissionWarning={permissionWarning}
       onAccept={accept}
       onReject={reject}
-      onRequestPermission={requestPermission}
+      onRequestPermission={handleRequestPermission}
     />
   );
 };

@@ -39,6 +39,14 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
   const [delivery, setDelivery] = useState<OverlayDelivery | null>(null);
   const [state, setState] = useState<OverlayState>("empty");
   const [permissionWarning, setPermissionWarning] = useState(false);
+  const checkPermission = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setPermissionWarning(true);
+      return;
+    }
+    setPermissionWarning(Notification.permission !== "granted");
+  }, []);
   const dismissedRef = useRef<Set<string>>(new Set());
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,12 +125,22 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
 
   // Notification / overlay permission check (web fallback for Android SYSTEM_ALERT_WINDOW).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) {
+    checkPermission();
+  }, [checkPermission]);
+
+  const requestPermission = useCallback(async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
       setPermissionWarning(true);
-      return;
+      return "denied" as NotificationPermission;
     }
-    if (Notification.permission === "denied") setPermissionWarning(true);
+    try {
+      const result = await Notification.requestPermission();
+      setPermissionWarning(result !== "granted");
+      return result;
+    } catch {
+      setPermissionWarning(true);
+      return "denied" as NotificationPermission;
+    }
   }, []);
 
   // Realtime listener for new pending deliveries.
@@ -196,5 +214,5 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     close();
   }, [delivery, close]);
 
-  return { delivery, state, accept, reject, close, permissionWarning };
+  return { delivery, state, accept, reject, close, permissionWarning, requestPermission };
 }
