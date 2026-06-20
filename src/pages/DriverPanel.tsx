@@ -130,6 +130,7 @@ const DriverPanel = () => {
         .from("delivery_requests")
         .select("*, restaurants(name, address, logo, latitude, longitude)")
         .eq("driver_id", user!.id)
+        .is("group_id", null)
         .in("status", ["accepted", "picked_up"])
         .order("created_at", { ascending: false });
       if (error) throw error;
