@@ -153,6 +153,10 @@ const StoreOwnerPanel = () => {
                   <CallDriverTab user={user} restaurant={restaurant} requests={requests} activeRequest={activeRequest} chatMessages={chatMessages} />
                 </TabsContent>
 
+                <TabsContent value="multi" className="mt-0 outline-none">
+                  <MultiDeliveryOrder restaurant={restaurant} userId={user.id} />
+                </TabsContent>
+
                 <TabsContent value="reassign" className="mt-0 outline-none">
                   <ReassignDriverTab restaurant={restaurant} userId={user.id} />
                 </TabsContent>
