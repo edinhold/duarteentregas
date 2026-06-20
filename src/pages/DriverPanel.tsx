@@ -640,6 +640,9 @@ const DriverPanel = () => {
                     trackingData={trackingData}
                   />
 
+                  {/* Multi-stop grouped routes */}
+                  <DriverGroupedDeliveries userId={user.id} hasActiveSingleRequest={!!activeRequest} />
+
                   {/* Active delivery */}
                   {activeRequest && (
                     <Card className="border-primary shadow-md">
