@@ -24,6 +24,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
 import DeliveryNotifications from "@/components/driver/DeliveryNotifications";
+import DriverGroupedDeliveries from "@/components/driver/DriverGroupedDeliveries";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -95,6 +96,7 @@ const DriverPanel = () => {
         .from("delivery_requests")
         .select("*, restaurants(name, address, logo, latitude, longitude)")
         .eq("status", "pending")
+        .is("group_id", null)
         .or(`driver_id.is.null,driver_id.eq.${user!.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -129,6 +131,7 @@ const DriverPanel = () => {
         .from("delivery_requests")
         .select("*, restaurants(name, address, logo, latitude, longitude)")
         .eq("driver_id", user!.id)
+        .is("group_id", null)
         .in("status", ["accepted", "picked_up"])
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -636,6 +639,9 @@ const DriverPanel = () => {
                     onAcceptRequest={acceptRequest}
                     trackingData={trackingData}
                   />
+
+                  {/* Multi-stop grouped routes */}
+                  <DriverGroupedDeliveries userId={user.id} hasActiveSingleRequest={!!activeRequest} />
 
                   {/* Active delivery */}
                   {activeRequest && (

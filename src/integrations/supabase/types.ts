@@ -1047,11 +1047,13 @@ export type Database = {
       }
     }
     Functions: {
+      accept_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
       cancel_delivery_request: {
         Args: { p_request_id: string }
         Returns: boolean
       }
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
+      complete_group_stop: { Args: { p_request_id: string }; Returns: boolean }
       create_delivery_group: {
         Args: {
           p_group_notes?: string
@@ -1115,6 +1117,7 @@ export type Database = {
         Args: { driver_id_to_check: string }
         Returns: boolean
       }
+      pickup_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
       place_order: {
         Args: {
           p_address: string
