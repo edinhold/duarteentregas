@@ -136,12 +136,28 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     try {
       const result = await Notification.requestPermission();
       setPermissionWarning(result !== "granted");
+      if (result === "granted") {
+        const { enableWebPush } = await import("@/lib/webPush");
+        enableWebPush().catch((e) => console.warn("enableWebPush failed", e));
+      }
       return result;
     } catch {
       setPermissionWarning(true);
       return "denied" as NotificationPermission;
     }
   }, []);
+
+  // Auto-subscribe to Web Push when standby starts and permission is already granted.
+  useEffect(() => {
+    if (!standby) return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    import("@/lib/webPush")
+      .then(({ enableWebPush, isPushSupported }) => {
+        if (isPushSupported()) enableWebPush().catch(() => {});
+      })
+      .catch(() => {});
+  }, [standby]);
 
   // Realtime listener for new pending deliveries.
   useEffect(() => {
