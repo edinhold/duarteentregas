@@ -95,6 +95,7 @@ const DriverPanel = () => {
         .from("delivery_requests")
         .select("*, restaurants(name, address, logo, latitude, longitude)")
         .eq("status", "pending")
+        .is("group_id", null)
         .or(`driver_id.is.null,driver_id.eq.${user!.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
