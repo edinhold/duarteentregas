@@ -21,6 +21,47 @@ const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
     onAccepted: () => onAccepted?.(),
   });
 
+  // Keep the screen awake while the driver is in standby so OS notifications
+  // and the in-app overlay fire reliably even when the phone would otherwise
+  // sleep. Released automatically when standby turns off or tab is hidden.
+  const wakeLockRef = useRef<any>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        if (!standby) return;
+        if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+        const lock = await (navigator as any).wakeLock.request("screen");
+        if (cancelled) {
+          try { await lock.release(); } catch {}
+          return;
+        }
+        wakeLockRef.current = lock;
+        lock.addEventListener?.("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (e) {
+        console.log("[DeliveryNotifications] WakeLock indisponível", e);
+      }
+    };
+    const release = async () => {
+      try { await wakeLockRef.current?.release?.(); } catch {}
+      wakeLockRef.current = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && standby && !wakeLockRef.current) {
+        acquire();
+      }
+    };
+    acquire();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      release();
+    };
+  }, [standby]);
+
   const handleRequestPermission = async () => {
     const result = await requestPermission();
     if (result === "denied") {
