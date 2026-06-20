@@ -193,13 +193,73 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_groups: {
+        Row: {
+          created_at: string
+          driver_id: string | null
+          id: string
+          notes: string | null
+          pickup_address: string
+          restaurant_id: string | null
+          status: string
+          stops_count: number
+          store_owner_id: string
+          total_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address: string
+          restaurant_id?: string | null
+          status?: string
+          stops_count?: number
+          store_owner_id: string
+          total_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address?: string
+          restaurant_id?: string | null
+          status?: string
+          stops_count?: number
+          store_owner_id?: string
+          total_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_groups_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_groups_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_requests: {
         Row: {
           created_at: string
           credit_cost: number
+          customer_name: string | null
+          customer_phone: string | null
           delivery_address: string | null
           driver_fee: number
           driver_id: string | null
+          group_id: string | null
           id: string
           notes: string | null
           pickup_address: string | null
@@ -211,9 +271,12 @@ export type Database = {
         Insert: {
           created_at?: string
           credit_cost?: number
+          customer_name?: string | null
+          customer_phone?: string | null
           delivery_address?: string | null
           driver_fee?: number
           driver_id?: string | null
+          group_id?: string | null
           id?: string
           notes?: string | null
           pickup_address?: string | null
@@ -225,9 +288,12 @@ export type Database = {
         Update: {
           created_at?: string
           credit_cost?: number
+          customer_name?: string | null
+          customer_phone?: string | null
           delivery_address?: string | null
           driver_fee?: number
           driver_id?: string | null
+          group_id?: string | null
           id?: string
           notes?: string | null
           pickup_address?: string | null
@@ -237,6 +303,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_requests_restaurant_id_fkey"
             columns: ["restaurant_id"]
@@ -979,6 +1052,16 @@ export type Database = {
         Returns: boolean
       }
       complete_delivery: { Args: { p_request_id: string }; Returns: string }
+      create_delivery_group: {
+        Args: {
+          p_group_notes?: string
+          p_pickup_address: string
+          p_preferred_driver_id?: string
+          p_restaurant_id: string
+          p_stops: Json
+        }
+        Returns: string
+      }
       deduct_credits_for_delivery: {
         Args: {
           p_delivery_address: string
