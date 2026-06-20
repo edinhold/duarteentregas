@@ -123,10 +123,11 @@ const StoreOwnerPanel = () => {
           <main className="p-4 max-w-4xl mx-auto w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {isMobile && (
-                <TabsList className="grid w-full grid-cols-7 bg-muted/50 p-1 rounded-xl mb-4">
+                <TabsList className="grid w-full grid-cols-8 bg-muted/50 p-1 rounded-xl mb-4">
                   <TabsTrigger value="store" className="rounded-lg"><Store className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="menu" className="rounded-lg"><UtensilsCrossed className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="driver" className="rounded-lg"><Truck className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="multi" className="rounded-lg"><Route className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="reassign" className="rounded-lg"><RefreshCw className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="favorites" className="rounded-lg"><Star className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
