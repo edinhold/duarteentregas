@@ -47,7 +47,21 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     }
     setPermissionWarning(Notification.permission !== "granted");
   }, []);
-  const dismissedRef = useRef<Set<string>>(new Set());
+  const DISMISSED_KEY = "delivery-overlay-dismissed";
+  const loadDismissed = (): Set<string> => {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(DISMISSED_KEY) : null;
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw) as string[];
+      return new Set(Array.isArray(arr) ? arr.slice(-500) : []);
+    } catch { return new Set(); }
+  };
+  const dismissedRef = useRef<Set<string>>(loadDismissed());
+  const persistDismissed = () => {
+    try {
+      window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(dismissedRef.current).slice(-500)));
+    } catch {}
+  };
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const standbyRef = useRef(standby);
@@ -251,6 +265,7 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     if (!delivery) return;
     console.log("[DeliveryOverlay] Entrega recusada", delivery.id);
     dismissedRef.current.add(delivery.id);
+    persistDismissed();
     close();
   }, [delivery, close]);
 
