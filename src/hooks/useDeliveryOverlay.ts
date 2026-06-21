@@ -265,6 +265,7 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     if (!delivery) return;
     console.log("[DeliveryOverlay] Entrega recusada", delivery.id);
     dismissedRef.current.add(delivery.id);
+    persistDismissed();
     close();
   }, [delivery, close]);
 
