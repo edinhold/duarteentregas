@@ -4,7 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import webpush from "npm:web-push@3.6.7";
 
 const VAPID_PUBLIC_KEY =
-  "BDHuP4e-ussnQbRWq8j8B_Tfx4FAnuIFIM6tRjVT8NlJtRDOgRkecwN2qykzd48gLPrXMhdOD1M-x1F0p5kD-kM";
+  "BGD2qLXHzweaz5XIUEc5dlsTDCjt0_6cg7wFTRLhDjZ714TOWlfTMRXRcyz5ffHjuI58A2YpHgFXlOqCRWAQK0E";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
 
