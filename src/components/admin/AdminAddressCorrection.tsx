@@ -87,6 +87,9 @@ const AdminAddressCorrection = ({ request }: Props) => {
     }
     setSaving(true);
     try {
+      const oldPickup = request.pickup_address || "";
+      const oldDelivery = request.delivery_address || "";
+      const oldCost = Number(request.credit_cost || 0);
       const { data, error } = await supabase.rpc("admin_update_delivery_address", {
         p_request_id: request.id,
         p_pickup_address: pickup.trim(),
@@ -96,6 +99,32 @@ const AdminAddressCorrection = ({ request }: Props) => {
       if (error) throw error;
       const diff = (data as any)?.diff ?? 0;
       const newCost = (data as any)?.new_cost ?? 0;
+      const newKm = (data as any)?.distance_km ?? distanceKm;
+
+      // Notify merchant in chat with before/after
+      const { data: auth } = await supabase.auth.getUser();
+      const senderId = auth?.user?.id;
+      if (senderId) {
+        const diffLine =
+          diff === 0
+            ? "• Sem alteração de valor"
+            : diff > 0
+              ? `• Cobrado adicional: R$ ${Math.abs(diff).toFixed(2)}`
+              : `• Estornado: R$ ${Math.abs(diff).toFixed(2)}`;
+        const msg =
+          `📍 *Endereços corrigidos pelo Admin (via GPS)*\n\n` +
+          `*Coleta:*\nAntes: ${oldPickup}\nAgora: ${pickup.trim()}\n\n` +
+          `*Entrega:*\nAntes: ${oldDelivery}\nAgora: ${delivery.trim()}\n\n` +
+          `*Valor:*\nAntes: R$ ${oldCost.toFixed(2)}\nAgora: R$ ${Number(newCost).toFixed(2)} (${Number(newKm).toFixed(2)} km)\n` +
+          diffLine;
+        const { error: chatErr } = await supabase.from("chat_messages").insert({
+          delivery_request_id: request.id,
+          sender_id: senderId,
+          message: msg,
+        });
+        if (chatErr) console.error("chat insert error", chatErr);
+      }
+
       toast.success(
         `Endereço corrigido. Novo valor: R$ ${Number(newCost).toFixed(2)}` +
           (diff !== 0
@@ -104,6 +133,7 @@ const AdminAddressCorrection = ({ request }: Props) => {
       );
       qc.invalidateQueries({ queryKey: ["admin-delivery-requests-chat"] });
       qc.invalidateQueries({ queryKey: ["admin-delivery-requests-chat-recent"] });
+      qc.invalidateQueries({ queryKey: ["chat-messages", request.id] });
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Erro ao corrigir endereço");
