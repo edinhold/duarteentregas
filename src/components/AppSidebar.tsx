@@ -36,6 +36,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "map", label: "GPS", icon: MapIcon },
           { id: "radar", label: "Radar", icon: Radar },
           { id: "finance", label: "Ganhos", icon: Wallet },
+          { id: "history", label: "Histórico", icon: History },
           { id: "settings", label: "Ajustes", icon: Settings },
         ];
       case "store":
