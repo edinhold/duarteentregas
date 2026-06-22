@@ -20,6 +20,7 @@ import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
+import AdminSupportPanel from "@/components/AdminSupportPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
