@@ -182,6 +182,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     },
   });
 
+  // Driver info shown once a driver accepts the active request
+  const assignedDriverId = activeRequest?.driver_id || null;
+  const activeStatus = activeRequest?.status;
+  const showDriverInfo = !!activeRequest && !!assignedDriverId && ["accepted", "picked_up"].includes(activeStatus);
+  const { data: assignedDriver } = useQuery({
+    queryKey: ["assigned-driver-info", activeRequest?.id, assignedDriverId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_assigned_driver_info", { p_request_id: activeRequest.id });
+      if (error) { console.warn("get_assigned_driver_info error", error); return null; }
+      return Array.isArray(data) ? data[0] : data;
+    },
+    enabled: showDriverInfo,
+  });
+
   const baseFee = (deliveryConfig as any)?.base_fee ?? 5;
   const feePerKm = (deliveryConfig as any)?.fee_per_km ?? 1.5;
   const minKm = (deliveryConfig as any)?.min_km ?? 0;
