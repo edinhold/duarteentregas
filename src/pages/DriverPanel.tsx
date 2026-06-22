@@ -967,6 +967,10 @@ const DriverPanel = () => {
                 </TabsContent>
 
 
+                <TabsContent value="support" className="space-y-4 outline-none m-0">
+                  {user && <AdminSupportPanel currentUserId={user.id} role="driver" />}
+                </TabsContent>
+
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
                   {/* Notification Settings */}
                   <DriverNotificationSettings />
