@@ -819,6 +819,9 @@ const DriverPanel = () => {
                     </CardContent>
                   </Card>
 
+                </TabsContent>
+
+                <TabsContent value="history" className="space-y-4 outline-none m-0">
                   {/* Completed deliveries */}
                   <Card>
                     <CardHeader className="pb-2">
@@ -850,6 +853,14 @@ const DriverPanel = () => {
                       )}
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="finance-rest" className="hidden">
+                  {/* placeholder kept to preserve JSX structure during edit */}
+                </TabsContent>
+
+                <TabsContent value="finance-continue" className="hidden">
+
 
                   {/* PIX Key */}
                   <Card>
