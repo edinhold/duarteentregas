@@ -154,12 +154,18 @@ const ChatTab = () => {
       </Card>
 
       {selectedRequestId && user && (
-        <ChatWidget
-          deliveryRequestId={selectedRequestId}
-          currentUserId={user.id}
-          title="Chat da Entrega (Admin)"
-          maxHeight="max-h-80"
-        />
+        <>
+          {(() => {
+            const selected = allRequests.find((r: any) => r.id === selectedRequestId);
+            return selected ? <AdminAddressCorrection request={selected} /> : null;
+          })()}
+          <ChatWidget
+            deliveryRequestId={selectedRequestId}
+            currentUserId={user.id}
+            title="Chat da Entrega (Admin)"
+            maxHeight="max-h-80"
+          />
+        </>
       )}
       <DeleteConfirm
         open={showDeleteAll}
