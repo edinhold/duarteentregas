@@ -1118,6 +1118,18 @@ export type Database = {
         Returns: string
       }
       delete_all_chat_messages: { Args: never; Returns: undefined }
+      get_assigned_driver_info: {
+        Args: { p_request_id: string }
+        Returns: {
+          driver_code: string
+          full_name: string
+          phone: string
+          photo_url: string
+          user_id: string
+          vehicle_plate: string
+          vehicle_type: string
+        }[]
+      }
       get_public_delivery_config: {
         Args: never
         Returns: {

@@ -182,6 +182,20 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     },
   });
 
+  // Driver info shown once a driver accepts the active request
+  const assignedDriverId = activeRequest?.driver_id || null;
+  const activeStatus = activeRequest?.status;
+  const showDriverInfo = !!activeRequest && !!assignedDriverId && ["accepted", "picked_up"].includes(activeStatus);
+  const { data: assignedDriver } = useQuery({
+    queryKey: ["assigned-driver-info", activeRequest?.id, assignedDriverId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_assigned_driver_info", { p_request_id: activeRequest.id });
+      if (error) { console.warn("get_assigned_driver_info error", error); return null; }
+      return Array.isArray(data) ? data[0] : data;
+    },
+    enabled: showDriverInfo,
+  });
+
   const baseFee = (deliveryConfig as any)?.base_fee ?? 5;
   const feePerKm = (deliveryConfig as any)?.fee_per_km ?? 1.5;
   const minKm = (deliveryConfig as any)?.min_km ?? 0;
@@ -858,6 +872,57 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             >
               <XCircle className="w-4 h-4 mr-1" /> Cancelar
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Assigned Driver Info — shown after a driver accepts */}
+      {showDriverInfo && assignedDriver && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Truck className="w-4 h-4 text-primary" /> Entregador a caminho
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-3">
+            {assignedDriver.photo_url ? (
+              <img
+                src={assignedDriver.photo_url}
+                alt={assignedDriver.full_name || "Entregador"}
+                className="w-16 h-16 rounded-full object-cover border-2 border-primary shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-xl font-bold text-primary shrink-0">
+                {(assignedDriver.full_name || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <p className="font-semibold truncate">{assignedDriver.full_name || "Entregador"}</p>
+              {assignedDriver.phone && (
+                <a
+                  href={`tel:${assignedDriver.phone.replace(/\D/g, "")}`}
+                  className="text-sm text-primary hover:underline block truncate"
+                >
+                  📞 {assignedDriver.phone}
+                </a>
+              )}
+              <p className="text-xs text-muted-foreground truncate">
+                🛵 {assignedDriver.vehicle_type || "Veículo não informado"}
+                {assignedDriver.vehicle_plate ? ` • ${assignedDriver.vehicle_plate}` : ""}
+              </p>
+            </div>
+            {assignedDriver.phone && (
+              <a
+                href={`https://wa.me/55${assignedDriver.phone.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0"
+              >
+                <Button size="sm" variant="outline" className="gap-1">
+                  💬 WhatsApp
+                </Button>
+              </a>
+            )}
           </CardContent>
         </Card>
       )}
