@@ -19,6 +19,7 @@ import RadarTab from "@/components/store/RadarTab";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import AdminSupportPanel from "@/components/AdminSupportPanel";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
