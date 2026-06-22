@@ -9,6 +9,7 @@ import { MessageSquare, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import ChatWidget from "@/components/ChatWidget";
 import DeleteConfirm from "@/components/admin/DeleteConfirm";
+import AdminAddressCorrection from "@/components/admin/AdminAddressCorrection";
 
 const statusLabels: Record<string, string> = {
   pending: "Aguardando",
