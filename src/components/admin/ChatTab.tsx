@@ -9,6 +9,7 @@ import { MessageSquare, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import ChatWidget from "@/components/ChatWidget";
 import DeleteConfirm from "@/components/admin/DeleteConfirm";
+import AdminAddressCorrection from "@/components/admin/AdminAddressCorrection";
 
 const statusLabels: Record<string, string> = {
   pending: "Aguardando",
@@ -153,12 +154,18 @@ const ChatTab = () => {
       </Card>
 
       {selectedRequestId && user && (
-        <ChatWidget
-          deliveryRequestId={selectedRequestId}
-          currentUserId={user.id}
-          title="Chat da Entrega (Admin)"
-          maxHeight="max-h-80"
-        />
+        <>
+          {(() => {
+            const selected = allRequests.find((r: any) => r.id === selectedRequestId);
+            return selected ? <AdminAddressCorrection request={selected} /> : null;
+          })()}
+          <ChatWidget
+            deliveryRequestId={selectedRequestId}
+            currentUserId={user.id}
+            title="Chat da Entrega (Admin)"
+            maxHeight="max-h-80"
+          />
+        </>
       )}
       <DeleteConfirm
         open={showDeleteAll}

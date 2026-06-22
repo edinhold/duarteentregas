@@ -1081,6 +1081,15 @@ export type Database = {
     }
     Functions: {
       accept_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
+      admin_update_delivery_address: {
+        Args: {
+          p_delivery_address: string
+          p_distance_km: number
+          p_pickup_address: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       cancel_delivery_request: {
         Args: { p_request_id: string }
         Returns: boolean
