@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_direct_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       admin_requests: {
         Row: {
           created_at: string
@@ -1160,6 +1187,7 @@ export type Database = {
           vehicle_type: string
         }[]
       }
+      get_support_admin_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

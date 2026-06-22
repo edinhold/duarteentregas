@@ -20,6 +20,7 @@ import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
 import ChatWidget from "@/components/ChatWidget";
+import AdminSupportPanel from "@/components/AdminSupportPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
@@ -616,12 +617,13 @@ const DriverPanel = () => {
           <main className="p-4 max-w-4xl mx-auto w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
               {isMobile && (
-                <TabsList className="grid w-full grid-cols-6 bg-muted/50 p-1 rounded-xl">
+                <TabsList className="grid w-full grid-cols-7 bg-muted/50 p-1 rounded-xl">
                   <TabsTrigger value="home" className="rounded-lg"><Home className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="radar" className="rounded-lg"><Radar className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="finance" className="rounded-lg"><Wallet className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="history" className="rounded-lg"><History className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="support" className="rounded-lg"><MessageSquare className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="settings" className="rounded-lg"><Settings className="w-4 h-4" /></TabsTrigger>
                 </TabsList>
               )}
@@ -964,6 +966,10 @@ const DriverPanel = () => {
                   </Card>
                 </TabsContent>
 
+
+                <TabsContent value="support" className="space-y-4 outline-none m-0">
+                  {user && <AdminSupportPanel currentUserId={user.id} role="driver" />}
+                </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
                   {/* Notification Settings */}

@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Truck, UtensilsCrossed, CreditCard, Store, Map as MapIcon, Star, RefreshCw, Route } from "lucide-react";
+import { ArrowLeft, Truck, UtensilsCrossed, CreditCard, Store, Map as MapIcon, Star, RefreshCw, Route, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import MultiDeliveryOrder from "@/components/MultiDeliveryOrder";
 import { motion } from "framer-motion";
@@ -19,6 +19,7 @@ import RadarTab from "@/components/store/RadarTab";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import AdminSupportPanel from "@/components/AdminSupportPanel";
 
 const StoreOwnerPanel = () => {
   const { user } = useAuth();
@@ -123,7 +124,7 @@ const StoreOwnerPanel = () => {
           <main className="p-4 max-w-4xl mx-auto w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {isMobile && (
-                <TabsList className="grid w-full grid-cols-8 bg-muted/50 p-1 rounded-xl mb-4">
+                <TabsList className="grid w-full grid-cols-9 bg-muted/50 p-1 rounded-xl mb-4">
                   <TabsTrigger value="store" className="rounded-lg"><Store className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="menu" className="rounded-lg"><UtensilsCrossed className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="driver" className="rounded-lg"><Truck className="w-4 h-4" /></TabsTrigger>
@@ -132,6 +133,7 @@ const StoreOwnerPanel = () => {
                   <TabsTrigger value="favorites" className="rounded-lg"><Star className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="credits" className="rounded-lg"><CreditCard className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="support" className="rounded-lg"><MessageSquare className="w-4 h-4" /></TabsTrigger>
                 </TabsList>
               )}
 
@@ -171,6 +173,10 @@ const StoreOwnerPanel = () => {
 
                 <TabsContent value="credits" className="mt-0 outline-none">
                   <CreditsTab credits={credits} />
+                </TabsContent>
+
+                <TabsContent value="support" className="mt-0 outline-none">
+                  <AdminSupportPanel currentUserId={user.id} role="store_owner" />
                 </TabsContent>
               </motion.div>
             </Tabs>
