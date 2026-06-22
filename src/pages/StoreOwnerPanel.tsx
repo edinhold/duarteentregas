@@ -174,6 +174,10 @@ const StoreOwnerPanel = () => {
                 <TabsContent value="credits" className="mt-0 outline-none">
                   <CreditsTab credits={credits} />
                 </TabsContent>
+
+                <TabsContent value="support" className="mt-0 outline-none">
+                  <AdminSupportPanel currentUserId={user.id} role="store_owner" />
+                </TabsContent>
               </motion.div>
             </Tabs>
           </main>
