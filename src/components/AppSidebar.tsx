@@ -37,6 +37,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "radar", label: "Radar", icon: Radar },
           { id: "finance", label: "Ganhos", icon: Wallet },
           { id: "history", label: "Histórico", icon: History },
+          { id: "support", label: "Suporte", icon: MessageSquare },
           { id: "settings", label: "Ajustes", icon: Settings },
         ];
       case "store":
@@ -49,6 +50,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "favorites", label: "Favoritos", icon: Star },
           { id: "map", label: "Mapa", icon: MapIcon },
           { id: "credits", label: "Recarga", icon: CreditCard },
+          { id: "support", label: "Suporte", icon: MessageSquare },
         ];
       case "admin":
         return [
