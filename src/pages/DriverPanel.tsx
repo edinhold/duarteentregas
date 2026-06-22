@@ -616,11 +616,12 @@ const DriverPanel = () => {
           <main className="p-4 max-w-4xl mx-auto w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
               {isMobile && (
-                <TabsList className="grid w-full grid-cols-5 bg-muted/50 p-1 rounded-xl">
+                <TabsList className="grid w-full grid-cols-6 bg-muted/50 p-1 rounded-xl">
                   <TabsTrigger value="home" className="rounded-lg"><Home className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="map" className="rounded-lg"><MapIcon className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="radar" className="rounded-lg"><Radar className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="finance" className="rounded-lg"><Wallet className="w-4 h-4" /></TabsTrigger>
+                  <TabsTrigger value="history" className="rounded-lg"><History className="w-4 h-4" /></TabsTrigger>
                   <TabsTrigger value="settings" className="rounded-lg"><Settings className="w-4 h-4" /></TabsTrigger>
                 </TabsList>
               )}
@@ -818,37 +819,8 @@ const DriverPanel = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Completed deliveries */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
-                        <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {completedRequests.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {completedRequests.map((r: any) => (
-                            <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
-                                <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">
-                                  {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                              </div>
-                              <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
-                                ✅ Entregue
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+
+
 
                   {/* PIX Key */}
                   <Card>
@@ -958,6 +930,40 @@ const DriverPanel = () => {
                     </Card>
                   )}
                 </TabsContent>
+
+                <TabsContent value="history" className="space-y-4 outline-none m-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <History className="w-4 h-4 text-green-500" /> Histórico de Entregas
+                        <Badge variant="outline" className="ml-auto">{completedRequests.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {completedRequests.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-8">Nenhuma entrega finalizada ainda</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {completedRequests.map((r: any) => (
+                            <div key={r.id} className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-bold text-sm truncate">{r.restaurants?.name || "Loja"}</p>
+                                <p className="text-xs text-muted-foreground truncate">🏠 {r.delivery_address}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  {new Date(r.updated_at).toLocaleDateString("pt-BR")} • {new Date(r.updated_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
+                              <Badge className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                                ✅ Entregue
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
                   {/* Notification Settings */}
