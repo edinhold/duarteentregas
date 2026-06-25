@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { setOneSignalExternalUserId, clearOneSignalExternalUserId } from "@/lib/onesignal";
 
 interface AuthContextType {
   user: User | null;
@@ -21,18 +22,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      const uid = session?.user?.id;
+      if (uid) {
+        setOneSignalExternalUserId(uid).catch(() => {});
+      } else {
+        clearOneSignalExternalUserId().catch(() => {});
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      const uid = session?.user?.id;
+      if (uid) setOneSignalExternalUserId(uid).catch(() => {});
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
+    try { await clearOneSignalExternalUserId(); } catch {}
     await supabase.auth.signOut();
   };
 
