@@ -375,18 +375,57 @@ const DriverPanel = () => {
     };
   }, [user, activeRequest?.id, driverProfile?.id]);
   
-  // Keep driver active status synced while panel is open
+  // Keep driver active+online status synced while panel is open
   useEffect(() => {
     if (!user?.id) return;
-    
-    const keepActive = async () => {
-      await supabase.from("drivers").update({ is_active: true, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+
+    const setOnline = async (online: boolean) => {
+      await supabase
+        .from("drivers")
+        .update({
+          is_active: true,
+          is_online: online,
+          last_seen_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
     };
-    
-    keepActive();
-    const interval = setInterval(keepActive, 60000); // Every minute
-    
-    return () => clearInterval(interval);
+
+    setOnline(true);
+    const interval = setInterval(() => setOnline(true), 60000); // Heartbeat 1 min
+
+    const handleVisibility = () => setOnline(!document.hidden);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const handleBeforeUnload = () => {
+      // Best-effort offline mark when tab closes
+      try {
+        const url = `${(import.meta as any).env?.VITE_SUPABASE_URL ?? ""}/rest/v1/drivers?user_id=eq.${user.id}`;
+        const headers = {
+          apikey: (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
+          "Content-Type": "application/json",
+        } as any;
+        navigator.sendBeacon?.(
+          url,
+          new Blob([JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() })], { type: "application/json" })
+        );
+        // sendBeacon can't set PATCH; fall back to fetch keepalive
+        fetch(url, {
+          method: "PATCH",
+          headers,
+          keepalive: true,
+          body: JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() }),
+        });
+      } catch {}
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      setOnline(false);
+    };
   }, [user?.id]);
 
   const acceptRequest = async (requestId: string) => {

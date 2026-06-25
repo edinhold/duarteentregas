@@ -432,6 +432,8 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          is_online: boolean
+          last_seen_at: string | null
           phone: string
           photo_url: string | null
           pix_key: string | null
@@ -452,6 +454,8 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean
+          is_online?: boolean
+          last_seen_at?: string | null
           phone: string
           photo_url?: string | null
           pix_key?: string | null
@@ -472,6 +476,8 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          is_online?: boolean
+          last_seen_at?: string | null
           phone?: string
           photo_url?: string | null
           pix_key?: string | null
