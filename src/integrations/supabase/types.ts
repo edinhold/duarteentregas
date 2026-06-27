@@ -734,6 +734,39 @@ export type Database = {
         }
         Relationships: []
       }
+      push_notification_logs: {
+        Row: {
+          attempts: number
+          created_at: string
+          driver_user_id: string
+          error: string | null
+          id: string
+          request_id: string
+          response: Json | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          driver_user_id: string
+          error?: string | null
+          id?: string
+          request_id: string
+          response?: Json | null
+          status: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          driver_user_id?: string
+          error?: string | null
+          id?: string
+          request_id?: string
+          response?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
