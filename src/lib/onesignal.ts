@@ -30,6 +30,9 @@ async function initOneSignalNative(): Promise<any> {
       OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
         const notification = event?.getNotification?.();
         try {
+          event?.preventDefault?.();
+        } catch {}
+        try {
           notification?.display?.();
         } catch {}
         try {
