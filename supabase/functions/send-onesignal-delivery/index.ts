@@ -54,7 +54,9 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
     // ---- iOS Category / sound / lockscreen ----
     ios_category: ONESIGNAL_IOS_CATEGORY,
     ios_sound: "default",
-    ios_interruption_level: "time-sensitive", // shows on lock screen even in Focus
+    // OneSignal accepts Apple's value with underscore, not hyphen.
+    // Invalid values make the entire API call fail with HTTP 400.
+    ios_interruption_level: "time_sensitive", // shows on lock screen even in Focus
     mutable_content: true,
     content_available: true,
   };
@@ -200,8 +202,16 @@ Deno.serve(async (req) => {
 
     if (!result.ok) {
       console.error("[PushNotifications] all attempts failed", result.status, result.json);
+      const errors = Array.isArray(result.json?.errors)
+        ? result.json.errors.join("; ")
+        : (typeof result.json?.errors === "string" ? result.json.errors : undefined);
       return new Response(
-        JSON.stringify({ error: result.json, status: result.status, attempts: result.attempts }),
+        JSON.stringify({
+          error: errors ?? result.error ?? "onesignal_send_failed",
+          details: result.json,
+          status: result.status,
+          attempts: result.attempts,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
