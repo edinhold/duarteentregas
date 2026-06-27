@@ -40,6 +40,35 @@ const TestPush = () => {
   const [broadcast, setBroadcast] = useState(false);
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  const runDiagnostic = async () => {
+    if (!driverId) { toast.error("Selecione um motorista"); return; }
+    setDiagnosing(true);
+    setDiagnostic(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("onesignal-user-status", {
+        body: { external_id: driverId },
+      });
+      if (error) {
+        const msg = getFunctionErrorMessage(error);
+        setDiagnostic({ error: msg, raw: error });
+        toast.error("Falha no diagnóstico: " + msg);
+        return;
+      }
+      setDiagnostic(data);
+      if ((data as any)?.android_active) {
+        toast.success("Android inscrito e habilitado ✓");
+      } else if ((data as any)?.any_active) {
+        toast.warning("Inscrito, mas nenhum aparelho Android ativo");
+      } else {
+        toast.error("Nenhuma inscrição ativa para este motorista");
+      }
+    } finally {
+      setDiagnosing(false);
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
