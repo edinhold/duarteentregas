@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon, ChevronLeft, ChevronRight, PanelLeft, Shield } from "lucide-react";
+import { Store, Package, ShoppingCart, TrendingUp, ArrowLeft, Pencil, Trash2, Truck, Users, Settings, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, Map as MapIcon, ChevronLeft, ChevronRight, PanelLeft, Shield, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RestaurantForm from "@/components/admin/RestaurantForm";
@@ -216,6 +216,10 @@ const AdminDashboard = () => {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1 className="font-bold text-lg flex-1 truncate">Painel Administrativo</h1>
+            <Button variant="outline" size="sm" onClick={() => navigate("/admin/teste-push")} className="gap-1">
+              <Bell className="w-4 h-4" />
+              <span className="hidden sm:inline">Teste Push</span>
+            </Button>
             <ThemeToggle />
           </header>
 
