@@ -4,6 +4,11 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const ONESIGNAL_APP_ID = "52d432a9-3b18-428f-ab87-eff19a2d5a6a";
 const ONESIGNAL_REST_API_KEY = Deno.env.get("ONESIGNAL_REST_API_KEY")!;
+// Optional: OneSignal Android Notification Category UUID (created in dashboard or via REST).
+// If unset, OneSignal uses the default high-importance channel "Miscellaneous".
+const ONESIGNAL_ANDROID_CHANNEL_ID = Deno.env.get("ONESIGNAL_ANDROID_CHANNEL_ID") || undefined;
+// Optional: iOS APNs Notification Category for action buttons/critical sound config.
+const ONESIGNAL_IOS_CATEGORY = Deno.env.get("ONESIGNAL_IOS_CATEGORY") || "NEW_DELIVERY";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -14,7 +19,7 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
-  const payload = {
+  const payload: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
     include_aliases: { external_id: externalIds },
@@ -34,11 +39,24 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
       url: "/motorista/pedido",
     },
     url: "/motorista/pedido",
+    // Delivery
     priority: 10,
     ttl: 120,
-    android_channel_id: undefined,
-    android_visibility: 1,
-    android_accent_color: "FF2563EB",
+    // ---- Android Notification Channel (Android 8+) ----
+    // High importance + lockscreen visibility + custom sound/vibration.
+    android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
+    android_visibility: 1,             // 1 = PUBLIC (show on lock screen)
+    android_accent_color: "FF2563EB",  // ARGB without "#"
+    android_led_color: "FF2563EB",
+    android_sound: "default",
+    // Vibration pattern (ms): wait 0, vibrate 400, pause 200, vibrate 400
+    android_vibration_pattern: [0, 400, 200, 400],
+    // ---- iOS Category / sound / lockscreen ----
+    ios_category: ONESIGNAL_IOS_CATEGORY,
+    ios_sound: "default",
+    ios_interruption_level: "time-sensitive", // shows on lock screen even in Focus
+    mutable_content: true,
+    content_available: true,
   };
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
@@ -125,18 +143,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Deduplicate: drop any driver who already has a log row for this request
-    const { data: existing } = await supabase
+    // ---- Idempotent reservation per (request_id, driver_user_id) ----
+    // INSERT ... ON CONFLICT DO NOTHING RETURNING — only the rows actually
+    // inserted come back, so concurrent invocations for the same request
+    // can never double-send to the same driver.
+    const reservation = externalIds.map((uid) => ({
+      request_id,
+      driver_user_id: uid,
+      status: "reserved",
+      attempts: 0,
+      response: null,
+      error: null,
+    }));
+    const { data: reserved, error: resErr } = await supabase
       .from("push_notification_logs")
-      .select("driver_user_id")
-      .eq("request_id", request_id)
-      .in("driver_user_id", externalIds);
-    const already = new Set((existing ?? []).map((r: any) => r.driver_user_id));
-    const targets = externalIds.filter((id) => !already.has(id));
+      .upsert(reservation, {
+        onConflict: "request_id,driver_user_id",
+        ignoreDuplicates: true,
+      })
+      .select("driver_user_id");
+    if (resErr) {
+      console.error("[PushNotifications] reservation error", resErr);
+      return new Response(JSON.stringify({ error: resErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
+    const targets = (reserved ?? []).map((r: any) => r.driver_user_id);
     if (targets.length === 0) {
       return new Response(
-        JSON.stringify({ sent: 0, reason: "already_notified", duplicates: externalIds.length }),
+        JSON.stringify({ sent: 0, reason: "already_notified", candidates: externalIds.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -148,19 +185,18 @@ Deno.serve(async (req) => {
       delivery_address,
     });
 
-    // Log per-driver (insert; unique constraint guarantees no duplicate)
-    const rows = targets.map((uid) => ({
-      request_id,
-      driver_user_id: uid,
-      status: result.ok ? "sent" : "failed",
-      attempts: result.attempts,
-      response: result.json ?? null,
-      error: result.ok ? null : (result.error ?? `http_${result.status}`),
-    }));
+    // Update the reserved rows with the final send result
     const { error: logErr } = await supabase
       .from("push_notification_logs")
-      .insert(rows);
-    if (logErr) console.error("[PushNotifications] log insert error", logErr);
+      .update({
+        status: result.ok ? "sent" : "failed",
+        attempts: result.attempts,
+        response: result.json ?? null,
+        error: result.ok ? null : (result.error ?? `http_${result.status}`),
+      })
+      .eq("request_id", request_id)
+      .in("driver_user_id", targets);
+    if (logErr) console.error("[PushNotifications] log update error", logErr);
 
     if (!result.ok) {
       console.error("[PushNotifications] all attempts failed", result.status, result.json);
