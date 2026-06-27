@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Volume2, Vibrate, Bell, BellOff } from "lucide-react";
+import { Volume2, Vibrate, Bell, BellOff, Smartphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -21,11 +21,15 @@ import {
   loadDriverNotificationSettings,
   saveDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
+import { getOneSignalStatus, requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
+import { toast } from "sonner";
 
 const DriverNotificationSettings = () => {
   const { user } = useAuth();
   const [settings, setSettings] = useState<DriverNotificationSettingsState>(loadDriverNotificationSettings);
   const [pendingCount, setPendingCount] = useState(0);
+  const [activatingPush, setActivatingPush] = useState(false);
+  const [pushStatus, setPushStatus] = useState<Awaited<ReturnType<typeof getOneSignalStatus>> | null>(null);
 
   // Apply sound controls while this tab is open. The standby loop itself is
   // owned by DriverPanel, so it keeps working on mobile after leaving this tab.
@@ -74,6 +78,37 @@ const DriverNotificationSettings = () => {
       return next;
     });
   }, []);
+
+  const refreshPushStatus = useCallback(async () => {
+    const status = await getOneSignalStatus();
+    setPushStatus(status);
+    return status;
+  }, []);
+
+  useEffect(() => {
+    refreshPushStatus().catch(() => {});
+  }, [refreshPushStatus]);
+
+  const activatePush = useCallback(async () => {
+    if (!user?.id) return;
+    setActivatingPush(true);
+    try {
+      const granted = await requestOneSignalPermission();
+      await setOneSignalExternalUserId(user.id);
+      const status = await refreshPushStatus();
+      if (granted && status.supported && status.externalId === user.id && status.optedIn !== false) {
+        toast.success("Push ativado para este motorista");
+      } else if (!granted) {
+        toast.error("Permissão de notificação bloqueada. Ative nas configurações do celular/app.");
+      } else {
+        toast.warning("Push solicitado. Aguarde alguns segundos e teste novamente.");
+      }
+    } catch (error: any) {
+      toast.error(error?.message ?? "Erro ao ativar Push");
+    } finally {
+      setActivatingPush(false);
+    }
+  }, [refreshPushStatus, user?.id]);
 
   const intervalOptions = [
     { value: "15000", label: "15 segundos" },
@@ -179,6 +214,36 @@ const DriverNotificationSettings = () => {
               </Button>
             </div>
           )}
+        </div>
+
+        <div className="space-y-3 border-t pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-primary" />
+              <div>
+                <Label className="text-sm">Push no celular</Label>
+                <p className="text-xs text-muted-foreground">
+                  {pushStatus?.supported
+                    ? pushStatus.externalId === user?.id && pushStatus.optedIn !== false
+                      ? "Ativado para receber em primeiro e segundo plano"
+                      : "Precisa ativar neste aparelho"
+                    : "Disponível no app instalado/celular"}
+                </p>
+              </div>
+            </div>
+            <Badge variant={pushStatus?.externalId === user?.id && pushStatus?.optedIn !== false ? "default" : "secondary"}>
+              {pushStatus?.externalId === user?.id && pushStatus?.optedIn !== false ? "Ativo" : "Pendente"}
+            </Badge>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={activatePush}
+            disabled={activatingPush}
+            className="w-full text-xs"
+          >
+            {activatingPush ? "Ativando..." : "Ativar/validar Push neste aparelho"}
+          </Button>
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
