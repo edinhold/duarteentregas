@@ -40,6 +40,35 @@ const TestPush = () => {
   const [broadcast, setBroadcast] = useState(false);
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  const runDiagnostic = async () => {
+    if (!driverId) { toast.error("Selecione um motorista"); return; }
+    setDiagnosing(true);
+    setDiagnostic(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("onesignal-user-status", {
+        body: { external_id: driverId },
+      });
+      if (error) {
+        const msg = getFunctionErrorMessage(error);
+        setDiagnostic({ error: msg, raw: error });
+        toast.error("Falha no diagnóstico: " + msg);
+        return;
+      }
+      setDiagnostic(data);
+      if ((data as any)?.android_active) {
+        toast.success("Android inscrito e habilitado ✓");
+      } else if ((data as any)?.any_active) {
+        toast.warning("Inscrito, mas nenhum aparelho Android ativo");
+      } else {
+        toast.error("Nenhuma inscrição ativa para este motorista");
+      }
+    } finally {
+      setDiagnosing(false);
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -147,6 +176,20 @@ const TestPush = () => {
                 <p className="text-xs text-muted-foreground">
                   {drivers.length} motoristas cadastrados ({drivers.filter(d => d.is_online).length} online)
                 </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={runDiagnostic}
+                  disabled={diagnosing || !driverId}
+                  className="w-full"
+                >
+                  {diagnosing ? "Consultando OneSignal..." : "🔎 Validar inscrição Android deste motorista"}
+                </Button>
+                {diagnostic && (
+                  <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-64">
+                    {JSON.stringify(diagnostic, null, 2)}
+                  </pre>
+                )}
               </div>
             )}
 
