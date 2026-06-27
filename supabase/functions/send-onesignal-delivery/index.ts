@@ -143,18 +143,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Deduplicate: drop any driver who already has a log row for this request
-    const { data: existing } = await supabase
+    // ---- Idempotent reservation per (request_id, driver_user_id) ----
+    // INSERT ... ON CONFLICT DO NOTHING RETURNING — only the rows actually
+    // inserted come back, so concurrent invocations for the same request
+    // can never double-send to the same driver.
+    const reservation = externalIds.map((uid) => ({
+      request_id,
+      driver_user_id: uid,
+      status: "reserved",
+      attempts: 0,
+      response: null,
+      error: null,
+    }));
+    const { data: reserved, error: resErr } = await supabase
       .from("push_notification_logs")
-      .select("driver_user_id")
-      .eq("request_id", request_id)
-      .in("driver_user_id", externalIds);
-    const already = new Set((existing ?? []).map((r: any) => r.driver_user_id));
-    const targets = externalIds.filter((id) => !already.has(id));
+      .upsert(reservation, {
+        onConflict: "request_id,driver_user_id",
+        ignoreDuplicates: true,
+      })
+      .select("driver_user_id");
+    if (resErr) {
+      console.error("[PushNotifications] reservation error", resErr);
+      return new Response(JSON.stringify({ error: resErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
+    const targets = (reserved ?? []).map((r: any) => r.driver_user_id);
     if (targets.length === 0) {
       return new Response(
-        JSON.stringify({ sent: 0, reason: "already_notified", duplicates: externalIds.length }),
+        JSON.stringify({ sent: 0, reason: "already_notified", candidates: externalIds.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -166,19 +185,18 @@ Deno.serve(async (req) => {
       delivery_address,
     });
 
-    // Log per-driver (insert; unique constraint guarantees no duplicate)
-    const rows = targets.map((uid) => ({
-      request_id,
-      driver_user_id: uid,
-      status: result.ok ? "sent" : "failed",
-      attempts: result.attempts,
-      response: result.json ?? null,
-      error: result.ok ? null : (result.error ?? `http_${result.status}`),
-    }));
+    // Update the reserved rows with the final send result
     const { error: logErr } = await supabase
       .from("push_notification_logs")
-      .insert(rows);
-    if (logErr) console.error("[PushNotifications] log insert error", logErr);
+      .update({
+        status: result.ok ? "sent" : "failed",
+        attempts: result.attempts,
+        response: result.json ?? null,
+        error: result.ok ? null : (result.error ?? `http_${result.status}`),
+      })
+      .eq("request_id", request_id)
+      .in("driver_user_id", targets);
+    if (logErr) console.error("[PushNotifications] log update error", logErr);
 
     if (!result.ok) {
       console.error("[PushNotifications] all attempts failed", result.status, result.json);
