@@ -40,9 +40,9 @@ const TestPush = () => {
       setAuthChecked(true);
       const { data, error } = await supabase
         .from("drivers")
-        .select("user_id,name,is_online,is_active,last_seen_at")
+        .select("user_id,full_name,is_online,is_active,last_seen_at")
         .order("is_online", { ascending: false })
-        .order("name", { ascending: true });
+        .order("full_name", { ascending: true });
       if (error) { toast.error("Erro ao listar motoristas: " + error.message); return; }
       setDrivers(data ?? []);
     };
