@@ -31,14 +31,14 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
     data: {
       pedido_id: payloadData.request_id,
       tipo: "nova_entrega",
-      rota: "/motorista/pedido",
+      rota: "/entregador",
       request_id: payloadData.request_id,
       driver_fee: payloadData.driver_fee,
       pickup_address: payloadData.pickup_address,
       delivery_address: payloadData.delivery_address,
-      url: "/motorista/pedido",
+      url: "/entregador",
     },
-    url: "/motorista/pedido",
+    url: "/entregador",
     // Delivery
     priority: 10,
     ttl: 120,
@@ -130,7 +130,9 @@ Deno.serve(async (req) => {
         .eq("is_active", true);
       if (error) console.error("[PushNotifications] drivers query error", error);
 
-      const cutoff = Date.now() - 5 * 60 * 1000;
+      // Mobile WebViews pause timers/network when the app goes to background.
+      // Keep recently online drivers eligible for push for a full work shift.
+      const cutoff = Date.now() - 12 * 60 * 60 * 1000;
       externalIds = (drivers ?? [])
         .filter((d: any) => !d.last_seen_at || new Date(d.last_seen_at).getTime() > cutoff)
         .map((d: any) => d.user_id)

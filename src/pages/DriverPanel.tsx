@@ -33,6 +33,7 @@ import {
   DriverNotificationSettingsState,
   loadDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
+import { requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -227,10 +228,14 @@ const DriverPanel = () => {
 
   // Request notification permission
   useEffect(() => {
+    if (!user?.id) return;
+
+    setOneSignalExternalUserId(user.id).catch(() => {});
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+      Notification.requestPermission().catch(() => {});
     }
-  }, []);
+    requestOneSignalPermission().catch(() => {});
+  }, [user?.id]);
 
   // Keep standby settings active for the whole driver panel (including mobile),
   // even when the settings tab is not mounted/open.
@@ -392,39 +397,18 @@ const DriverPanel = () => {
     };
 
     setOnline(true);
-    const interval = setInterval(() => setOnline(true), 60000); // Heartbeat 1 min
+    const interval = setInterval(() => setOnline(true), 30000); // Heartbeat 30s
 
-    const handleVisibility = () => setOnline(!document.hidden);
+    const handleVisibility = () => setOnline(true);
     document.addEventListener("visibilitychange", handleVisibility);
-
-    const handleBeforeUnload = () => {
-      // Best-effort offline mark when tab closes
-      try {
-        const url = `${(import.meta as any).env?.VITE_SUPABASE_URL ?? ""}/rest/v1/drivers?user_id=eq.${user.id}`;
-        const headers = {
-          apikey: (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
-          "Content-Type": "application/json",
-        } as any;
-        navigator.sendBeacon?.(
-          url,
-          new Blob([JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() })], { type: "application/json" })
-        );
-        // sendBeacon can't set PATCH; fall back to fetch keepalive
-        fetch(url, {
-          method: "PATCH",
-          headers,
-          keepalive: true,
-          body: JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() }),
-        });
-      } catch {}
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      setOnline(false);
+      // Do not mark offline on background/route unload: mobile browsers and
+      // WebViews pause/unmount pages aggressively, but the driver must remain
+      // eligible for push while recently active. The backend already filters by
+      // last_seen_at, so stale sessions naturally expire.
     };
   }, [user?.id]);
 
