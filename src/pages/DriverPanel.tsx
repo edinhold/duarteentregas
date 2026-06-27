@@ -33,6 +33,7 @@ import {
   DriverNotificationSettingsState,
   loadDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
+import { requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
 
 const DriverPanel = () => {
   const { user } = useAuth();
@@ -227,10 +228,14 @@ const DriverPanel = () => {
 
   // Request notification permission
   useEffect(() => {
+    if (!user?.id) return;
+
+    setOneSignalExternalUserId(user.id).catch(() => {});
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+      Notification.requestPermission().catch(() => {});
     }
-  }, []);
+    requestOneSignalPermission().catch(() => {});
+  }, [user?.id]);
 
   // Keep standby settings active for the whole driver panel (including mobile),
   // even when the settings tab is not mounted/open.
@@ -392,9 +397,9 @@ const DriverPanel = () => {
     };
 
     setOnline(true);
-    const interval = setInterval(() => setOnline(true), 60000); // Heartbeat 1 min
+    const interval = setInterval(() => setOnline(true), 30000); // Heartbeat 30s
 
-    const handleVisibility = () => setOnline(!document.hidden);
+    const handleVisibility = () => setOnline(true);
     document.addEventListener("visibilitychange", handleVisibility);
 
     const handleBeforeUnload = () => {
@@ -419,11 +424,13 @@ const DriverPanel = () => {
       } catch {}
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
       setOnline(false);
     };
   }, [user?.id]);
