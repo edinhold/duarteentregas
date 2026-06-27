@@ -4,6 +4,11 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const ONESIGNAL_APP_ID = "52d432a9-3b18-428f-ab87-eff19a2d5a6a";
 const ONESIGNAL_REST_API_KEY = Deno.env.get("ONESIGNAL_REST_API_KEY")!;
+// Optional: OneSignal Android Notification Category UUID (created in dashboard or via REST).
+// If unset, OneSignal uses the default high-importance channel "Miscellaneous".
+const ONESIGNAL_ANDROID_CHANNEL_ID = Deno.env.get("ONESIGNAL_ANDROID_CHANNEL_ID") || undefined;
+// Optional: iOS APNs Notification Category for action buttons/critical sound config.
+const ONESIGNAL_IOS_CATEGORY = Deno.env.get("ONESIGNAL_IOS_CATEGORY") || "NEW_DELIVERY";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -14,7 +19,7 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
-  const payload = {
+  const payload: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
     include_aliases: { external_id: externalIds },
@@ -34,11 +39,24 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
       url: "/motorista/pedido",
     },
     url: "/motorista/pedido",
+    // Delivery
     priority: 10,
     ttl: 120,
-    android_channel_id: undefined,
-    android_visibility: 1,
-    android_accent_color: "FF2563EB",
+    // ---- Android Notification Channel (Android 8+) ----
+    // High importance + lockscreen visibility + custom sound/vibration.
+    android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
+    android_visibility: 1,             // 1 = PUBLIC (show on lock screen)
+    android_accent_color: "FF2563EB",  // ARGB without "#"
+    android_led_color: "FF2563EB",
+    android_sound: "default",
+    // Vibration pattern (ms): wait 0, vibrate 400, pause 200, vibrate 400
+    android_vibration_pattern: [0, 400, 200, 400],
+    // ---- iOS Category / sound / lockscreen ----
+    ios_category: ONESIGNAL_IOS_CATEGORY,
+    ios_sound: "default",
+    ios_interruption_level: "time-sensitive", // shows on lock screen even in Focus
+    mutable_content: true,
+    content_available: true,
   };
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
