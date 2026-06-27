@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 interface DriverRow {
   user_id: string;
-  name: string | null;
+  full_name: string | null;
   is_online: boolean;
   is_active: boolean;
   last_seen_at: string | null;
