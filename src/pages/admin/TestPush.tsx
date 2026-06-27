@@ -123,7 +123,7 @@ const TestPush = () => {
                     {drivers.map((d) => (
                       <SelectItem key={d.user_id} value={d.user_id}>
                         {d.is_online ? "🟢 " : "⚪ "}
-                        {d.name ?? "(sem nome)"} {d.is_active ? "" : "• inativo"}
+                        {d.full_name ?? "(sem nome)"} {d.is_active ? "" : "• inativo"}
                       </SelectItem>
                     ))}
                   </SelectContent>
