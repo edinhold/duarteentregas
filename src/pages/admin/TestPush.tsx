@@ -9,6 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Send, Bell } from "lucide-react";
 import { toast } from "sonner";
 
+const getFunctionErrorMessage = (error: unknown) => {
+  const anyError = error as any;
+  const context = anyError?.context;
+  const response = context?.response;
+  const body = context?.body ?? context?.json;
+  const backendMessage = body?.error
+    ?? body?.details?.errors?.join?.("; ")
+    ?? anyError?.message;
+  const status = response?.status ?? body?.status;
+  return status ? `${backendMessage} (HTTP ${status})` : (backendMessage ?? String(error));
+};
+
 interface DriverRow {
   user_id: string;
   full_name: string | null;
@@ -67,7 +79,11 @@ const TestPush = () => {
       const { data, error } = await supabase.functions.invoke("send-onesignal-delivery", {
         body: payload,
       });
-      if (error) throw error;
+      if (error) {
+        const message = getFunctionErrorMessage(error);
+        setLastResult({ error: message, raw: error });
+        throw new Error(message);
+      }
       setLastResult(data);
       if ((data as any)?.sent > 0) {
         toast.success(`Push enviado para ${(data as any).sent} motorista(s)`);
@@ -76,7 +92,7 @@ const TestPush = () => {
       }
     } catch (e: any) {
       toast.error("Falha ao enviar: " + (e?.message ?? String(e)));
-      setLastResult({ error: e?.message ?? String(e) });
+      setLastResult((current: any) => current ?? { error: e?.message ?? String(e) });
     } finally {
       setSending(false);
     }
@@ -166,7 +182,7 @@ const TestPush = () => {
           <CardHeader><CardTitle>Como validar canal / som / vibração</CardTitle></CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p><strong>Primeiro plano (app aberto):</strong> o overlay interno aparece com som e vibração via Web Audio + Vibration API.</p>
-            <p><strong>Segundo plano (tela bloqueada / outro app):</strong> a notificação OneSignal chega no canal de alta importância — som padrão e padrão de vibração (0, 400, 200, 400 ms). No iOS é enviada como <code>time-sensitive</code> para aparecer na tela de bloqueio mesmo em Foco.</p>
+            <p><strong>Segundo plano (tela bloqueada / outro app):</strong> a notificação OneSignal chega no canal de alta importância — som padrão e padrão de vibração (0, 400, 200, 400 ms). No iOS é enviada como <code>time_sensitive</code> para aparecer na tela de bloqueio mesmo em Foco.</p>
             <p><strong>Dica:</strong> faça o motorista logar no app móvel/web, conceder permissão de notificação, depois minimize ou bloqueie a tela e dispare o teste daqui.</p>
             <p>O <code>request_id</code> é aleatório a cada disparo, então a trava de idempotência <em>(pedido, motorista)</em> nunca bloqueia o teste.</p>
           </CardContent>
