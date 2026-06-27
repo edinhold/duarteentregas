@@ -402,36 +402,13 @@ const DriverPanel = () => {
     const handleVisibility = () => setOnline(true);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    const handleBeforeUnload = () => {
-      // Best-effort offline mark when tab closes
-      try {
-        const url = `${(import.meta as any).env?.VITE_SUPABASE_URL ?? ""}/rest/v1/drivers?user_id=eq.${user.id}`;
-        const headers = {
-          apikey: (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
-          "Content-Type": "application/json",
-        } as any;
-        navigator.sendBeacon?.(
-          url,
-          new Blob([JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() })], { type: "application/json" })
-        );
-        // sendBeacon can't set PATCH; fall back to fetch keepalive
-        fetch(url, {
-          method: "PATCH",
-          headers,
-          keepalive: true,
-          body: JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() }),
-        });
-      } catch {}
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handleBeforeUnload);
-
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", handleBeforeUnload);
-      setOnline(false);
+      // Do not mark offline on background/route unload: mobile browsers and
+      // WebViews pause/unmount pages aggressively, but the driver must remain
+      // eligible for push while recently active. The backend already filters by
+      // last_seen_at, so stale sessions naturally expire.
     };
   }, [user?.id]);
 
