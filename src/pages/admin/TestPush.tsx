@@ -176,6 +176,20 @@ const TestPush = () => {
                 <p className="text-xs text-muted-foreground">
                   {drivers.length} motoristas cadastrados ({drivers.filter(d => d.is_online).length} online)
                 </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={runDiagnostic}
+                  disabled={diagnosing || !driverId}
+                  className="w-full"
+                >
+                  {diagnosing ? "Consultando OneSignal..." : "🔎 Validar inscrição Android deste motorista"}
+                </Button>
+                {diagnostic && (
+                  <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-64">
+                    {JSON.stringify(diagnostic, null, 2)}
+                  </pre>
+                )}
               </div>
             )}
 
