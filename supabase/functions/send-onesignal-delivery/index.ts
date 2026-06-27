@@ -31,14 +31,14 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
     data: {
       pedido_id: payloadData.request_id,
       tipo: "nova_entrega",
-      rota: "/motorista/pedido",
+      rota: "/entregador",
       request_id: payloadData.request_id,
       driver_fee: payloadData.driver_fee,
       pickup_address: payloadData.pickup_address,
       delivery_address: payloadData.delivery_address,
-      url: "/motorista/pedido",
+      url: "/entregador",
     },
-    url: "/motorista/pedido",
+    url: "/entregador",
     // Delivery
     priority: 10,
     ttl: 120,
