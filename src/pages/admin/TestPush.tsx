@@ -9,17 +9,104 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Send, Bell } from "lucide-react";
 import { toast } from "sonner";
 
+const FUNCTIONS_BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+const FUNCTIONS_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+const parseJsonSafely = (text: string) => {
+  try { return text ? JSON.parse(text) : null; } catch { return text; }
+};
+
+const stringifyBackendError = (value: any): string | undefined => {
+  if (!value) return undefined;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => item?.title ?? item?.message ?? JSON.stringify(item)).join("; ");
+  }
+  return value?.title ?? value?.message ?? JSON.stringify(value);
+};
+
 const getFunctionErrorMessage = (error: unknown) => {
   const anyError = error as any;
   const context = anyError?.context;
   const response = context?.response;
   const body = context?.body ?? context?.json;
-  const backendMessage = body?.error
-    ?? body?.details?.errors?.join?.("; ")
+  const backendMessage = stringifyBackendError(body?.error)
+    ?? stringifyBackendError(body?.details?.errors)
+    ?? stringifyBackendError(body?.details)
     ?? anyError?.message;
   const status = response?.status ?? body?.status;
   return status ? `${backendMessage} (HTTP ${status})` : (backendMessage ?? String(error));
 };
+
+const serializeError = (error: unknown) => {
+  const anyError = error as any;
+  return {
+    name: anyError?.name,
+    message: anyError?.message ?? String(error),
+    context: anyError?.context ?? null,
+  };
+};
+
+const invokeFunctionWithFallback = async (functionName: string, body: Record<string, unknown>) => {
+  const primary = await supabase.functions.invoke(functionName, { body });
+  if (!primary.error) return { data: primary.data, usedFallback: false };
+
+  const primaryMessage = getFunctionErrorMessage(primary.error);
+  const isNetworkFailure =
+    (primary.error as any)?.name === "FunctionsFetchError"
+    || primaryMessage.includes("Failed to send a request");
+
+  if (!isNetworkFailure) {
+    return { error: primaryMessage, raw: serializeError(primary.error), usedFallback: false };
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${functionName}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": FUNCTIONS_ANON_KEY,
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const payload = parseJsonSafely(text);
+    if (!response.ok) {
+      const message = stringifyBackendError((payload as any)?.error)
+        ?? stringifyBackendError((payload as any)?.details)
+        ?? `HTTP ${response.status}`;
+      return {
+        error: `${message} (HTTP ${response.status})`,
+        raw: { primary: serializeError(primary.error), fallback: payload },
+        usedFallback: true,
+      };
+    }
+    return {
+      data: { ...(typeof payload === "object" && payload ? payload : { response: payload }), fallback_fetch_used: true },
+      usedFallback: true,
+    };
+  } catch (fallbackError) {
+    return {
+      error: `${primaryMessage}. Verifique a internet do aparelho; a tentativa direta também falhou: ${(fallbackError as any)?.message ?? String(fallbackError)}`,
+      raw: { primary: serializeError(primary.error), fallback: serializeError(fallbackError) },
+      usedFallback: true,
+    };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
+const buildRuntimeInfo = () => ({
+  online: typeof navigator !== "undefined" ? navigator.onLine : undefined,
+  origin: typeof window !== "undefined" ? window.location.origin : undefined,
+  user_agent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+});
 
 interface DriverRow {
   user_id: string;
@@ -48,16 +135,13 @@ const TestPush = () => {
     setDiagnosing(true);
     setDiagnostic(null);
     try {
-      const { data, error } = await supabase.functions.invoke("onesignal-user-status", {
-        body: { external_id: driverId },
-      });
+      const { data, error, raw } = await invokeFunctionWithFallback("onesignal-user-status", { external_id: driverId });
       if (error) {
-        const msg = getFunctionErrorMessage(error);
-        setDiagnostic({ error: msg, raw: error });
-        toast.error("Falha no diagnóstico: " + msg);
+        setDiagnostic({ error, raw, runtime: buildRuntimeInfo() });
+        toast.error("Falha no diagnóstico: " + error);
         return;
       }
-      setDiagnostic(data);
+      setDiagnostic({ ...data, runtime: buildRuntimeInfo() });
       if ((data as any)?.android_active) {
         toast.success("Android inscrito e habilitado ✓");
       } else if ((data as any)?.any_active) {
@@ -105,15 +189,12 @@ const TestPush = () => {
         if (!driverId) { toast.error("Selecione um motorista ou marque broadcast"); setSending(false); return; }
         payload.driver_id = driverId;
       }
-      const { data, error } = await supabase.functions.invoke("send-onesignal-delivery", {
-        body: payload,
-      });
+      const { data, error, raw } = await invokeFunctionWithFallback("send-onesignal-delivery", payload);
       if (error) {
-        const message = getFunctionErrorMessage(error);
-        setLastResult({ error: message, raw: error });
-        throw new Error(message);
+        setLastResult({ error, raw, runtime: buildRuntimeInfo() });
+        throw new Error(error);
       }
-      setLastResult(data);
+      setLastResult({ ...data, runtime: buildRuntimeInfo() });
       if ((data as any)?.sent > 0) {
         toast.success(`Push enviado para ${(data as any).sent} motorista(s)`);
       } else {
