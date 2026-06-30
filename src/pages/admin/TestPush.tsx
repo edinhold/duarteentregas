@@ -69,7 +69,7 @@ const invokeFunctionWithFallback = async (functionName: string, body: Record<str
       headers: {
         "Content-Type": "application/json",
         "apikey": FUNCTIONS_ANON_KEY,
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        Authorization: `Bearer ${session?.access_token ?? FUNCTIONS_ANON_KEY}`,
       },
       body: JSON.stringify(body),
       cache: "no-store",
