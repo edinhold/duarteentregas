@@ -423,9 +423,11 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           }
         }
 
-        // Fallback to Nominatim
-        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
-        
+        // Nominatim: acrescenta cidade/UF quando o usuário só digitou rua/bairro
+        const hasCity = /primavera do leste|\bmt\b|mato grosso/i.test(address);
+        const query = hasCity ? address : `${address}, Primavera do Leste, MT`;
+        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
+
         if (storeLat && storeLng) {
           const delta = 0.25;
           searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`;
