@@ -1,4 +1,4 @@
-export const GOOGLE_MAPS_API_KEY = "AIzaSyDlfAsqIpfRYcKDxu3gCfcWOtyRN_wOygs";
+export const GOOGLE_MAPS_API_KEY = "AIzaSyCO9r8RD6KA_5M5oQH6QuqYiLl6FIkbEFA";
 export const DEFAULT_CENTER = { lat: -15.5595, lng: -54.3079 }; // Primavera do Leste, MT center
 export const DEFAULT_ZOOM = 14;
 
