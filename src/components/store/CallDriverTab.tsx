@@ -783,7 +783,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         }
       } catch (e) {}
 
-      toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
+      toast.success(`Entregador chamado! Custo: R$ ${(deliveryCost ?? 0).toFixed(2)}`);
       
       const pickupAddr = restaurant?.address || callForm.pickup;
       setCallForm({ pickup: pickupAddr, delivery: "", delivery_number: "", notes: "" });
@@ -1003,7 +1003,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               </div>
               <div className="rounded-lg bg-muted/50 p-2.5 text-center">
                 <DollarSign className="w-4 h-4 mx-auto mb-1 text-primary" />
-                <p className="text-sm font-bold">R$ {deliveryCost.toFixed(2).replace(".", ",")}</p>
+                <p className="text-sm font-bold">R$ {(deliveryCost ?? 0).toFixed(2).replace(".", ",")}</p>
                 <p className="text-[10px] text-muted-foreground">Custo total</p>
               </div>
             </div>
@@ -1203,7 +1203,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
               <DollarSign className="w-5 h-5 text-primary" />
               <div className="flex-1">
-                <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
+                <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {(deliveryCost ?? 0).toFixed(2).replace(".", ",")}</span></p>
                 <p className="text-xs text-muted-foreground">
                   Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")} = R$ {(feePerKm * distanceKm).toFixed(2).replace(".", ",")}
                 </p>
@@ -1286,7 +1286,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           </div>
 
           <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0 || loadingRoute} className="w-full">
-            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
+            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${(deliveryCost ?? 0).toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
           </Button>
         </CardContent>
       </Card>
