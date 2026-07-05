@@ -196,10 +196,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     enabled: showDriverInfo,
   });
 
-  const baseFee = (deliveryConfig as any)?.base_fee ?? 5;
-  const feePerKm = (deliveryConfig as any)?.fee_per_km ?? 1.5;
-  const minKm = (deliveryConfig as any)?.min_km ?? 0;
-  const maxKm = (deliveryConfig as any)?.max_km ?? 0;
+  // Use ADMIN config strictly — no defaults. Cost is null until config loads,
+  // ensuring the value shown always matches exactly what admin configured.
+  const configLoaded = !!deliveryConfig;
+  const baseFee = Number((deliveryConfig as any)?.base_fee ?? 0);
+  const feePerKm = Number((deliveryConfig as any)?.fee_per_km ?? 0);
+  const minKm = Number((deliveryConfig as any)?.min_km ?? 0);
+  const maxKm = Number((deliveryConfig as any)?.max_km ?? 0);
   const roundKmUp = !!(deliveryConfig as any)?.round_km_up;
 
   const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
@@ -214,14 +217,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     ? parseFloat(manualDistanceKm)
     : autoDistanceKm;
 
-  // Apply km rules (same as DB function)
+  // Apply km rules — MUST match server-side deduct_credits_for_delivery exactly
   let effectiveKm = rawDistanceKm;
   if (roundKmUp && effectiveKm > 0) effectiveKm = Math.ceil(effectiveKm);
   if (minKm > 0 && effectiveKm < minKm) effectiveKm = minKm;
   if (maxKm > 0 && effectiveKm > maxKm) effectiveKm = maxKm;
 
   const distanceKm = rawDistanceKm;
-  const deliveryCost = baseFee + feePerKm * effectiveKm;
+  const deliveryCost = configLoaded ? (baseFee + feePerKm * effectiveKm) : null;
 
   const distanceSource = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
     ? "manual"
