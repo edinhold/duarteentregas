@@ -18,6 +18,8 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
+  const { data: driverLocations = [] } = useDriverLocations();
+  const onlineUserIds = new Set(driverLocations.map((d: any) => d.user_id));
 
   const { data: favorites = [], isLoading } = useQuery({
     queryKey: ["favorite-drivers", restaurant?.id],
