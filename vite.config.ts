@@ -6,8 +6,9 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Relative base so the same /dist works in Electron (file://) and Android (Capacitor) without breaking web hosting at root.
-  base: "./",
+  // Use absolute base for web (required for SPA nested routes like /admin/login).
+  // Only use relative base for Electron/Capacitor builds (set BUILD_TARGET=native).
+  base: process.env.BUILD_TARGET === "native" ? "./" : "/",
   server: {
     host: "::",
     port: 8080,
