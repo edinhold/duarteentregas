@@ -269,7 +269,8 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
