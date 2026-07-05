@@ -72,8 +72,9 @@ const AdminLogin = () => {
   };
 
   const handleGoogleLogin = async () => {
+    localStorage.setItem("lastRoute", "/admin");
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/admin",
+      redirect_uri: window.location.origin,
     });
     if (error) toast.error("Erro ao conectar com Google");
   };
