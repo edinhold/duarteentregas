@@ -196,10 +196,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     enabled: showDriverInfo,
   });
 
-  const baseFee = (deliveryConfig as any)?.base_fee ?? 5;
-  const feePerKm = (deliveryConfig as any)?.fee_per_km ?? 1.5;
-  const minKm = (deliveryConfig as any)?.min_km ?? 0;
-  const maxKm = (deliveryConfig as any)?.max_km ?? 0;
+  // Use ADMIN config strictly — no defaults. Cost is null until config loads,
+  // ensuring the value shown always matches exactly what admin configured.
+  const configLoaded = !!deliveryConfig;
+  const baseFee = Number((deliveryConfig as any)?.base_fee ?? 0);
+  const feePerKm = Number((deliveryConfig as any)?.fee_per_km ?? 0);
+  const minKm = Number((deliveryConfig as any)?.min_km ?? 0);
+  const maxKm = Number((deliveryConfig as any)?.max_km ?? 0);
   const roundKmUp = !!(deliveryConfig as any)?.round_km_up;
 
   const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
@@ -214,14 +217,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     ? parseFloat(manualDistanceKm)
     : autoDistanceKm;
 
-  // Apply km rules (same as DB function)
+  // Apply km rules — MUST match server-side deduct_credits_for_delivery exactly
   let effectiveKm = rawDistanceKm;
   if (roundKmUp && effectiveKm > 0) effectiveKm = Math.ceil(effectiveKm);
   if (minKm > 0 && effectiveKm < minKm) effectiveKm = minKm;
   if (maxKm > 0 && effectiveKm > maxKm) effectiveKm = maxKm;
 
   const distanceKm = rawDistanceKm;
-  const deliveryCost = baseFee + feePerKm * effectiveKm;
+  const deliveryCost = configLoaded ? (baseFee + feePerKm * effectiveKm) : null;
 
   const distanceSource = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
     ? "manual"
@@ -780,7 +783,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         }
       } catch (e) {}
 
-      toast.success(`Entregador chamado! Custo: R$ ${deliveryCost.toFixed(2)}`);
+      toast.success(`Entregador chamado! Custo: R$ ${(deliveryCost ?? 0).toFixed(2)}`);
       
       const pickupAddr = restaurant?.address || callForm.pickup;
       setCallForm({ pickup: pickupAddr, delivery: "", delivery_number: "", notes: "" });
@@ -1000,7 +1003,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               </div>
               <div className="rounded-lg bg-muted/50 p-2.5 text-center">
                 <DollarSign className="w-4 h-4 mx-auto mb-1 text-primary" />
-                <p className="text-sm font-bold">R$ {deliveryCost.toFixed(2).replace(".", ",")}</p>
+                <p className="text-sm font-bold">R$ {(deliveryCost ?? 0).toFixed(2).replace(".", ",")}</p>
                 <p className="text-[10px] text-muted-foreground">Custo total</p>
               </div>
             </div>
@@ -1200,7 +1203,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
               <DollarSign className="w-5 h-5 text-primary" />
               <div className="flex-1">
-                <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {deliveryCost.toFixed(2).replace(".", ",")}</span></p>
+                <p className="text-sm font-semibold">Valor da corrida: <span className="text-primary">R$ {(deliveryCost ?? 0).toFixed(2).replace(".", ",")}</span></p>
                 <p className="text-xs text-muted-foreground">
                   Taxa fixa R$ {baseFee.toFixed(2).replace(".", ",")} + {distanceKm.toFixed(1)} km × R$ {feePerKm.toFixed(2).replace(".", ",")} = R$ {(feePerKm * distanceKm).toFixed(2).replace(".", ",")}
                 </p>
@@ -1283,7 +1286,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           </div>
 
           <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0 || loadingRoute} className="w-full">
-            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${deliveryCost.toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
+            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${(deliveryCost ?? 0).toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
           </Button>
         </CardContent>
       </Card>

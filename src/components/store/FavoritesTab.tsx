@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck, Plus } from "lucide-react";
+import { Star, UserPlus, Trash2, Search, Code, User, BadgeCheck, Plus, Circle } from "lucide-react";
+import { useDriverLocations } from "@/hooks/useDriverLocations";
 
 interface FavoritesTabProps {
   restaurant: any;
@@ -17,6 +18,8 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
+  const { data: driverLocations = [] } = useDriverLocations();
+  const onlineUserIds = new Set(driverLocations.map((d: any) => d.user_id));
 
   const { data: favorites = [], isLoading } = useQuery({
     queryKey: ["favorite-drivers", restaurant?.id],
@@ -201,18 +204,32 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
             </div>
           ) : (
             <div className="grid gap-3">
-              {favorites.map((fav: any) => (
+              {favorites.map((fav: any) => {
+                const isOnline = fav.driver?.user_id && onlineUserIds.has(fav.driver.user_id);
+                return (
                 <div 
                   key={fav.id} 
                   className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {fav.driver?.full_name?.charAt(0) || <User className="w-5 h-5" />}
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {fav.driver?.full_name?.charAt(0) || <User className="w-5 h-5" />}
+                      </div>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-card ${isOnline ? "bg-green-500" : "bg-slate-400"}`}
+                        title={isOnline ? "Online" : "Offline"}
+                      />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm">{fav.driver?.full_name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm">{fav.driver?.full_name || "Entregador"}</p>
+                        <Badge
+                          className={`text-[10px] py-0 h-4 gap-1 border-0 ${isOnline ? "bg-green-500 hover:bg-green-500 text-white" : "bg-slate-400 hover:bg-slate-400 text-white"}`}
+                        >
+                          <Circle className={`w-2 h-2 fill-current ${isOnline ? "animate-pulse" : ""}`} />
+                          {isOnline ? "Online" : "Offline"}
+                        </Badge>
                         {fav.is_default && (
                           <Badge className="text-[10px] py-0 h-4 gap-1 bg-yellow-500 hover:bg-yellow-500">
                             <Star className="w-2.5 h-2.5 fill-current" /> Padrão
@@ -252,7 +269,8 @@ const FavoritesTab = ({ restaurant }: FavoritesTabProps) => {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
