@@ -36,7 +36,7 @@ import {
 import { requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
 
 const DriverPanel = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [chatMessage, setChatMessage] = useState("");
@@ -52,6 +52,11 @@ const DriverPanel = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [notificationSettings, setNotificationSettings] = useState<DriverNotificationSettingsState>(loadDriverNotificationSettings);
   const hadPendingStandbyRef = useRef(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) navigate("/auth", { replace: true });
+  }, [loading, user, navigate]);
 
   useEffect(() => {
     const handleOnline = () => { setIsOnline(true); toast.success("Internet restabelecida"); };
@@ -589,7 +594,13 @@ const DriverPanel = () => {
 
 
 
-  if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Verificando login...</p>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
