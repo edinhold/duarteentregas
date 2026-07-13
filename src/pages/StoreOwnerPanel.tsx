@@ -22,11 +22,16 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import AdminSupportPanel from "@/components/AdminSupportPanel";
 
 const StoreOwnerPanel = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("store");
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) navigate("/auth", { replace: true });
+  }, [loading, user, navigate]);
 
   const { data: restaurant } = useQuery({
     queryKey: ["my-restaurant", user?.id],
@@ -104,7 +109,13 @@ const StoreOwnerPanel = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, activeRequest?.id]);
 
-  if (!user) return <div className="p-8 text-center">Faça login para acessar</div>;
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Verificando login...</p>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
