@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const { data: categories = [] } = useCategories();
   const [authChecked, setAuthChecked] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("restaurants");
   const isMobile = useIsMobile();
 
@@ -57,10 +58,15 @@ const AdminDashboard = () => {
         navigate("/admin/login", { replace: true });
         return;
       }
-      const { data: isAdmin } = await supabase.rpc("has_role", {
+      const { data: isAdmin, error: roleError } = await supabase.rpc("has_role", {
         _user_id: session.user.id,
         _role: "admin",
       });
+      if (roleError) {
+        setAuthError("Não foi possível verificar sua permissão. Tente novamente em instantes.");
+        toast.error("Erro ao verificar permissão de administrador.");
+        return;
+      }
       if (!isAdmin) {
         toast.error("Acesso negado. Sua conta não possui permissão de administrador.", {
           description: `Conta: ${session.user.email}`,
@@ -199,7 +205,14 @@ const AdminDashboard = () => {
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Verificando permissões...</p>
+        <div className="text-center space-y-3 px-4">
+          <p className="text-muted-foreground">{authError ?? "Verificando permissões..."}</p>
+          {authError && (
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Tentar novamente
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

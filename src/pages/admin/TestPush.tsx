@@ -119,6 +119,7 @@ interface DriverRow {
 const TestPush = () => {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
   const [driverId, setDriverId] = useState<string>("");
   const [fee, setFee] = useState("8.50");
@@ -158,9 +159,14 @@ const TestPush = () => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/admin/login", { replace: true }); return; }
-      const { data: isAdmin } = await supabase.rpc("has_role", {
+      const { data: isAdmin, error: roleError } = await supabase.rpc("has_role", {
         _user_id: session.user.id, _role: "admin",
       });
+      if (roleError) {
+        setAuthError("Não foi possível verificar sua permissão. Tente novamente em instantes.");
+        toast.error("Erro ao verificar permissão de administrador.");
+        return;
+      }
       if (!isAdmin) { toast.error("Acesso negado"); navigate("/admin/login", { replace: true }); return; }
       setAuthChecked(true);
       const { data, error } = await supabase
@@ -208,7 +214,20 @@ const TestPush = () => {
     }
   };
 
-  if (!authChecked) return null;
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3 px-4">
+          <p className="text-muted-foreground">{authError ?? "Verificando permissões..."}</p>
+          {authError && (
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Tentar novamente
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
