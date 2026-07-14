@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DriverPhoto } from "@/components/DriverPhoto";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -171,11 +172,14 @@ const DriversTab = () => {
           {viewDriver && (
             <div className="space-y-3">
               {/* Photo */}
-              {(viewDriver as any).photo_url && (
-                <div className="flex justify-center">
-                  <img src={(viewDriver as any).photo_url} alt={viewDriver.full_name} className="w-24 h-24 rounded-full object-cover border-2 border-border" />
-                </div>
-              )}
+              <div className="flex justify-center">
+                <DriverPhoto
+                  photoUrl={(viewDriver as any).photo_url}
+                  driverId={viewDriver.user_id}
+                  alt={viewDriver.full_name}
+                  className="w-24 h-24 rounded-full border-2 border-border"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <InfoField label="Nome completo" value={viewDriver.full_name} />
                 <InfoField label="Telefone" value={viewDriver.phone} />
