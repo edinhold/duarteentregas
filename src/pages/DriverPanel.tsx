@@ -602,6 +602,38 @@ const DriverPanel = () => {
     );
   }
 
+  if (driverProfile && (driverProfile as any).approval_status && (driverProfile as any).approval_status !== "approved") {
+    const status = (driverProfile as any).approval_status;
+    const rejected = status === "rejected";
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-center">
+              {rejected ? "Cadastro rejeitado" : "Cadastro em análise"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-center">
+            <p className="text-muted-foreground text-sm">
+              {rejected
+                ? "Seu cadastro de entregador foi rejeitado pela administração. Entre em contato com o suporte para mais informações."
+                : "Seu cadastro está aguardando aprovação da administração. Assim que aprovado, você poderá começar a receber corridas."}
+            </p>
+            <Badge variant={rejected ? "destructive" : "secondary"} className="text-sm">
+              Status: {rejected ? "Rejeitado" : "Pendente"}
+            </Badge>
+            <div className="pt-2">
+              <Button variant="outline" onClick={async () => { await supabase.auth.signOut(); navigate("/auth", { replace: true }); }}>
+                Sair
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+
   return (
     <SidebarProvider>
       <DeliveryNotifications
