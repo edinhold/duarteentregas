@@ -58,6 +58,21 @@ const DriversTab = () => {
     }
   };
 
+  const handleApproval = async (driverId: string, status: "approved" | "rejected", name: string) => {
+    try {
+      const { error } = await supabase
+        .from("drivers")
+        .update({ approval_status: status } as any)
+        .eq("id", driverId);
+      if (error) throw error;
+      toast.success(`${name} ${status === "approved" ? "aprovado" : "rejeitado"}!`);
+      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao atualizar");
+    }
+  };
+
+
   // Realtime: auto-update earnings when a driver finishes a delivery
   useEffect(() => {
     const channel = supabase.channel("admin-earnings-realtime")
