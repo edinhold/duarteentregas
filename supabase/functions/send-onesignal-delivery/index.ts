@@ -123,21 +123,21 @@ Deno.serve(async (req) => {
     if (driver_id) {
       externalIds = [driver_id];
     } else {
+      // Notify ALL approved active drivers (regardless of is_online / last_seen).
+      // OneSignal will only deliver to drivers who have a valid push subscription
+      // linked to their external_id.
       const { data: drivers, error } = await supabase
         .from("drivers")
-        .select("user_id, is_online, is_active, last_seen_at")
-        .eq("is_online", true)
-        .eq("is_active", true);
+        .select("user_id, is_active, approval_status")
+        .eq("is_active", true)
+        .eq("approval_status", "approved");
       if (error) console.error("[PushNotifications] drivers query error", error);
 
-      // Mobile WebViews pause timers/network when the app goes to background.
-      // Keep recently online drivers eligible for push for a full work shift.
-      const cutoff = Date.now() - 12 * 60 * 60 * 1000;
       externalIds = (drivers ?? [])
-        .filter((d: any) => !d.last_seen_at || new Date(d.last_seen_at).getTime() > cutoff)
         .map((d: any) => d.user_id)
         .filter(Boolean);
     }
+
 
     console.log("[PushNotifications] targets", externalIds.length, { request_id });
 
