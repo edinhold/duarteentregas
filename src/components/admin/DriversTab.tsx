@@ -6,8 +6,9 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trash2, Eye } from "lucide-react";
+import { Trash2, Eye, Check, X } from "lucide-react";
 import { toast } from "sonner";
+
 import DeleteConfirm from "./DeleteConfirm";
 
 const DriversTab = () => {
