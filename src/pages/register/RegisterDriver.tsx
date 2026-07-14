@@ -26,13 +26,21 @@ const RegisterDriver = () => {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowed = ["image/jpeg", "image/jpg", "image/png"];
+    if (!allowed.includes(file.type.toLowerCase())) {
+      toast.error("Formato inválido. Envie apenas JPG ou PNG.");
+      e.target.value = "";
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       toast.error("A foto deve ter no máximo 5MB");
+      e.target.value = "";
       return;
     }
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
+
 
   const handleChange = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -112,7 +120,7 @@ const RegisterDriver = () => {
               <input
                 ref={cameraInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 capture="user"
                 className="hidden"
                 onChange={handlePhotoChange}
@@ -120,10 +128,11 @@ const RegisterDriver = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 className="hidden"
                 onChange={handlePhotoChange}
               />
+
               <div className="flex gap-2 flex-wrap justify-center">
                 <Button type="button" variant="default" size="sm" className="rounded-xl gap-1" onClick={() => cameraInputRef.current?.click()}>
                   <Camera className="w-3 h-3" /> Tirar foto
@@ -138,8 +147,9 @@ const RegisterDriver = () => {
                 )}
               </div>
               <p className={`text-xs ${photoFile ? "text-muted-foreground" : "text-destructive"}`}>
-                {photoFile ? "Foto pronta para envio" : "Foto obrigatória (selfie ou imagem, máx. 5MB)"}
+                {photoFile ? "Foto pronta para envio" : "Foto obrigatória — JPG ou PNG (máx. 5MB), ou tire uma selfie pela câmera"}
               </p>
+
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
