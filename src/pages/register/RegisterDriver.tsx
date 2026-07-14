@@ -147,8 +147,9 @@ const RegisterDriver = () => {
                 )}
               </div>
               <p className={`text-xs ${photoFile ? "text-muted-foreground" : "text-destructive"}`}>
-                {photoFile ? "Foto pronta para envio" : "Foto obrigatória (selfie ou imagem, máx. 5MB)"}
+                {photoFile ? "Foto pronta para envio" : "Foto obrigatória — JPG ou PNG (máx. 5MB), ou tire uma selfie pela câmera"}
               </p>
+
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
