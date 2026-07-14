@@ -26,13 +26,21 @@ const RegisterDriver = () => {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowed = ["image/jpeg", "image/jpg", "image/png"];
+    if (!allowed.includes(file.type.toLowerCase())) {
+      toast.error("Formato inválido. Envie apenas JPG ou PNG.");
+      e.target.value = "";
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       toast.error("A foto deve ter no máximo 5MB");
+      e.target.value = "";
       return;
     }
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
+
 
   const handleChange = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
