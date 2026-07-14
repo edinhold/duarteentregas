@@ -120,7 +120,7 @@ const RegisterDriver = () => {
               <input
                 ref={cameraInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 capture="user"
                 className="hidden"
                 onChange={handlePhotoChange}
@@ -128,10 +128,11 @@ const RegisterDriver = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 className="hidden"
                 onChange={handlePhotoChange}
               />
+
               <div className="flex gap-2 flex-wrap justify-center">
                 <Button type="button" variant="default" size="sm" className="rounded-xl gap-1" onClick={() => cameraInputRef.current?.click()}>
                   <Camera className="w-3 h-3" /> Tirar foto
