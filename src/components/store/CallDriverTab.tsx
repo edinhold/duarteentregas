@@ -890,17 +890,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-3">
-            {assignedDriver.photo_url ? (
-              <img
-                src={assignedDriver.photo_url}
-                alt={assignedDriver.full_name || "Entregador"}
-                className="w-16 h-16 rounded-full object-cover border-2 border-primary shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-xl font-bold text-primary shrink-0">
-                {(assignedDriver.full_name || "?").charAt(0).toUpperCase()}
-              </div>
-            )}
+            <DriverPhoto
+              photoUrl={assignedDriver.photo_url}
+              driverId={assignedDriver.user_id}
+              alt={assignedDriver.full_name || "Entregador"}
+              className="w-16 h-16 rounded-full border-2 border-primary shrink-0"
+            />
             <div className="flex-1 min-w-0 space-y-0.5">
               <p className="font-semibold truncate">{assignedDriver.full_name || "Entregador"}</p>
               {assignedDriver.phone && (
