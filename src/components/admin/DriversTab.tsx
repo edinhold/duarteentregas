@@ -105,7 +105,9 @@ const DriversTab = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {drivers.map((d) => (
+              {drivers.map((d) => {
+                const approval = (d as any).approval_status || "approved";
+                return (
                 <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.full_name}</TableCell>
                   <TableCell>{d.phone}</TableCell>
@@ -115,12 +117,30 @@ const DriversTab = () => {
                     R$ {getDriverEarnings(d.id).toFixed(2)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={d.is_active ? "default" : "secondary"}>
-                      {d.is_active ? "Ativo" : "Inativo"}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant={d.is_active ? "default" : "secondary"} className="w-fit">
+                        {d.is_active ? "Ativo" : "Inativo"}
+                      </Badge>
+                      <Badge
+                        variant={approval === "approved" ? "default" : approval === "rejected" ? "destructive" : "secondary"}
+                        className="w-fit text-[10px]"
+                      >
+                        {approval === "approved" ? "Aprovado" : approval === "rejected" ? "Rejeitado" : "Pendente"}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      {approval !== "approved" && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" title="Aprovar" onClick={() => handleApproval(d.id, "approved", d.full_name)}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {approval !== "rejected" && approval === "pending" && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Rejeitar" onClick={() => handleApproval(d.id, "rejected", d.full_name)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewDriver(d)}>
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -130,11 +150,13 @@ const DriversTab = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {drivers.length === 0 && (
                 <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum motorista cadastrado</TableCell></TableRow>
               )}
             </TableBody>
+
           </Table>
         </CardContent>
       </Card>
