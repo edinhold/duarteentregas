@@ -426,6 +426,7 @@ export type Database = {
       }
       drivers: {
         Row: {
+          approval_status: string
           cpf: string | null
           created_at: string
           driver_code: string | null
@@ -448,6 +449,7 @@ export type Database = {
           zone_radius_km: number | null
         }
         Insert: {
+          approval_status?: string
           cpf?: string | null
           created_at?: string
           driver_code?: string | null
@@ -470,6 +472,7 @@ export type Database = {
           zone_radius_km?: number | null
         }
         Update: {
+          approval_status?: string
           cpf?: string | null
           created_at?: string
           driver_code?: string | null
