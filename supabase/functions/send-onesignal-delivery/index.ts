@@ -181,17 +181,25 @@ Deno.serve(async (req) => {
         .eq("driver_user_id", driver_id);
 
       if (!result.ok) {
+        const isInvalidAlias = invalid.length > 0;
+        const reason = isInvalidAlias
+          ? "driver_not_subscribed"
+          : (result.error ?? "onesignal_send_failed");
+        const message = isInvalidAlias
+          ? "Este motorista ainda não registrou o dispositivo no OneSignal. Peça para ele abrir o app, conceder permissão de notificação e tentar novamente."
+          : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+        // Return 200 so the client sees the real reason instead of "non-2xx".
         return new Response(
           JSON.stringify({
-            error: invalid.length > 0
-              ? "driver_not_subscribed"
-              : (result.error ?? "onesignal_send_failed"),
+            sent: 0,
+            reason,
+            message,
             invalid_aliases: invalid,
             details: result.json,
             status: result.status,
             attempts: result.attempts,
           }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
