@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { supabase } from "@/integrations/supabase/client";
 
 export const ONESIGNAL_APP_ID = "52d432a9-3b18-428f-ab87-eff19a2d5a6a";
 
@@ -9,57 +10,17 @@ declare global {
   }
 }
 
-let webInitStarted = false;
 let nativeInitPromise: Promise<any> | null = null;
 let webInitPromise: Promise<void> | null = null;
 
-async function initOneSignalNative(): Promise<any> {
-  if (nativeInitPromise) return nativeInitPromise;
-
-  nativeInitPromise = (async () => {
-    const mod = await import("onesignal-cordova-plugin");
-    const OneSignal: any = (mod as any).default ?? mod;
-
-    try {
-      OneSignal.Debug?.setLogLevel?.(5);
-    } catch {}
-
-    OneSignal.initialize(ONESIGNAL_APP_ID);
-
-    try {
-      OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
-        const notification = event?.getNotification?.();
-        try {
-          event?.preventDefault?.();
-        } catch {}
-        try {
-          notification?.display?.();
-        } catch {}
-        try {
-          if ("vibrate" in navigator) navigator.vibrate?.([400, 200, 400]);
-        } catch {}
-      });
-    } catch (err) {
-      console.warn("[PushNotifications] foreground listener failed", err);
-    }
-
-    try {
-      OneSignal.Notifications.addEventListener("click", (event: any) => {
-        console.log("[PushNotifications] native click", event);
-        const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
-        if (typeof window !== "undefined") window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
-      });
-    } catch {}
-
-    try {
-      OneSignal.User?.pushSubscription?.optIn?.();
-    } catch {}
-
-    console.log("[PushNotifications] OneSignal Native initialized");
-    return OneSignal;
-  })();
-
-  return nativeInitPromise;
+function log(...args: any[]) {
+  try { console.log("[OneSignal]", ...args); } catch {}
+}
+function warn(...args: any[]) {
+  try { console.warn("[OneSignal]", ...args); } catch {}
+}
+function err(...args: any[]) {
+  try { console.error("[OneSignal]", ...args); } catch {}
 }
 
 function isPreviewOrIframe(): boolean {
@@ -73,81 +34,113 @@ function isPreviewOrIframe(): boolean {
   return false;
 }
 
+// ---------------- NATIVE (Android/iOS via Capacitor + Cordova plugin) ----------------
+
+async function initOneSignalNative(): Promise<any> {
+  if (nativeInitPromise) return nativeInitPromise;
+
+  nativeInitPromise = (async () => {
+    const mod = await import("onesignal-cordova-plugin");
+    const OneSignal: any = (mod as any).default ?? mod;
+
+    try { OneSignal.Debug?.setLogLevel?.(5); } catch {}
+
+    OneSignal.initialize(ONESIGNAL_APP_ID);
+    log("SDK inicializado (native)", { appId: ONESIGNAL_APP_ID });
+
+    try {
+      OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
+        const notification = event?.getNotification?.();
+        try { event?.preventDefault?.(); } catch {}
+        try { notification?.display?.(); } catch {}
+        try { if ("vibrate" in navigator) navigator.vibrate?.([400, 200, 400]); } catch {}
+      });
+    } catch (e) { warn("foreground listener failed", e); }
+
+    try {
+      OneSignal.Notifications.addEventListener("click", (event: any) => {
+        log("native click", event);
+        const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
+        if (typeof window !== "undefined") window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
+      });
+    } catch {}
+
+    return OneSignal;
+  })();
+
+  return nativeInitPromise;
+}
+
+// ---------------- WEB ----------------
+
 async function initOneSignalWeb(): Promise<void> {
   if (webInitPromise) return webInitPromise;
   if (typeof window === "undefined") return;
   if (isPreviewOrIframe()) {
-    console.log("[PushNotifications] skipping OneSignal Web init in preview/iframe");
+    log("skipping Web init in preview/iframe host", window.location.hostname);
     return;
   }
-  webInitStarted = true;
 
   webInitPromise = new Promise<void>((resolve) => {
-
-  // Inject SDK script once
-  if (!document.querySelector('script[data-onesignal-sdk]')) {
-    const s = document.createElement("script");
-    s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-    s.defer = true;
-    s.dataset.onesignalSdk = "true";
-    document.head.appendChild(s);
-  }
-
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async (OneSignal: any) => {
-    try {
-      await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
-        serviceWorkerPath: "OneSignalSDKWorker.js",
-        serviceWorkerParam: { scope: "/" },
-        allowLocalhostAsSecureOrigin: true,
-        notifyButton: { enable: false },
-      });
-      OneSignal.Notifications.addEventListener("click", (event: any) => {
-        console.log("[PushNotifications] web click", event);
-        try {
-          const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
-          window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
-        } catch {}
-      });
-      console.log("[PushNotifications] OneSignal Web initialized");
-      resolve();
-    } catch (err) {
-      console.error("[PushNotifications] OneSignal Web init failed", err);
-      resolve();
+    if (!document.querySelector('script[data-onesignal-sdk]')) {
+      const s = document.createElement("script");
+      s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+      s.defer = true;
+      s.dataset.onesignalSdk = "true";
+      document.head.appendChild(s);
     }
-  });
-
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async (OneSignal: any) => {
+      try {
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          serviceWorkerPath: "OneSignalSDKWorker.js",
+          serviceWorkerParam: { scope: "/" },
+          allowLocalhostAsSecureOrigin: true,
+          notifyButton: { enable: false },
+        });
+        OneSignal.Notifications.addEventListener("click", (event: any) => {
+          log("web click", event);
+          try {
+            const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
+            window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
+          } catch {}
+        });
+        log("SDK inicializado (web)", { appId: ONESIGNAL_APP_ID });
+        resolve();
+      } catch (e) {
+        err("Web init failed", e);
+        resolve();
+      }
+    });
   });
 
   return webInitPromise;
 }
 
-/**
- * Initialize the OneSignal SDK on both native (Capacitor) and web.
- */
+// ---------------- Public API ----------------
+
 export async function initOneSignal(): Promise<void> {
   try {
     if (Capacitor.isNativePlatform()) {
-      const OneSignal = await initOneSignalNative();
-      OneSignal.Notifications.requestPermission(true).catch((e: unknown) => {
-        console.warn("[PushNotifications] requestPermission failed", e);
-      });
+      await initOneSignalNative();
       return;
     }
     await initOneSignalWeb();
-  } catch (err) {
-    console.error("[PushNotifications] initialization failed", err);
+  } catch (e) {
+    err("initialization failed", e);
   }
 }
 
-/** Request browser/system permission for push notifications (call from a user gesture). */
 export async function requestOneSignalPermission(): Promise<boolean> {
   try {
     if (Capacitor.isNativePlatform()) {
       const OneSignal = await initOneSignalNative();
       const granted = await OneSignal.Notifications.requestPermission(true);
-      if (granted) OneSignal.User?.pushSubscription?.optIn?.();
+      log("Permission (native):", granted);
+      if (granted) {
+        try { OneSignal.User?.pushSubscription?.optIn?.(); log("optIn called"); } catch (e) { warn("optIn failed", e); }
+      }
       return !!granted;
     }
     if (typeof window === "undefined" || isPreviewOrIframe()) return false;
@@ -156,20 +149,21 @@ export async function requestOneSignalPermission(): Promise<boolean> {
       window.OneSignalDeferred!.push(async (OneSignal: any) => {
         try {
           const granted = await OneSignal.Notifications.requestPermission(true);
+          log("Permission (web):", granted);
+          try { OneSignal.User?.PushSubscription?.optIn?.(); } catch {}
           resolve(!!granted);
         } catch (e) {
-          console.error("[PushNotifications] web requestPermission failed", e);
+          err("web requestPermission failed", e);
           resolve(false);
         }
       });
     });
-  } catch (err) {
-    console.error("[PushNotifications] requestPermission error", err);
+  } catch (e) {
+    err("requestPermission error", e);
     return false;
   }
 }
 
-/** Associate the current authenticated user with their OneSignal subscription. */
 export async function setOneSignalExternalUserId(userId: string): Promise<void> {
   if (!userId) return;
   try {
@@ -177,7 +171,7 @@ export async function setOneSignalExternalUserId(userId: string): Promise<void> 
       const OneSignal = await initOneSignalNative();
       try { OneSignal.User?.pushSubscription?.optIn?.(); } catch {}
       OneSignal.login(userId);
-      console.log("[PushNotifications] native login", userId);
+      log("External ID vinculado (native):", userId);
       return;
     }
     if (typeof window === "undefined" || isPreviewOrIframe()) return;
@@ -185,50 +179,136 @@ export async function setOneSignalExternalUserId(userId: string): Promise<void> 
     window.OneSignalDeferred!.push((OneSignal: any) => {
       try {
         OneSignal.login(userId);
-        console.log("[PushNotifications] web login", userId);
-      } catch (e) {
-        console.error("[PushNotifications] web login failed", e);
-      }
+        log("External ID vinculado (web):", userId);
+      } catch (e) { err("web login failed", e); }
     });
-  } catch (err) {
-    console.error("[PushNotifications] login failed", err);
+  } catch (e) {
+    err("login failed", e);
   }
 }
 
-/** Clear the external user id (e.g. on logout). */
 export async function clearOneSignalExternalUserId(): Promise<void> {
   try {
     if (Capacitor.isNativePlatform()) {
       const OneSignal = await initOneSignalNative();
       OneSignal.logout();
+      log("Logout (native)");
       return;
     }
     if (typeof window === "undefined" || isPreviewOrIframe()) return;
     if (!window.OneSignalDeferred) return;
     window.OneSignalDeferred.push((OneSignal: any) => {
-      try { OneSignal.logout(); } catch (e) { console.error("[PushNotifications] web logout failed", e); }
+      try { OneSignal.logout(); log("Logout (web)"); } catch (e) { err("web logout failed", e); }
     });
-  } catch (err) {
-    console.error("[PushNotifications] logout failed", err);
-  }
+  } catch (e) { err("logout failed", e); }
 }
 
-/** Attach tags (e.g. role=driver) to the current OneSignal user for segment targeting. */
 export async function setOneSignalTags(tags: Record<string, string>): Promise<void> {
   if (!tags || Object.keys(tags).length === 0) return;
   try {
     if (Capacitor.isNativePlatform()) {
       const OneSignal = await initOneSignalNative();
-      try { OneSignal.User?.addTags?.(tags); } catch (e) { console.warn("[PushNotifications] native addTags failed", e); }
+      try { OneSignal.User?.addTags?.(tags); log("Tags aplicadas (native)", tags); }
+      catch (e) { warn("native addTags failed", e); }
       return;
     }
     if (typeof window === "undefined" || isPreviewOrIframe()) return;
     await initOneSignalWeb();
     window.OneSignalDeferred!.push((OneSignal: any) => {
-      try { OneSignal.User?.addTags?.(tags); } catch (e) { console.warn("[PushNotifications] web addTags failed", e); }
+      try { OneSignal.User?.addTags?.(tags); log("Tags aplicadas (web)", tags); }
+      catch (e) { warn("web addTags failed", e); }
     });
-  } catch (err) {
-    console.error("[PushNotifications] setTags failed", err);
+  } catch (e) { err("setTags failed", e); }
+}
+
+async function readSubscription(): Promise<{
+  subscriptionId?: string | null;
+  onesignalUserId?: string | null;
+  optedIn?: boolean | null;
+  permission?: any;
+  platform: string;
+}> {
+  if (Capacitor.isNativePlatform()) {
+    const OneSignal = await initOneSignalNative();
+    return {
+      subscriptionId: await OneSignal.User?.pushSubscription?.getIdAsync?.().catch(() => null),
+      onesignalUserId: await OneSignal.User?.getOnesignalId?.().catch(() => null),
+      optedIn: await OneSignal.User?.pushSubscription?.getOptedInAsync?.().catch(() => null),
+      permission: await OneSignal.Notifications?.getPermissionAsync?.().catch(() => null),
+      platform: Capacitor.getPlatform() || "native",
+    };
+  }
+  if (typeof window === "undefined" || isPreviewOrIframe()) return { platform: "web" };
+  await initOneSignalWeb();
+  return await new Promise((resolve) => {
+    window.OneSignalDeferred!.push(async (OneSignal: any) => {
+      resolve({
+        subscriptionId: OneSignal.User?.PushSubscription?.id ?? null,
+        onesignalUserId: OneSignal.User?.onesignalId ?? null,
+        optedIn: OneSignal.User?.PushSubscription?.optedIn ?? null,
+        permission: typeof Notification !== "undefined" ? Notification.permission : null,
+        platform: "web",
+      });
+    });
+  });
+}
+
+async function syncDeviceToSupabase(userId: string, info: Awaited<ReturnType<typeof readSubscription>>) {
+  try {
+    if (!info?.subscriptionId) {
+      log("Sync ignorado: sem subscription_id ainda");
+      return;
+    }
+    const payload = {
+      user_id: userId,
+      external_id: userId,
+      subscription_id: info.subscriptionId,
+      onesignal_user_id: info.onesignalUserId ?? null,
+      platform: info.platform,
+      status: info.optedIn === false ? "opted_out" : "active",
+      last_synced_at: new Date().toISOString(),
+    };
+    const { error } = await (supabase as any)
+      .from("onesignal_devices")
+      .upsert(payload, { onConflict: "user_id,subscription_id" });
+    if (error) warn("Supabase sync error", error);
+    else log("Dispositivo sincronizado no Supabase", payload);
+  } catch (e) {
+    warn("syncDeviceToSupabase failed", e);
+  }
+}
+
+/**
+ * Full registration flow for an authenticated user.
+ * Runs the correct sequence: init → login(externalId) → requestPermission → optIn
+ * → addTags → read subscription → sync to Supabase, with verbose logs.
+ */
+export async function registerDeviceForUser(
+  userId: string,
+  tags: Record<string, string> = {},
+): Promise<void> {
+  if (!userId) { warn("registerDeviceForUser: userId ausente"); return; }
+  log("registerDeviceForUser start", { userId, tags });
+  try {
+    await initOneSignal();
+    await setOneSignalExternalUserId(userId);
+    const granted = await requestOneSignalPermission();
+    log("Permission granted?", granted);
+    if (Object.keys(tags).length > 0) await setOneSignalTags(tags);
+
+    // Poll subscription id up to ~10s (registration can take a moment on Android)
+    let info = await readSubscription();
+    let attempts = 0;
+    while (!info?.subscriptionId && attempts < 10) {
+      await new Promise((r) => setTimeout(r, 1000));
+      info = await readSubscription();
+      attempts++;
+    }
+    log("Push Subscription:", info);
+
+    await syncDeviceToSupabase(userId, info);
+  } catch (e) {
+    err("registerDeviceForUser failed", e);
   }
 }
 
@@ -265,8 +345,8 @@ export async function getOneSignalStatus(): Promise<{
         });
       });
     });
-  } catch (err) {
-    console.error("[PushNotifications] status failed", err);
+  } catch (e) {
+    err("status failed", e);
     return { supported: false };
   }
 }
