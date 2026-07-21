@@ -199,25 +199,21 @@ Deno.serve(async (req) => {
     // Reserve one broadcast slot per request so we never send twice for the
     // same delivery even if the trigger fires multiple times.
     const BROADCAST_UUID = "00000000-0000-0000-0000-000000000000";
-    const { data: reserved, error: resErr } = await supabase
+    const { error: resErr } = await supabase
       .from("push_notification_logs")
-      .upsert(
-        [{ request_id, driver_user_id: BROADCAST_UUID, status: "reserved", attempts: 0, response: null, error: null }],
-        { onConflict: "request_id,driver_user_id", ignoreDuplicates: true },
-      )
-      .select("driver_user_id");
+      .insert([{ request_id, driver_user_id: BROADCAST_UUID, status: "reserved", attempts: 0, response: null, error: null }]);
     if (resErr) {
+      if ((resErr as any).code === "23505") {
+        return new Response(
+          JSON.stringify({ sent: 0, reason: "already_broadcast" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
       console.error("[PushNotifications] broadcast reservation error", resErr);
       return new Response(JSON.stringify({ error: resErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-    if ((reserved ?? []).length === 0) {
-      return new Response(
-        JSON.stringify({ sent: 0, reason: "already_broadcast" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
     }
 
     const result = await sendWithRetry({ mode: "segment" }, payloadData);
