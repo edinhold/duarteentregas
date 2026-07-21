@@ -213,6 +213,25 @@ export async function clearOneSignalExternalUserId(): Promise<void> {
   }
 }
 
+/** Attach tags (e.g. role=driver) to the current OneSignal user for segment targeting. */
+export async function setOneSignalTags(tags: Record<string, string>): Promise<void> {
+  if (!tags || Object.keys(tags).length === 0) return;
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const OneSignal = await initOneSignalNative();
+      try { OneSignal.User?.addTags?.(tags); } catch (e) { console.warn("[PushNotifications] native addTags failed", e); }
+      return;
+    }
+    if (typeof window === "undefined" || isPreviewOrIframe()) return;
+    await initOneSignalWeb();
+    window.OneSignalDeferred!.push((OneSignal: any) => {
+      try { OneSignal.User?.addTags?.(tags); } catch (e) { console.warn("[PushNotifications] web addTags failed", e); }
+    });
+  } catch (err) {
+    console.error("[PushNotifications] setTags failed", err);
+  }
+}
+
 export async function getOneSignalStatus(): Promise<{
   supported: boolean;
   permission?: boolean | NotificationPermission;
