@@ -201,10 +201,13 @@ const TestPush = () => {
         throw new Error(error);
       }
       setLastResult({ ...data, runtime: buildRuntimeInfo() });
-      if ((data as any)?.sent > 0) {
-        toast.success(`Push enviado para ${(data as any).sent} motorista(s)`);
+      const d = data as any;
+      if (d?.sent > 0) {
+        toast.success(`Push enviado para ${d.sent} motorista(s)`);
+      } else if (d?.message) {
+        toast.warning(d.message);
       } else {
-        toast.warning(`Nenhum push enviado (${(data as any)?.reason ?? "ver detalhes"})`);
+        toast.warning(`Nenhum push enviado (${d?.reason ?? "ver detalhes abaixo"})`);
       }
     } catch (e: any) {
       toast.error("Falha ao enviar: " + (e?.message ?? String(e)));

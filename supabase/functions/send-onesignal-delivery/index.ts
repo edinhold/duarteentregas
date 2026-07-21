@@ -84,21 +84,30 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastStatus = 0;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+      console.log("[OneSignal] attempt", attempt, "target", target.mode);
       const res = await sendOneSignal(target, payloadData);
       lastStatus = res.status;
       lastJson = await res.json().catch(() => ({}));
+      console.log("[OneSignal] response", { attempt, status: res.status, body: lastJson });
       const recipients = Number(lastJson?.recipients ?? 0);
       const hasId = !!lastJson?.id;
-      // OneSignal returns HTTP 200 even when no device actually got the push
-      // (e.g. all external_ids are unregistered). Treat that as failure so we
-      // can surface it in the logs / admin UI.
       if (res.ok && hasId && recipients > 0) {
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
-      console.warn("[PushNotifications] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
+      // Non-transient failures: do NOT retry.
+      const invalid = extractInvalidAliases(lastJson);
+      const authError = res.status === 401 || res.status === 403;
+      if (invalid.length > 0 || authError) {
+        console.warn("[OneSignal] non_transient_failure", { invalid, status: res.status });
+        return {
+          ok: false, attempts: attempt, json: lastJson, status: res.status,
+          recipients, error: authError ? "onesignal_auth_error" : "invalid_aliases",
+        };
+      }
+      console.warn("[OneSignal] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
-      console.warn("[PushNotifications] attempt", attempt, "threw", e);
+      console.error("[OneSignal] attempt", attempt, "threw", e);
     }
     await new Promise((r) => setTimeout(r, 300 * Math.pow(3, attempt - 1)));
   }
@@ -125,6 +134,16 @@ Deno.serve(async (req) => {
       delivery_address,
     } = body ?? {};
 
+    console.log("[OneSignal] request received", { request_id, driver_id, has_pickup: !!pickup_address });
+
+    if (!ONESIGNAL_REST_API_KEY) {
+      console.error("[OneSignal] missing ONESIGNAL_REST_API_KEY secret");
+      return new Response(
+        JSON.stringify({ error: "config_error", message: "ONESIGNAL_REST_API_KEY não configurada no backend." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (!request_id) {
       return new Response(JSON.stringify({ error: "missing request_id" }), {
         status: 400,
@@ -133,6 +152,7 @@ Deno.serve(async (req) => {
     }
 
     const payloadData = { request_id, driver_fee, pickup_address, delivery_address };
+
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
@@ -172,17 +192,25 @@ Deno.serve(async (req) => {
         .eq("driver_user_id", driver_id);
 
       if (!result.ok) {
+        const isInvalidAlias = invalid.length > 0;
+        const reason = isInvalidAlias
+          ? "driver_not_subscribed"
+          : (result.error ?? "onesignal_send_failed");
+        const message = isInvalidAlias
+          ? "Este motorista ainda não registrou o dispositivo no OneSignal. Peça para ele abrir o app, conceder permissão de notificação e tentar novamente."
+          : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+        // Return 200 so the client sees the real reason instead of "non-2xx".
         return new Response(
           JSON.stringify({
-            error: invalid.length > 0
-              ? "driver_not_subscribed"
-              : (result.error ?? "onesignal_send_failed"),
+            sent: 0,
+            reason,
+            message,
             invalid_aliases: invalid,
             details: result.json,
             status: result.status,
             attempts: result.attempts,
           }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -229,16 +257,23 @@ Deno.serve(async (req) => {
       .eq("driver_user_id", BROADCAST_UUID);
 
     if (!result.ok) {
-      console.error("[PushNotifications] broadcast failed", result.status, result.json);
+      console.error("[OneSignal] broadcast failed", result.status, result.json);
+      const noRecipients = result.recipients === 0;
+      const reason = noRecipients ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed");
+      const message = noRecipients
+        ? "Nenhum motorista com dispositivo registrado no OneSignal. Peça para os motoristas abrirem o app e concederem permissão de notificação."
+        : `OneSignal respondeu com falha (HTTP ${result.status}).`;
       return new Response(
         JSON.stringify({
-          error: result.recipients === 0 ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed"),
+          sent: 0,
+          reason,
+          message,
           details: result.json,
           status: result.status,
           recipients: result.recipients,
           attempts: result.attempts,
         }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
