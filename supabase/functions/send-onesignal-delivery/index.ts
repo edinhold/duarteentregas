@@ -246,16 +246,23 @@ Deno.serve(async (req) => {
       .eq("driver_user_id", BROADCAST_UUID);
 
     if (!result.ok) {
-      console.error("[PushNotifications] broadcast failed", result.status, result.json);
+      console.error("[OneSignal] broadcast failed", result.status, result.json);
+      const noRecipients = result.recipients === 0;
+      const reason = noRecipients ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed");
+      const message = noRecipients
+        ? "Nenhum motorista com dispositivo registrado no OneSignal. Peça para os motoristas abrirem o app e concederem permissão de notificação."
+        : `OneSignal respondeu com falha (HTTP ${result.status}).`;
       return new Response(
         JSON.stringify({
-          error: result.recipients === 0 ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed"),
+          sent: 0,
+          reason,
+          message,
           details: result.json,
           status: result.status,
           recipients: result.recipients,
           attempts: result.attempts,
         }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
