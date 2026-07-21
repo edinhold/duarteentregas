@@ -134,6 +134,16 @@ Deno.serve(async (req) => {
       delivery_address,
     } = body ?? {};
 
+    console.log("[OneSignal] request received", { request_id, driver_id, has_pickup: !!pickup_address });
+
+    if (!ONESIGNAL_REST_API_KEY) {
+      console.error("[OneSignal] missing ONESIGNAL_REST_API_KEY secret");
+      return new Response(
+        JSON.stringify({ error: "config_error", message: "ONESIGNAL_REST_API_KEY não configurada no backend." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (!request_id) {
       return new Response(JSON.stringify({ error: "missing request_id" }), {
         status: 400,
@@ -142,6 +152,7 @@ Deno.serve(async (req) => {
     }
 
     const payloadData = { request_id, driver_fee, pickup_address, delivery_address };
+
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
