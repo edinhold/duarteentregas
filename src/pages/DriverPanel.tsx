@@ -236,6 +236,7 @@ const DriverPanel = () => {
     if (!user?.id) return;
 
     setOneSignalExternalUserId(user.id).catch(() => {});
+    setOneSignalTags({ role: "driver" }).catch(() => {});
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }
