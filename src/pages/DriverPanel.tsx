@@ -33,7 +33,7 @@ import {
   DriverNotificationSettingsState,
   loadDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
-import { requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
+import { requestOneSignalPermission, setOneSignalExternalUserId, setOneSignalTags } from "@/lib/onesignal";
 
 const DriverPanel = () => {
   const { user, loading } = useAuth();
