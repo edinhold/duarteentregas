@@ -33,7 +33,7 @@ import {
   DriverNotificationSettingsState,
   loadDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
-import { requestOneSignalPermission, setOneSignalExternalUserId } from "@/lib/onesignal";
+import { requestOneSignalPermission, setOneSignalExternalUserId, setOneSignalTags } from "@/lib/onesignal";
 
 const DriverPanel = () => {
   const { user, loading } = useAuth();
@@ -236,6 +236,7 @@ const DriverPanel = () => {
     if (!user?.id) return;
 
     setOneSignalExternalUserId(user.id).catch(() => {});
+    setOneSignalTags({ role: "driver" }).catch(() => {});
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }

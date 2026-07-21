@@ -15,14 +15,15 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-async function sendOneSignal(externalIds: string[], payloadData: any) {
+type SendMode = { mode: "aliases"; externalIds: string[] } | { mode: "segment" };
+
+async function sendOneSignal(target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
   const payload: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
-    include_aliases: { external_id: externalIds },
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
     contents: {
       en: `Você possui uma nova entrega aguardando aceite. ${subtitle}`,
@@ -39,27 +40,27 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
       url: "/entregador",
     },
     url: "/entregador",
-    // Delivery
     priority: 10,
     ttl: 120,
-    // ---- Android Notification Channel (Android 8+) ----
-    // High importance + lockscreen visibility + custom sound/vibration.
     android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
-    android_visibility: 1,             // 1 = PUBLIC (show on lock screen)
-    android_accent_color: "FF2563EB",  // ARGB without "#"
+    android_visibility: 1,
+    android_accent_color: "FF2563EB",
     android_led_color: "FF2563EB",
     android_sound: "default",
-    // Vibration pattern (ms): wait 0, vibrate 400, pause 200, vibrate 400
     android_vibration_pattern: [0, 400, 200, 400],
-    // ---- iOS Category / sound / lockscreen ----
     ios_category: ONESIGNAL_IOS_CATEGORY,
     ios_sound: "default",
-    // OneSignal accepts Apple's value with underscore, not hyphen.
-    // Invalid values make the entire API call fail with HTTP 400.
-    ios_interruption_level: "time_sensitive", // shows on lock screen even in Focus
+    ios_interruption_level: "time_sensitive",
     mutable_content: true,
     content_available: true,
   };
+
+  if (target.mode === "aliases") {
+    payload.include_aliases = { external_id: target.externalIds };
+  } else {
+    payload.included_segments = ["Subscribed Users"];
+    payload.filters = [{ field: "tag", key: "role", relation: "=", value: "driver" }];
+  }
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
     method: "POST",
@@ -71,22 +72,34 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
   });
 }
 
-async function sendWithRetry(externalIds: string[], payloadData: any) {
+function extractInvalidAliases(json: any): string[] {
+  const inv = json?.errors?.invalid_aliases?.external_id;
+  if (!Array.isArray(inv)) return [];
+  return Array.from(new Set(inv.map((x: any) => String(x))));
+}
+
+async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastErr: any = null;
   let lastJson: any = null;
   let lastStatus = 0;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await sendOneSignal(externalIds, payloadData);
+      const res = await sendOneSignal(target, payloadData);
       lastStatus = res.status;
       lastJson = await res.json().catch(() => ({}));
-      if (res.ok) return { ok: true, attempts: attempt, json: lastJson, status: res.status };
-      console.warn("[PushNotifications] attempt", attempt, "failed", res.status, lastJson);
+      const recipients = Number(lastJson?.recipients ?? 0);
+      const hasId = !!lastJson?.id;
+      // OneSignal returns HTTP 200 even when no device actually got the push
+      // (e.g. all external_ids are unregistered). Treat that as failure so we
+      // can surface it in the logs / admin UI.
+      if (res.ok && hasId && recipients > 0) {
+        return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
+      }
+      console.warn("[PushNotifications] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
       console.warn("[PushNotifications] attempt", attempt, "threw", e);
     }
-    // backoff: 300ms, 900ms
     await new Promise((r) => setTimeout(r, 300 * Math.pow(3, attempt - 1)));
   }
   return {
@@ -94,6 +107,7 @@ async function sendWithRetry(externalIds: string[], payloadData: any) {
     attempts: 3,
     json: lastJson,
     status: lastStatus,
+    recipients: Number(lastJson?.recipients ?? 0),
     error: lastErr ? String(lastErr) : undefined,
   };
 }
@@ -118,109 +132,121 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Identify target drivers
-    let externalIds: string[] = [];
+    const payloadData = { request_id, driver_fee, pickup_address, delivery_address };
+
+    // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
-      externalIds = [driver_id];
-    } else {
-      // Notify ALL approved active drivers (regardless of is_online / last_seen).
-      // OneSignal will only deliver to drivers who have a valid push subscription
-      // linked to their external_id.
-      const { data: drivers, error } = await supabase
-        .from("drivers")
-        .select("user_id, is_active, approval_status")
-        .eq("is_active", true)
-        .eq("approval_status", "approved");
-      if (error) console.error("[PushNotifications] drivers query error", error);
+      // Idempotent reservation for the specific driver via unique-violation catch
+      const { error: resErr } = await supabase
+        .from("push_notification_logs")
+        .insert([{ request_id, driver_user_id: driver_id, status: "reserved", attempts: 0, response: null, error: null }]);
+      if (resErr) {
+        if ((resErr as any).code === "23505") {
+          return new Response(
+            JSON.stringify({ sent: 0, reason: "already_notified" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        console.error("[PushNotifications] reservation error", resErr);
+        return new Response(JSON.stringify({ error: resErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      externalIds = (drivers ?? [])
-        .map((d: any) => d.user_id)
-        .filter(Boolean);
-    }
+      const result = await sendWithRetry({ mode: "aliases", externalIds: [driver_id] }, payloadData);
+      const invalid = extractInvalidAliases(result.json);
+      await supabase
+        .from("push_notification_logs")
+        .update({
+          status: result.ok ? "sent" : "failed",
+          attempts: result.attempts,
+          response: result.json ?? null,
+          error: result.ok
+            ? null
+            : (invalid.length > 0
+                ? `invalid_alias:${invalid.join(",")}`
+                : (result.error ?? `http_${result.status}`)),
+        })
+        .eq("request_id", request_id)
+        .eq("driver_user_id", driver_id);
 
+      if (!result.ok) {
+        return new Response(
+          JSON.stringify({
+            error: invalid.length > 0
+              ? "driver_not_subscribed"
+              : (result.error ?? "onesignal_send_failed"),
+            invalid_aliases: invalid,
+            details: result.json,
+            status: result.status,
+            attempts: result.attempts,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
 
-    console.log("[PushNotifications] targets", externalIds.length, { request_id });
-
-    if (externalIds.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, reason: "no_online_drivers" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.log("[PushNotifications] sent (targeted)", {
+        request_id, driver_id, recipients: result.recipients, attempts: result.attempts,
       });
+      return new Response(
+        JSON.stringify({ sent: 1, recipients: result.recipients, attempts: result.attempts, onesignal: result.json }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    // ---- Idempotent reservation per (request_id, driver_user_id) ----
-    // INSERT ... ON CONFLICT DO NOTHING RETURNING — only the rows actually
-    // inserted come back, so concurrent invocations for the same request
-    // can never double-send to the same driver.
-    const reservation = externalIds.map((uid) => ({
-      request_id,
-      driver_user_id: uid,
-      status: "reserved",
-      attempts: 0,
-      response: null,
-      error: null,
-    }));
-    const { data: reserved, error: resErr } = await supabase
+    // ---------- Broadcast: all drivers via segment + tag filter ----------
+    // Reserve one broadcast slot per request so we never send twice for the
+    // same delivery even if the trigger fires multiple times.
+    const BROADCAST_UUID = "00000000-0000-0000-0000-000000000000";
+    const { error: resErr } = await supabase
       .from("push_notification_logs")
-      .upsert(reservation, {
-        onConflict: "request_id,driver_user_id",
-        ignoreDuplicates: true,
-      })
-      .select("driver_user_id");
+      .insert([{ request_id, driver_user_id: BROADCAST_UUID, status: "reserved", attempts: 0, response: null, error: null }]);
     if (resErr) {
-      console.error("[PushNotifications] reservation error", resErr);
+      if ((resErr as any).code === "23505") {
+        return new Response(
+          JSON.stringify({ sent: 0, reason: "already_broadcast" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      console.error("[PushNotifications] broadcast reservation error", resErr);
       return new Response(JSON.stringify({ error: resErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const targets = (reserved ?? []).map((r: any) => r.driver_user_id);
-    if (targets.length === 0) {
-      return new Response(
-        JSON.stringify({ sent: 0, reason: "already_notified", candidates: externalIds.length }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const result = await sendWithRetry(targets, {
-      request_id,
-      driver_fee,
-      pickup_address,
-      delivery_address,
-    });
-
-    // Update the reserved rows with the final send result
-    const { error: logErr } = await supabase
+    const result = await sendWithRetry({ mode: "segment" }, payloadData);
+    await supabase
       .from("push_notification_logs")
       .update({
         status: result.ok ? "sent" : "failed",
         attempts: result.attempts,
         response: result.json ?? null,
-        error: result.ok ? null : (result.error ?? `http_${result.status}`),
+        error: result.ok ? null : (result.error ?? `http_${result.status}_recipients_${result.recipients}`),
       })
       .eq("request_id", request_id)
-      .in("driver_user_id", targets);
-    if (logErr) console.error("[PushNotifications] log update error", logErr);
+      .eq("driver_user_id", BROADCAST_UUID);
 
     if (!result.ok) {
-      console.error("[PushNotifications] all attempts failed", result.status, result.json);
-      const errors = Array.isArray(result.json?.errors)
-        ? result.json.errors.join("; ")
-        : (typeof result.json?.errors === "string" ? result.json.errors : undefined);
+      console.error("[PushNotifications] broadcast failed", result.status, result.json);
       return new Response(
         JSON.stringify({
-          error: errors ?? result.error ?? "onesignal_send_failed",
+          error: result.recipients === 0 ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed"),
           details: result.json,
           status: result.status,
+          recipients: result.recipients,
           attempts: result.attempts,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.log("[PushNotifications] sent", { request_id, count: targets.length, attempts: result.attempts });
+    console.log("[PushNotifications] broadcast sent", {
+      request_id, recipients: result.recipients, attempts: result.attempts,
+    });
     return new Response(
-      JSON.stringify({ sent: targets.length, attempts: result.attempts, onesignal: result.json }),
+      JSON.stringify({ sent: result.recipients, attempts: result.attempts, onesignal: result.json }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
