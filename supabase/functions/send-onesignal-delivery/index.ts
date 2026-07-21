@@ -15,14 +15,15 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-async function sendOneSignal(externalIds: string[], payloadData: any) {
+type SendMode = { mode: "aliases"; externalIds: string[] } | { mode: "segment" };
+
+async function sendOneSignal(target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
   const payload: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
-    include_aliases: { external_id: externalIds },
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
     contents: {
       en: `Você possui uma nova entrega aguardando aceite. ${subtitle}`,
@@ -39,27 +40,27 @@ async function sendOneSignal(externalIds: string[], payloadData: any) {
       url: "/entregador",
     },
     url: "/entregador",
-    // Delivery
     priority: 10,
     ttl: 120,
-    // ---- Android Notification Channel (Android 8+) ----
-    // High importance + lockscreen visibility + custom sound/vibration.
     android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
-    android_visibility: 1,             // 1 = PUBLIC (show on lock screen)
-    android_accent_color: "FF2563EB",  // ARGB without "#"
+    android_visibility: 1,
+    android_accent_color: "FF2563EB",
     android_led_color: "FF2563EB",
     android_sound: "default",
-    // Vibration pattern (ms): wait 0, vibrate 400, pause 200, vibrate 400
     android_vibration_pattern: [0, 400, 200, 400],
-    // ---- iOS Category / sound / lockscreen ----
     ios_category: ONESIGNAL_IOS_CATEGORY,
     ios_sound: "default",
-    // OneSignal accepts Apple's value with underscore, not hyphen.
-    // Invalid values make the entire API call fail with HTTP 400.
-    ios_interruption_level: "time_sensitive", // shows on lock screen even in Focus
+    ios_interruption_level: "time_sensitive",
     mutable_content: true,
     content_available: true,
   };
+
+  if (target.mode === "aliases") {
+    payload.include_aliases = { external_id: target.externalIds };
+  } else {
+    payload.included_segments = ["Subscribed Users"];
+    payload.filters = [{ field: "tag", key: "role", relation: "=", value: "driver" }];
+  }
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
     method: "POST",
