@@ -136,26 +136,22 @@ Deno.serve(async (req) => {
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
-      // Idempotent reservation for the specific driver
-      const { data: reserved, error: resErr } = await supabase
+      // Idempotent reservation for the specific driver via unique-violation catch
+      const { error: resErr } = await supabase
         .from("push_notification_logs")
-        .upsert(
-          [{ request_id, driver_user_id: driver_id, status: "reserved", attempts: 0, response: null, error: null }],
-          { onConflict: "request_id,driver_user_id", ignoreDuplicates: true },
-        )
-        .select("driver_user_id");
+        .insert([{ request_id, driver_user_id: driver_id, status: "reserved", attempts: 0, response: null, error: null }]);
       if (resErr) {
+        if ((resErr as any).code === "23505") {
+          return new Response(
+            JSON.stringify({ sent: 0, reason: "already_notified" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
         console.error("[PushNotifications] reservation error", resErr);
         return new Response(JSON.stringify({ error: resErr.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-      }
-      if ((reserved ?? []).length === 0) {
-        return new Response(
-          JSON.stringify({ sent: 0, reason: "already_notified" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
       }
 
       const result = await sendWithRetry({ mode: "aliases", externalIds: [driver_id] }, payloadData);
