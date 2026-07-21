@@ -18,24 +18,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const handleUser = async (uid: string | undefined) => {
+      if (!uid) {
+        clearOneSignalExternalUserId().catch(() => {});
+        return;
+      }
+      setOneSignalExternalUserId(uid).catch(() => {});
+      // Fetch role and fully register the device on OneSignal + sync to Supabase
+      try {
+        const { data: roles } = await (supabase as any)
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", uid);
+        const role = Array.isArray(roles) && roles.length > 0 ? String(roles[0].role) : "customer";
+        registerDeviceForUser(uid, { role }).catch(() => {});
+      } catch {
+        registerDeviceForUser(uid, {}).catch(() => {});
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      const uid = session?.user?.id;
-      if (uid) {
-        setOneSignalExternalUserId(uid).catch(() => {});
-      } else {
-        clearOneSignalExternalUserId().catch(() => {});
-      }
+      handleUser(session?.user?.id);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      const uid = session?.user?.id;
-      if (uid) setOneSignalExternalUserId(uid).catch(() => {});
+      handleUser(session?.user?.id);
     });
 
     return () => subscription.unsubscribe();
