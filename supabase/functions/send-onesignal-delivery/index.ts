@@ -84,21 +84,30 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastStatus = 0;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+      console.log("[OneSignal] attempt", attempt, "target", target.mode);
       const res = await sendOneSignal(target, payloadData);
       lastStatus = res.status;
       lastJson = await res.json().catch(() => ({}));
+      console.log("[OneSignal] response", { attempt, status: res.status, body: lastJson });
       const recipients = Number(lastJson?.recipients ?? 0);
       const hasId = !!lastJson?.id;
-      // OneSignal returns HTTP 200 even when no device actually got the push
-      // (e.g. all external_ids are unregistered). Treat that as failure so we
-      // can surface it in the logs / admin UI.
       if (res.ok && hasId && recipients > 0) {
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
-      console.warn("[PushNotifications] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
+      // Non-transient failures: do NOT retry.
+      const invalid = extractInvalidAliases(lastJson);
+      const authError = res.status === 401 || res.status === 403;
+      if (invalid.length > 0 || authError) {
+        console.warn("[OneSignal] non_transient_failure", { invalid, status: res.status });
+        return {
+          ok: false, attempts: attempt, json: lastJson, status: res.status,
+          recipients, error: authError ? "onesignal_auth_error" : "invalid_aliases",
+        };
+      }
+      console.warn("[OneSignal] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
-      console.warn("[PushNotifications] attempt", attempt, "threw", e);
+      console.error("[OneSignal] attempt", attempt, "threw", e);
     }
     await new Promise((r) => setTimeout(r, 300 * Math.pow(3, attempt - 1)));
   }
