@@ -196,6 +196,36 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_deletion_logs: {
+        Row: {
+          admin_id: string
+          created_at: string
+          deleted_name: string | null
+          deleted_phone: string | null
+          deleted_user_id: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          deleted_name?: string | null
+          deleted_phone?: string | null
+          deleted_user_id: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          deleted_name?: string | null
+          deleted_phone?: string | null
+          deleted_user_id?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       delivery_config: {
         Row: {
           app_fee_per_delivery: number
