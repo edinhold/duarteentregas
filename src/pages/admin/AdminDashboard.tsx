@@ -27,6 +27,7 @@ import CustomersTab from "@/components/admin/CustomersTab";
 import PrivacyPolicyTab from "@/components/admin/PrivacyPolicyTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
+import RealtimeMonitorTab from "@/components/admin/RealtimeMonitorTab";
 import AppSidebar from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
