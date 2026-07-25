@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Trash2, UserCog, Users, Search, History } from "lucide-react";
+import { Trash2, UserCog, Users, Search, History, Ban, ShieldCheck } from "lucide-react";
 
 type RoleFilter = "all" | "customer" | "driver" | "store_owner" | "admin";
 
