@@ -268,6 +268,49 @@ const FinancialTab = () => {
     }
   };
 
+  const { data: cleanupLogs = [], refetch: refetchCleanupLogs } = useQuery({
+    queryKey: ["financial-cleanup-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("financial_cleanup_logs" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+  });
+
+  const handlePeriodCleanup = async () => {
+    setCleaning(true);
+    try {
+      const from = cleanFrom ? new Date(cleanFrom).toISOString() : null;
+      const to = cleanTo ? new Date(cleanTo + "T23:59:59").toISOString() : null;
+      const { data, error } = await supabase.rpc("admin_cleanup_financials" as any, {
+        p_from: from,
+        p_to: to,
+        p_include_withdrawals: incWithdrawals,
+        p_include_earnings: incEarnings,
+        p_include_delivered_requests: incDelivered,
+        p_include_delivered_orders: incOrders,
+        p_reason: cleanReason || null,
+      });
+      if (error) throw error;
+      const r: any = data;
+      toast.success(`Limpeza concluída: ${r?.total || 0} registro(s) removido(s)`);
+      setCleanReason("");
+      refetchCleanupLogs();
+      queryClient.invalidateQueries({ queryKey: ["admin-earnings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-delivered-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro na limpeza");
+    } finally {
+      setCleaning(false);
+      setShowCleanupConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
