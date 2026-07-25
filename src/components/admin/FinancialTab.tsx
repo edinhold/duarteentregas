@@ -680,6 +680,13 @@ const FinancialTab = () => {
         title={`${totalSelected} registro(s) selecionado(s)`}
         loading={deleting}
       />
+      <DeleteConfirm
+        open={showCleanupConfirm}
+        onOpenChange={setShowCleanupConfirm}
+        onConfirm={handlePeriodCleanup}
+        title="registros financeiros do período selecionado"
+        loading={cleaning}
+      />
     </div>
   );
 };
