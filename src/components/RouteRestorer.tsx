@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const STORAGE_KEY = "lastRoute";
 
 // Routes that should NOT be saved/restored (auth flows, etc.)
-const EXCLUDED_ROUTES = ["/auth", "/admin/login", "/cadastro/cliente", "/cadastro/entregador", "/cadastro/lojista"];
+const EXCLUDED_ROUTES = ["/auth", "/admin/login", "/cadastro/entregador", "/cadastro/lojista"];
 const PROTECTED_PANEL_ROUTES = ["/admin", "/lojista", "/entregador"];
 
 const isExcludedRoute = (path: string) =>
