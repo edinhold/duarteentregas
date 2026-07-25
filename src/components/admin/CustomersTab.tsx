@@ -297,7 +297,15 @@ const CustomersTab = () => {
                       {new Date(c.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-1 items-center flex-wrap">
+                        {c.suspended_until && new Date(c.suspended_until).getTime() > Date.now() && (
+                          <span
+                            className="text-[10px] bg-destructive/15 text-destructive px-1.5 py-0.5 rounded"
+                            title={c.suspension_reason || ""}
+                          >
+                            Suspenso até {new Date(c.suspended_until).toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
                         {!c.isDriver && (
                           <Button
                             size="sm"
@@ -308,6 +316,28 @@ const CustomersTab = () => {
                             <UserCog className="w-3.5 h-3.5 mr-1" />
                             Motorista
                           </Button>
+                        )}
+                        {c.suspended_until && new Date(c.suspended_until).getTime() > Date.now() ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => handleUnsuspend(c)}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Reativar
+                          </Button>
+                        ) : (
+                          !c.roles.includes("admin") && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-amber-600"
+                              title="Suspender"
+                              onClick={() => setSuspendTarget(c)}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </Button>
+                          )
                         )}
                         <Button
                           size="icon"
@@ -327,6 +357,7 @@ const CustomersTab = () => {
                       Nenhum cliente encontrado
                     </TableCell>
                   </TableRow>
+
                 )}
               </TableBody>
             </Table>
