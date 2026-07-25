@@ -208,7 +208,7 @@ const Index = () => {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">
-              {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Restaurantes"}
+              {selectedCategory ? categories.find((c) => c.id === selectedCategory)?.name : "Lojistas"}
             </h2>
             <Button size="sm" variant="outline" className="rounded-xl gap-1.5" onClick={() => setShowMap(!showMap)}>
               {showMap ? <List className="w-4 h-4" /> : <Map className="w-4 h-4" />}
@@ -223,7 +223,7 @@ const Index = () => {
               </MapErrorBoundary>
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhum restaurante encontrado</p>
+            <p className="text-muted-foreground text-center py-8">Nenhum lojista encontrado</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filtered.map((r, i) => (

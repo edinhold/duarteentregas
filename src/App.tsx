@@ -15,7 +15,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import TestPush from "./pages/admin/TestPush";
 import StoreOwnerPanel from "./pages/StoreOwnerPanel";
 import DriverPanel from "./pages/DriverPanel";
-import RegisterCustomer from "./pages/register/RegisterCustomer";
+
 import RegisterDriver from "./pages/register/RegisterDriver";
 import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import Install from "./pages/Install";
@@ -45,7 +45,7 @@ const App = () => (
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/cadastro/cliente" element={<RegisterCustomer />} />
+              
               <Route path="/cadastro/entregador" element={<RegisterDriver />} />
               <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
               <Route path="/admin/login" element={<AdminLogin />} />

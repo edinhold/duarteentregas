@@ -54,7 +54,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
         ];
       case "admin":
         return [
-          { id: "restaurants", label: "Restaurantes", icon: Store },
+          { id: "restaurants", label: "Lojistas", icon: Store },
           { id: "products", label: "Produtos", icon: Package },
           { id: "orders", label: "Pedidos", icon: ShoppingCart },
           { id: "map", label: "Mapa Geral", icon: MapIcon },
