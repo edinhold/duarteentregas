@@ -23,6 +23,17 @@ const FinancialTab = () => {
   const [selectedEarnings, setSelectedEarnings] = useState<Set<string>>(new Set());
   const [selectedWithdrawals, setSelectedWithdrawals] = useState<Set<string>>(new Set());
 
+  // Period cleanup state
+  const [cleanFrom, setCleanFrom] = useState<string>("");
+  const [cleanTo, setCleanTo] = useState<string>("");
+  const [cleanReason, setCleanReason] = useState<string>("");
+  const [incEarnings, setIncEarnings] = useState(true);
+  const [incWithdrawals, setIncWithdrawals] = useState(true);
+  const [incDelivered, setIncDelivered] = useState(true);
+  const [incOrders, setIncOrders] = useState(true);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
     queryFn: async () => {
