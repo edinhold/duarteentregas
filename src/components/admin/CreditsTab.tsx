@@ -37,9 +37,42 @@ const CreditsTab = () => {
   const { data: storeOwners = [] } = useQuery({
     queryKey: ["admin-store-owners"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_list_store_owners");
-      if (error) throw error;
-      return (data as any[]) || [];
+      // Try the RPC first (includes emails via auth.users)
+      const rpc = await supabase.rpc("admin_list_store_owners");
+      if (!rpc.error && Array.isArray(rpc.data) && rpc.data.length > 0) {
+        return rpc.data as any[];
+      }
+      if (rpc.error) {
+        console.warn("[CreditsTab] admin_list_store_owners falhou, usando fallback:", rpc.error.message);
+      }
+      // Fallback: query user_roles + profiles directly (admin RLS allows it)
+      const { data: roles, error: rolesErr } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "store_owner");
+      if (rolesErr) {
+        toast.error("Erro ao carregar lojistas: " + rolesErr.message);
+        throw rolesErr;
+      }
+      const ids = (roles || []).map((r: any) => r.user_id);
+      if (ids.length === 0) return [];
+      const { data: profiles, error: profErr } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, phone")
+        .in("user_id", ids);
+      if (profErr) {
+        toast.error("Erro ao carregar perfis: " + profErr.message);
+        throw profErr;
+      }
+      const map = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      return ids.map((id) => {
+        const p: any = map.get(id) || {};
+        return {
+          user_id: id,
+          full_name: p.full_name || "",
+          email: p.phone || id.slice(0, 8),
+        };
+      });
     },
   });
 
