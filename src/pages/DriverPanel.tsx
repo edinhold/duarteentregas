@@ -417,40 +417,20 @@ const DriverPanel = () => {
 
   const acceptRequest = async (requestId: string) => {
     try {
-      // First check if it's still pending and not already taken or finished
-      const { data: currentReq, error: checkError } = await supabase
-        .from("delivery_requests")
-        .select("status")
-        .eq("id", requestId)
-        .single();
-      
-      if (checkError || !currentReq) throw new Error("Pedido não encontrado");
-      if (currentReq.status !== "pending") {
-        toast.error("Este pedido já foi aceito ou finalizado por outro entregador");
-        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
-        return;
-      }
-
-      // Get the existing driver_fee
-      const { data: requestData, error: fetchError } = await supabase
-        .from("delivery_requests")
-        .select("driver_fee")
-        .eq("id", requestId)
-        .single();
-      if (fetchError) throw fetchError;
-
-      const driverFee = Number(requestData?.driver_fee || deliveryConfig?.base_fee || 5);
-
-      const { error } = await supabase.from("delivery_requests").update({
-        driver_id: user!.id,
-        status: "accepted",
-      } as any).eq("id", requestId).eq("status", "pending");
+      console.log("[Delivery] Motorista tentando aceitar", requestId);
+      const { data, error } = await (supabase as any).rpc("accept_delivery_request", {
+        p_request_id: requestId,
+      });
       if (error) throw error;
-      toast.success(`Entrega aceita! Você ganhará R$ ${driverFee.toFixed(2)}`);
+      const fee = Number((data as any)?.driver_fee || 0);
+      console.log("[Delivery] Motorista aceitou", requestId, data);
+      toast.success(fee > 0 ? `Entrega aceita! Você ganhará R$ ${fee.toFixed(2)}` : "Entrega aceita!");
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
     } catch (err: any) {
-      toast.error(err.message || "Erro ao aceitar");
+      const msg = err?.message || "Erro ao aceitar";
+      toast.error(msg);
+      queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
     }
   };
 
