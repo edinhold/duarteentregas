@@ -59,7 +59,7 @@ const Index = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, loading, navigate]);
+  }, [user?.id, loading, navigate]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
