@@ -173,6 +173,47 @@ const CustomersTab = () => {
     }
   };
 
+  const handleSuspend = async () => {
+    if (!suspendTarget) return;
+    const days = parseInt(suspendDays, 10);
+    if (!Number.isFinite(days) || days <= 0) return toast.error("Informe um número de dias válido");
+    if (!suspendReason.trim()) return toast.error("Informe o motivo");
+    setSuspending(true);
+    try {
+      const until = new Date(Date.now() + days * 86400000).toISOString();
+      const { error } = await (supabase as any).rpc("admin_suspend_user", {
+        p_target_user_id: suspendTarget.user_id,
+        p_until: until,
+        p_reason: suspendReason.trim(),
+      });
+      if (error) throw error;
+      toast.success(`${suspendTarget.full_name || "Usuário"} suspenso até ${new Date(until).toLocaleDateString("pt-BR")}`);
+      setSuspendTarget(null);
+      setSuspendReason("");
+      setSuspendDays("7");
+      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao suspender");
+    } finally {
+      setSuspending(false);
+    }
+  };
+
+  const handleUnsuspend = async (c: any) => {
+    if (!confirm(`Reativar ${c.full_name || "este usuário"}?`)) return;
+    try {
+      const { error } = await (supabase as any).rpc("admin_unsuspend_user", {
+        p_target_user_id: c.user_id,
+      });
+      if (error) throw error;
+      toast.success("Usuário reativado");
+      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao reativar");
+    }
+  };
+
+
   return (
     <div className="space-y-4">
       <Card>
