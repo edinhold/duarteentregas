@@ -18,6 +18,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Track last processed uid + access token to avoid re-running side effects
+    // for duplicate auth events (INITIAL_SESSION + SIGNED_IN + TOKEN_REFRESHED
+    // all fire and each carries a fresh object reference, which was causing
+    // downstream effects that depend on `user` to re-run in a loop).
+    let lastUid: string | null | undefined = undefined;
+    let lastToken: string | null | undefined = undefined;
+    let handled = false;
+
     const enforceSuspension = async () => {
       try {
         const { data } = await (supabase as any).rpc("get_my_suspension");
@@ -42,7 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const suspended = await enforceSuspension();
       if (suspended) return;
       setOneSignalExternalUserId(uid).catch(() => {});
-      // Fetch role and fully register the device on OneSignal + sync to Supabase
       try {
         const { data: roles } = await (supabase as any)
           .from("user_roles")
@@ -55,22 +62,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      handleUser(session?.user?.id);
+    const apply = (nextSession: Session | null, source: string) => {
+      const uid = nextSession?.user?.id ?? null;
+      const token = nextSession?.access_token ?? null;
+      const sameUser = uid === lastUid;
+      const sameToken = token === lastToken;
+
+      // Always clear loading on the first signal so UI doesn't hang.
+      if (!handled) {
+        handled = true;
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+        setLoading(false);
+        lastUid = uid;
+        lastToken = token;
+        console.log("[Auth] Sessão inicial", { source, uid });
+        handleUser(uid ?? undefined);
+        return;
+      }
+
+      if (sameUser && sameToken) {
+        // Duplicate event (e.g. INITIAL_SESSION after getSession): skip.
+        return;
+      }
+
+      setSession(nextSession);
+      // Only swap the user object reference when the uid actually changes,
+      // so downstream `useEffect([user])` doesn't re-fire on token refresh.
+      if (!sameUser) {
+        setUser(nextSession?.user ?? null);
+        console.log("[Auth] Sessão alterada", { source, uid });
+        handleUser(uid ?? undefined);
+      }
+      lastUid = uid;
+      lastToken = token;
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      apply(session, `event:${event}`);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      handleUser(session?.user?.id);
+      apply(session, "getSession");
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
 
 
   const signOut = async () => {
