@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2 } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2, Sparkles, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import DeleteConfirm from "@/components/admin/DeleteConfirm";
 
 const FinancialTab = () => {
@@ -20,6 +22,17 @@ const FinancialTab = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedEarnings, setSelectedEarnings] = useState<Set<string>>(new Set());
   const [selectedWithdrawals, setSelectedWithdrawals] = useState<Set<string>>(new Set());
+
+  // Period cleanup state
+  const [cleanFrom, setCleanFrom] = useState<string>("");
+  const [cleanTo, setCleanTo] = useState<string>("");
+  const [cleanReason, setCleanReason] = useState<string>("");
+  const [incEarnings, setIncEarnings] = useState(true);
+  const [incWithdrawals, setIncWithdrawals] = useState(true);
+  const [incDelivered, setIncDelivered] = useState(true);
+  const [incOrders, setIncOrders] = useState(true);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
 
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config"],
@@ -255,6 +268,49 @@ const FinancialTab = () => {
     }
   };
 
+  const { data: cleanupLogs = [], refetch: refetchCleanupLogs } = useQuery({
+    queryKey: ["financial-cleanup-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("financial_cleanup_logs" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+  });
+
+  const handlePeriodCleanup = async () => {
+    setCleaning(true);
+    try {
+      const from = cleanFrom ? new Date(cleanFrom).toISOString() : null;
+      const to = cleanTo ? new Date(cleanTo + "T23:59:59").toISOString() : null;
+      const { data, error } = await supabase.rpc("admin_cleanup_financials" as any, {
+        p_from: from,
+        p_to: to,
+        p_include_withdrawals: incWithdrawals,
+        p_include_earnings: incEarnings,
+        p_include_delivered_requests: incDelivered,
+        p_include_delivered_orders: incOrders,
+        p_reason: cleanReason || null,
+      });
+      if (error) throw error;
+      const r: any = data;
+      toast.success(`Limpeza concluída: ${r?.total || 0} registro(s) removido(s)`);
+      setCleanReason("");
+      refetchCleanupLogs();
+      queryClient.invalidateQueries({ queryKey: ["admin-earnings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-delivered-requests"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro na limpeza");
+    } finally {
+      setCleaning(false);
+      setShowCleanupConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
@@ -331,6 +387,112 @@ const FinancialTab = () => {
         </CardContent>
       </Card>
 
+      {/* Period-based Financial Cleanup */}
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="w-4 h-4" /> Limpeza Financeira por Período
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Remove ganhos, saques e entregas/pedidos concluídos dentro do período selecionado.
+            Deixe as datas em branco para considerar todo o histórico. A ação é registrada.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>De</Label>
+              <Input type="date" value={cleanFrom} onChange={(e) => setCleanFrom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Até</Label>
+              <Input type="date" value={cleanTo} onChange={(e) => setCleanTo(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 text-sm">
+            <label className="flex items-center gap-2">
+              <Checkbox checked={incEarnings} onCheckedChange={(v) => setIncEarnings(Boolean(v))} />
+              Ganhos dos motoristas
+            </label>
+            <label className="flex items-center gap-2">
+              <Checkbox checked={incWithdrawals} onCheckedChange={(v) => setIncWithdrawals(Boolean(v))} />
+              Solicitações de saque
+            </label>
+            <label className="flex items-center gap-2">
+              <Checkbox checked={incDelivered} onCheckedChange={(v) => setIncDelivered(Boolean(v))} />
+              Entregas concluídas
+            </label>
+            <label className="flex items-center gap-2">
+              <Checkbox checked={incOrders} onCheckedChange={(v) => setIncOrders(Boolean(v))} />
+              Pedidos concluídos
+            </label>
+          </div>
+          <div className="space-y-2">
+            <Label>Motivo (opcional)</Label>
+            <Input
+              placeholder="Ex.: Fechamento mensal - novembro"
+              value={cleanReason}
+              onChange={(e) => setCleanReason(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={() => setShowCleanupConfirm(true)}
+            disabled={cleaning || (!incEarnings && !incWithdrawals && !incDelivered && !incOrders)}
+          >
+            {cleaning ? "Executando limpeza..." : "Executar limpeza"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Cleanup History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <History className="w-4 h-4" /> Histórico de Limpezas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Período</TableHead>
+                <TableHead>Ganhos</TableHead>
+                <TableHead>Saques</TableHead>
+                <TableHead>Entregas</TableHead>
+                <TableHead>Pedidos</TableHead>
+                <TableHead>Motivo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cleanupLogs.map((l: any) => (
+                <TableRow key={l.id}>
+                  <TableCell className="text-xs">{new Date(l.created_at).toLocaleString("pt-BR")}</TableCell>
+                  <TableCell className="text-xs">
+                    {l.from_date ? new Date(l.from_date).toLocaleDateString("pt-BR") : "início"}
+                    {" → "}
+                    {l.to_date ? new Date(l.to_date).toLocaleDateString("pt-BR") : "agora"}
+                  </TableCell>
+                  <TableCell>{l.deleted_earnings}</TableCell>
+                  <TableCell>{l.deleted_withdrawals}</TableCell>
+                  <TableCell>{l.deleted_delivered_requests}</TableCell>
+                  <TableCell>{l.deleted_delivered_orders}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{l.reason || "—"}</TableCell>
+                </TableRow>
+              ))}
+              {cleanupLogs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                    Nenhuma limpeza registrada
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Withdrawal Requests with checkboxes */}
       <Card>
@@ -517,6 +679,13 @@ const FinancialTab = () => {
         onConfirm={handleDeleteSelected}
         title={`${totalSelected} registro(s) selecionado(s)`}
         loading={deleting}
+      />
+      <DeleteConfirm
+        open={showCleanupConfirm}
+        onOpenChange={setShowCleanupConfirm}
+        onConfirm={handlePeriodCleanup}
+        title="registros financeiros do período selecionado"
+        loading={cleaning}
       />
     </div>
   );

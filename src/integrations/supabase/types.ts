@@ -526,6 +526,45 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_cleanup_logs: {
+        Row: {
+          admin_user_id: string
+          created_at: string
+          deleted_delivered_orders: number
+          deleted_delivered_requests: number
+          deleted_earnings: number
+          deleted_withdrawals: number
+          from_date: string | null
+          id: string
+          reason: string | null
+          to_date: string | null
+        }
+        Insert: {
+          admin_user_id: string
+          created_at?: string
+          deleted_delivered_orders?: number
+          deleted_delivered_requests?: number
+          deleted_earnings?: number
+          deleted_withdrawals?: number
+          from_date?: string | null
+          id?: string
+          reason?: string | null
+          to_date?: string | null
+        }
+        Update: {
+          admin_user_id?: string
+          created_at?: string
+          deleted_delivered_orders?: number
+          deleted_delivered_requests?: number
+          deleted_earnings?: number
+          deleted_withdrawals?: number
+          from_date?: string | null
+          id?: string
+          reason?: string | null
+          to_date?: string | null
+        }
+        Relationships: []
+      }
       location_reports: {
         Row: {
           created_at: string
@@ -1220,6 +1259,18 @@ export type Database = {
     Functions: {
       accept_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
       accept_delivery_request: { Args: { p_request_id: string }; Returns: Json }
+      admin_cleanup_financials: {
+        Args: {
+          p_from?: string
+          p_include_delivered_orders?: boolean
+          p_include_delivered_requests?: boolean
+          p_include_earnings?: boolean
+          p_include_withdrawals?: boolean
+          p_reason?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       admin_list_store_owners: {
         Args: never
         Returns: {
