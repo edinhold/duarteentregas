@@ -406,14 +406,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="map">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-bold">Monitoramento de Entregadores em Tempo Real</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <GlobalDriverMap />
-              </CardContent>
-            </Card>
+            <RealtimeMonitorTab />
           </TabsContent>
           <TabsContent value="drivers"><DriversTab /></TabsContent>
 
