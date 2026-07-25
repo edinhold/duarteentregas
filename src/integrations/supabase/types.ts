@@ -846,6 +846,10 @@ export type Database = {
           id: string
           neighborhood: string | null
           phone: string | null
+          suspended_at: string | null
+          suspended_by: string | null
+          suspended_until: string | null
+          suspension_reason: string | null
           updated_at: string
           user_id: string
         }
@@ -858,6 +862,10 @@ export type Database = {
           id?: string
           neighborhood?: string | null
           phone?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_until?: string | null
+          suspension_reason?: string | null
           updated_at?: string
           user_id: string
         }
@@ -870,6 +878,10 @@ export type Database = {
           id?: string
           neighborhood?: string | null
           phone?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_until?: string | null
+          suspension_reason?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1107,6 +1119,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_suspension_logs: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          suspended_until: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          suspended_until?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          suspended_until?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
@@ -1317,6 +1359,14 @@ export type Database = {
         }
         Returns: number
       }
+      admin_suspend_user: {
+        Args: { p_reason: string; p_target_user_id: string; p_until: string }
+        Returns: boolean
+      }
+      admin_unsuspend_user: {
+        Args: { p_target_user_id: string }
+        Returns: boolean
+      }
       admin_update_delivery_address: {
         Args: {
           p_delivery_address: string
@@ -1364,6 +1414,13 @@ export type Database = {
           user_id: string
           vehicle_plate: string
           vehicle_type: string
+        }[]
+      }
+      get_my_suspension: {
+        Args: never
+        Returns: {
+          suspended_until: string
+          suspension_reason: string
         }[]
       }
       get_public_delivery_config: {
