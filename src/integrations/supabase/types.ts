@@ -165,6 +165,7 @@ export type Database = {
       }
       credit_codes: {
         Row: {
+          assigned_to_user_id: string | null
           code: string
           created_at: string
           id: string
@@ -174,6 +175,7 @@ export type Database = {
           value: number
         }
         Insert: {
+          assigned_to_user_id?: string | null
           code: string
           created_at?: string
           id?: string
@@ -183,6 +185,7 @@ export type Database = {
           value?: number
         }
         Update: {
+          assigned_to_user_id?: string | null
           code?: string
           created_at?: string
           id?: string
@@ -1217,6 +1220,22 @@ export type Database = {
     Functions: {
       accept_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
       accept_delivery_request: { Args: { p_request_id: string }; Returns: Json }
+      admin_list_store_owners: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
+      admin_recharge_store: {
+        Args: {
+          p_amount: number
+          p_apply_promo?: boolean
+          p_store_owner_id: string
+        }
+        Returns: number
+      }
       admin_update_delivery_address: {
         Args: {
           p_delivery_address: string
