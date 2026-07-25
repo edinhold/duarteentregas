@@ -15,7 +15,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import TestPush from "./pages/admin/TestPush";
 import StoreOwnerPanel from "./pages/StoreOwnerPanel";
 import DriverPanel from "./pages/DriverPanel";
-import RegisterCustomer from "./pages/register/RegisterCustomer";
+
 import RegisterDriver from "./pages/register/RegisterDriver";
 import RegisterStoreOwner from "./pages/register/RegisterStoreOwner";
 import Install from "./pages/Install";
