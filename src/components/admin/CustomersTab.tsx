@@ -490,7 +490,45 @@ const CustomersTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!suspendTarget} onOpenChange={(o) => { if (!o) { setSuspendTarget(null); setSuspendReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspender usuário</DialogTitle>
+            <DialogDescription>
+              Bloquear temporariamente o acesso de <strong>{suspendTarget?.full_name || "usuário"}</strong>. Ele será deslogado ao tentar entrar até o fim do período.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Duração (dias)</label>
+              <Input
+                type="number"
+                min={1}
+                value={suspendDays}
+                onChange={(e) => setSuspendDays(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo (obrigatório)</label>
+              <Textarea
+                placeholder="Ex: comportamento inadequado, cobrança pendente..."
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSuspendTarget(null); setSuspendReason(""); }}>Cancelar</Button>
+            <Button onClick={handleSuspend} disabled={suspending || !suspendReason.trim()}>
+              {suspending ? "Suspendendo..." : "Confirmar suspensão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 };
 
