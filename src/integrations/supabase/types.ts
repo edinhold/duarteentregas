@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_impersonation_logs: {
+        Row: {
+          admin_user_id: string
+          created_at: string
+          id: string
+          target_email: string | null
+          target_role: string | null
+          target_user_id: string
+        }
+        Insert: {
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          target_email?: string | null
+          target_role?: string | null
+          target_user_id: string
+        }
+        Update: {
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          target_email?: string | null
+          target_role?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       admin_requests: {
         Row: {
           created_at: string
