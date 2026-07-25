@@ -1,20 +1,26 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Trash2, UserCog, Users, Search } from "lucide-react";
-import DeleteConfirm from "./DeleteConfirm";
+import { Trash2, UserCog, Users, Search, History } from "lucide-react";
+
+type RoleFilter = "all" | "customer" | "driver" | "store_owner" | "admin";
 
 const CustomersTab = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [deleteCustomer, setDeleteCustomer] = useState<any>(null);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<any[] | null>(null);
+  const [reason, setReason] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [promoteCustomer, setPromoteCustomer] = useState<any>(null);
   const [promoting, setPromoting] = useState(false);
@@ -25,7 +31,6 @@ const CustomersTab = () => {
     pixKeyType: "cpf",
   });
 
-  // Fetch all profiles (customers)
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["admin-customers"],
     queryFn: async () => {
@@ -34,19 +39,14 @@ const CustomersTab = () => {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-
-      // Get existing driver user_ids to flag them
       const { data: drivers } = await supabase.from("drivers").select("user_id");
       const driverUserIds = new Set((drivers || []).map((d: any) => d.user_id));
-
-      // Get user roles
       const { data: roles } = await supabase.from("user_roles").select("user_id, role");
       const roleMap: Record<string, string[]> = {};
       (roles || []).forEach((r: any) => {
         if (!roleMap[r.user_id]) roleMap[r.user_id] = [];
         roleMap[r.user_id].push(r.role);
       });
-
       return (data || []).map((p: any) => ({
         ...p,
         isDriver: driverUserIds.has(p.user_id),
@@ -55,41 +55,92 @@ const CustomersTab = () => {
     },
   });
 
-  const filtered = customers.filter((c: any) => {
-    const q = search.toLowerCase();
-    return (
-      !q ||
-      (c.full_name || "").toLowerCase().includes(q) ||
-      (c.phone || "").toLowerCase().includes(q) ||
-      (c.city || "").toLowerCase().includes(q)
-    );
+  const { data: logs = [] } = useQuery({
+    queryKey: ["customer-deletion-logs"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customer_deletion_logs" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      return (data as any[]) || [];
+    },
   });
 
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return customers.filter((c: any) => {
+      const matchesSearch =
+        !q ||
+        (c.full_name || "").toLowerCase().includes(q) ||
+        (c.phone || "").toLowerCase().includes(q) ||
+        (c.city || "").toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (roleFilter === "all") return true;
+      if (roleFilter === "customer") return c.roles.length === 0;
+      return c.roles.includes(roleFilter);
+    });
+  }, [customers, search, roleFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every((c: any) => selected.has(c.user_id));
+  const toggleAll = () => {
+    const next = new Set(selected);
+    if (allSelected) filtered.forEach((c: any) => next.delete(c.user_id));
+    else filtered.forEach((c: any) => next.add(c.user_id));
+    setSelected(next);
+  };
+  const toggleOne = (uid: string) => {
+    const next = new Set(selected);
+    next.has(uid) ? next.delete(uid) : next.add(uid);
+    setSelected(next);
+  };
+
+  const openBulkDelete = () => {
+    const targets = customers.filter((c: any) => selected.has(c.user_id));
+    if (targets.length === 0) return toast.error("Selecione ao menos um cliente");
+    setDeleteTarget(targets);
+  };
+
   const handleDelete = async () => {
-    if (!deleteCustomer) return;
+    if (!deleteTarget) return;
+    if (!reason.trim()) return toast.error("Informe o motivo da exclusão");
     setDeleting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke("delete-user", {
-        body: { user_id: deleteCustomer.user_id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success("Cliente excluído com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
-      setDeleteCustomer(null);
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao excluir cliente");
-    } finally {
-      setDeleting(false);
+    let ok = 0, fail = 0;
+    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    for (const c of deleteTarget) {
+      try {
+        const { data, error } = await supabase.functions.invoke("delete-user", {
+          body: { user_id: c.user_id },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        await supabase.from("customer_deletion_logs" as any).insert({
+          admin_id: adminUser?.id,
+          deleted_user_id: c.user_id,
+          deleted_name: c.full_name,
+          deleted_phone: c.phone,
+          reason: reason.trim(),
+        });
+        ok++;
+      } catch (err: any) {
+        console.error("delete failed", c.user_id, err);
+        fail++;
+      }
     }
+    setDeleting(false);
+    setDeleteTarget(null);
+    setReason("");
+    setSelected(new Set());
+    queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+    queryClient.invalidateQueries({ queryKey: ["customer-deletion-logs"] });
+    if (ok) toast.success(`${ok} cliente(s) excluído(s)`);
+    if (fail) toast.error(`${fail} falha(s) ao excluir`);
   };
 
   const handlePromote = async () => {
     if (!promoteCustomer) return;
     setPromoting(true);
     try {
-      // Create driver record
       const { error: driverError } = await supabase.from("drivers").insert({
         user_id: promoteCustomer.user_id,
         full_name: promoteCustomer.full_name || "Sem nome",
@@ -100,14 +151,11 @@ const CustomersTab = () => {
         pix_key_type: driverForm.pixKeyType || null,
       });
       if (driverError) throw driverError;
-
-      // Assign driver role
       const { error: roleError } = await supabase.from("user_roles").insert({
         user_id: promoteCustomer.user_id,
         role: "driver" as any,
       });
       if (roleError) throw roleError;
-
       toast.success(`${promoteCustomer.full_name} promovido a motorista!`);
       queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
@@ -123,18 +171,38 @@ const CustomersTab = () => {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader className="flex-col md:flex-row md:items-center md:justify-between gap-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="w-4 h-4" /> Clientes Cadastrados ({filtered.length})
           </CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, telefone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9"
-            />
+          <div className="flex flex-wrap gap-2 items-center">
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as RoleFilter)}>
+              <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="customer">Somente clientes</SelectItem>
+                <SelectItem value="driver">Motoristas</SelectItem>
+                <SelectItem value="store_owner">Lojistas</SelectItem>
+                <SelectItem value="admin">Admins</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-56">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, telefone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={selected.size === 0}
+              onClick={openBulkDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-1" /> Excluir selecionados ({selected.size})
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -144,6 +212,9 @@ const CustomersTab = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                  </TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Telefone</TableHead>
                   <TableHead>Cidade</TableHead>
@@ -155,6 +226,12 @@ const CustomersTab = () => {
               <TableBody>
                 {filtered.map((c: any) => (
                   <TableRow key={c.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(c.user_id)}
+                        onCheckedChange={() => toggleOne(c.user_id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{c.full_name || "—"}</TableCell>
                     <TableCell>{c.phone || "—"}</TableCell>
                     <TableCell>{c.city || "—"}</TableCell>
@@ -190,7 +267,7 @@ const CustomersTab = () => {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-destructive"
-                          onClick={() => setDeleteCustomer(c)}
+                          onClick={() => setDeleteTarget([c])}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -200,7 +277,7 @@ const CustomersTab = () => {
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
                       Nenhum cliente encontrado
                     </TableCell>
                   </TableRow>
@@ -211,16 +288,74 @@ const CustomersTab = () => {
         </CardContent>
       </Card>
 
-      {/* Delete confirmation */}
-      <DeleteConfirm
-        open={!!deleteCustomer}
-        onOpenChange={(o) => !o && setDeleteCustomer(null)}
-        onConfirm={handleDelete}
-        title={deleteCustomer?.full_name || "cliente"}
-        loading={deleting}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <History className="w-4 h-4" /> Histórico de Exclusões
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Motivo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logs.map((l: any) => (
+                <TableRow key={l.id}>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(l.created_at).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell>{l.deleted_name || "—"}</TableCell>
+                  <TableCell>{l.deleted_phone || "—"}</TableCell>
+                  <TableCell className="max-w-xs truncate">{l.reason || "—"}</TableCell>
+                </TableRow>
+              ))}
+              {logs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                    Nenhuma exclusão registrada
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      {/* Promote to driver dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar exclusão</DialogTitle>
+            <DialogDescription>
+              {deleteTarget?.length === 1
+                ? `Excluir cliente "${deleteTarget[0]?.full_name || "sem nome"}" permanentemente?`
+                : `Excluir ${deleteTarget?.length} clientes permanentemente?`}
+              {" "}Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Motivo (obrigatório)</label>
+            <Textarea
+              placeholder="Ex: Solicitação do usuário / conta duplicada / spam..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setReason(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting || !reason.trim()}>
+              {deleting ? "Excluindo..." : "Confirmar exclusão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!promoteCustomer} onOpenChange={(o) => !o && setPromoteCustomer(null)}>
         <DialogContent>
           <DialogHeader>
