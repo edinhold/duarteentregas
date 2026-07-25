@@ -24,12 +24,17 @@ const CustomersTab = () => {
   const [deleting, setDeleting] = useState(false);
   const [promoteCustomer, setPromoteCustomer] = useState<any>(null);
   const [promoting, setPromoting] = useState(false);
+  const [suspendTarget, setSuspendTarget] = useState<any>(null);
+  const [suspendDays, setSuspendDays] = useState<string>("7");
+  const [suspendReason, setSuspendReason] = useState("");
+  const [suspending, setSuspending] = useState(false);
   const [driverForm, setDriverForm] = useState({
     vehicleType: "moto",
     vehiclePlate: "",
     pixKey: "",
     pixKeyType: "cpf",
   });
+
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["admin-customers"],
