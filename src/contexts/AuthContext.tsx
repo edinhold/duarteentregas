@@ -18,11 +18,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const enforceSuspension = async () => {
+      try {
+        const { data } = await (supabase as any).rpc("get_my_suspension");
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row?.suspended_until && new Date(row.suspended_until).getTime() > Date.now()) {
+          const until = new Date(row.suspended_until).toLocaleString("pt-BR");
+          const reason = row.suspension_reason ? `\nMotivo: ${row.suspension_reason}` : "";
+          alert(`Sua conta está suspensa até ${until}.${reason}`);
+          try { await clearOneSignalExternalUserId(); } catch {}
+          await supabase.auth.signOut();
+          return true;
+        }
+      } catch {}
+      return false;
+    };
+
     const handleUser = async (uid: string | undefined) => {
       if (!uid) {
         clearOneSignalExternalUserId().catch(() => {});
         return;
       }
+      const suspended = await enforceSuspension();
+      if (suspended) return;
       setOneSignalExternalUserId(uid).catch(() => {});
       // Fetch role and fully register the device on OneSignal + sync to Supabase
       try {
@@ -53,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
   }, []);
+
 
   const signOut = async () => {
     try { await clearOneSignalExternalUserId(); } catch {}

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Trash2, UserCog, Users, Search, History } from "lucide-react";
+import { Trash2, UserCog, Users, Search, History, Ban, ShieldCheck } from "lucide-react";
 
 type RoleFilter = "all" | "customer" | "driver" | "store_owner" | "admin";
 
@@ -24,12 +24,17 @@ const CustomersTab = () => {
   const [deleting, setDeleting] = useState(false);
   const [promoteCustomer, setPromoteCustomer] = useState<any>(null);
   const [promoting, setPromoting] = useState(false);
+  const [suspendTarget, setSuspendTarget] = useState<any>(null);
+  const [suspendDays, setSuspendDays] = useState<string>("7");
+  const [suspendReason, setSuspendReason] = useState("");
+  const [suspending, setSuspending] = useState(false);
   const [driverForm, setDriverForm] = useState({
     vehicleType: "moto",
     vehiclePlate: "",
     pixKey: "",
     pixKeyType: "cpf",
   });
+
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["admin-customers"],
@@ -168,6 +173,47 @@ const CustomersTab = () => {
     }
   };
 
+  const handleSuspend = async () => {
+    if (!suspendTarget) return;
+    const days = parseInt(suspendDays, 10);
+    if (!Number.isFinite(days) || days <= 0) return toast.error("Informe um número de dias válido");
+    if (!suspendReason.trim()) return toast.error("Informe o motivo");
+    setSuspending(true);
+    try {
+      const until = new Date(Date.now() + days * 86400000).toISOString();
+      const { error } = await (supabase as any).rpc("admin_suspend_user", {
+        p_target_user_id: suspendTarget.user_id,
+        p_until: until,
+        p_reason: suspendReason.trim(),
+      });
+      if (error) throw error;
+      toast.success(`${suspendTarget.full_name || "Usuário"} suspenso até ${new Date(until).toLocaleDateString("pt-BR")}`);
+      setSuspendTarget(null);
+      setSuspendReason("");
+      setSuspendDays("7");
+      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao suspender");
+    } finally {
+      setSuspending(false);
+    }
+  };
+
+  const handleUnsuspend = async (c: any) => {
+    if (!confirm(`Reativar ${c.full_name || "este usuário"}?`)) return;
+    try {
+      const { error } = await (supabase as any).rpc("admin_unsuspend_user", {
+        p_target_user_id: c.user_id,
+      });
+      if (error) throw error;
+      toast.success("Usuário reativado");
+      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao reativar");
+    }
+  };
+
+
   return (
     <div className="space-y-4">
       <Card>
@@ -251,7 +297,15 @@ const CustomersTab = () => {
                       {new Date(c.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-1 items-center flex-wrap">
+                        {c.suspended_until && new Date(c.suspended_until).getTime() > Date.now() && (
+                          <span
+                            className="text-[10px] bg-destructive/15 text-destructive px-1.5 py-0.5 rounded"
+                            title={c.suspension_reason || ""}
+                          >
+                            Suspenso até {new Date(c.suspended_until).toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
                         {!c.isDriver && (
                           <Button
                             size="sm"
@@ -262,6 +316,28 @@ const CustomersTab = () => {
                             <UserCog className="w-3.5 h-3.5 mr-1" />
                             Motorista
                           </Button>
+                        )}
+                        {c.suspended_until && new Date(c.suspended_until).getTime() > Date.now() ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => handleUnsuspend(c)}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Reativar
+                          </Button>
+                        ) : (
+                          !c.roles.includes("admin") && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-amber-600"
+                              title="Suspender"
+                              onClick={() => setSuspendTarget(c)}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </Button>
+                          )
                         )}
                         <Button
                           size="icon"
@@ -281,6 +357,7 @@ const CustomersTab = () => {
                       Nenhum cliente encontrado
                     </TableCell>
                   </TableRow>
+
                 )}
               </TableBody>
             </Table>
@@ -413,7 +490,45 @@ const CustomersTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!suspendTarget} onOpenChange={(o) => { if (!o) { setSuspendTarget(null); setSuspendReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspender usuário</DialogTitle>
+            <DialogDescription>
+              Bloquear temporariamente o acesso de <strong>{suspendTarget?.full_name || "usuário"}</strong>. Ele será deslogado ao tentar entrar até o fim do período.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Duração (dias)</label>
+              <Input
+                type="number"
+                min={1}
+                value={suspendDays}
+                onChange={(e) => setSuspendDays(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo (obrigatório)</label>
+              <Textarea
+                placeholder="Ex: comportamento inadequado, cobrança pendente..."
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSuspendTarget(null); setSuspendReason(""); }}>Cancelar</Button>
+            <Button onClick={handleSuspend} disabled={suspending || !suspendReason.trim()}>
+              {suspending ? "Suspendendo..." : "Confirmar suspensão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 };
 
