@@ -1189,6 +1189,7 @@ export type Database = {
     }
     Functions: {
       accept_delivery_group: { Args: { p_group_id: string }; Returns: boolean }
+      accept_delivery_request: { Args: { p_request_id: string }; Returns: Json }
       admin_update_delivery_address: {
         Args: {
           p_delivery_address: string

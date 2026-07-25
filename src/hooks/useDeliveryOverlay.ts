@@ -244,18 +244,16 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
   const accept = useCallback(async () => {
     if (!delivery || !user) return;
     try {
-      const { error } = await supabase
-        .from("delivery_requests")
-        .update({ driver_id: user.id, status: "accepted" } as any)
-        .eq("id", delivery.id)
-        .eq("status", "pending");
+      const { error } = await (supabase as any).rpc("accept_delivery_request", {
+        p_request_id: delivery.id,
+      });
       if (error) throw error;
-      console.log("[DeliveryOverlay] Entrega aceita", delivery.id);
+      console.log("[Delivery] Motorista aceitou (overlay)", delivery.id);
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
       onAccepted?.(delivery);
       close();
-    } catch (err) {
+    } catch (err: any) {
       console.log("[DeliveryOverlay] Falha ao aceitar", err);
       setState("error");
     }
