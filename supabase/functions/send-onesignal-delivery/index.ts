@@ -102,6 +102,26 @@ function extractInvalidAliases(json: any): string[] {
   return Array.from(new Set(inv.map((x: any) => String(x))));
 }
 
+function hasApiErrors(json: any): boolean {
+  const e = json?.errors;
+  if (!e) return false;
+  if (Array.isArray(e)) return e.length > 0;
+  return Object.keys(e).length > 0;
+}
+
+function describeError(status: number, json: any): string {
+  const e = json?.errors;
+  const list = Array.isArray(e) ? e.map((x: any) => String(x)) : [];
+  const first = list[0] ?? "";
+  if (status === 401) return "REST API Key inválida ou ausente";
+  if (status === 403) return "Acesso negado pelo OneSignal (chave/app incorretos)";
+  if (/app_id/i.test(first)) return "App ID inválido";
+  if (/subscription/i.test(first)) return "Subscription ID inexistente";
+  if (first) return first;
+  if (status >= 500) return `Erro no OneSignal (HTTP ${status})`;
+  return `Payload inválido (HTTP ${status})`;
+}
+
 async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastErr: any = null;
   let lastJson: any = null;
@@ -110,30 +130,41 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log("[OneSignal] attempt", attempt, "target", target.mode);
+      console.log("[OneSignal:Validation]", { attempt, target: target.mode });
       const res = await sendOneSignal(target, payloadData);
       lastStatus = res.status;
       lastJson = await res.json().catch(() => ({}));
-      console.log("[OneSignal] response", { attempt, status: res.status, body: lastJson });
+      console.log("[OneSignal:Response]", { attempt, status: res.status, body: lastJson });
       const recipients = Number(lastJson?.recipients ?? 0);
-      const hasId = !!lastJson?.id;
-      if (res.ok && hasId && recipients > 0) {
+      const hasId = !!(lastJson?.id || lastJson?.notification_id);
+      const accepted = lastJson?.accepted === true;
+      // Success = OneSignal accepted the notification (id/accepted) and reported
+      // no `errors`. `recipients` may legitimately be absent/0 on the v16 API,
+      // so it must NOT drive the success decision.
+      if (res.ok && (hasId || accepted) && !hasApiErrors(lastJson)) {
+        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients });
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
       // Non-transient failures: do NOT retry.
       const invalid = extractInvalidAliases(lastJson);
       const authError = res.status === 401 || res.status === 403;
-      if (invalid.length > 0 || authError) {
-        console.warn("[OneSignal] non_transient_failure", { invalid, status: res.status });
+      const validationError = res.status === 400 && hasApiErrors(lastJson);
+      if (invalid.length > 0 || authError || validationError) {
+        console.error("[OneSignal:Error] non_transient", { invalid, status: res.status, body: lastJson });
         return {
-          ok: false, attempts: attempt, json: lastJson, status: res.status,
-          recipients, error: authError ? "onesignal_auth_error" : "invalid_aliases",
+          ok: false, attempts: attempt, json: lastJson, status: res.status, recipients,
+          error: authError
+            ? "onesignal_auth_error"
+            : invalid.length > 0
+              ? "invalid_aliases"
+              : "invalid_payload",
+          message: describeError(res.status, lastJson),
         };
       }
-      console.warn("[OneSignal] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
+      console.warn("[OneSignal:Error] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
-      console.error("[OneSignal] attempt", attempt, "threw", e);
+      console.error("[OneSignal:Error] attempt", attempt, "threw", e);
     }
     if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400));
   }
@@ -144,6 +175,7 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
     status: lastStatus,
     recipients: Number(lastJson?.recipients ?? 0),
     error: lastErr ? String(lastErr) : undefined,
+    message: lastErr ? "Erro de rede ao contatar o OneSignal" : describeError(lastStatus, lastJson),
   };
 }
 
