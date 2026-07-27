@@ -17,15 +17,30 @@ const supabase = createClient(
 
 type SendMode = { mode: "aliases"; externalIds: string[] } | { mode: "segment" };
 
+// ROOT CAUSE (HTTP 400): we were sending BOTH `url` and `web_url`, and the value
+// was a relative path. OneSignal answers:
+//   "Url Remove url field when setting app_url or web_url"
+//   "Option Begin your notification web_url with http:// or https://."
+// Fix: send ONLY `url`, always as an absolute https URL.
+const APP_BASE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://duarteentregas.lovable.app")
+  .replace(/\/+$/, "");
+
+function prune(obj: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+  );
+}
+
 async function sendOneSignal(target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
   // Deep link straight to the delivery so PWA/native clients open the offer.
-  const deepLink = payloadData.request_id
+  const path = payloadData.request_id
     ? `/entregador?entrega=${payloadData.request_id}`
     : "/entregador";
-  const payload: Record<string, unknown> = {
+  const deepLink = `${APP_BASE_URL}${path}`;
+  const payload: Record<string, unknown> = prune({
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
@@ -33,20 +48,20 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
       en: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
       pt: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
     },
-    data: {
+    data: prune({
       pedido_id: payloadData.request_id,
       tipo: "nova_entrega",
-      rota: deepLink,
+      rota: path,
       request_id: payloadData.request_id,
       driver_fee: payloadData.driver_fee,
       pickup_address: payloadData.pickup_address,
       delivery_address: payloadData.delivery_address,
       url: deepLink,
-    },
+    }),
+    // Only `url` — never together with `web_url`/`app_url`.
     url: deepLink,
-    web_url: deepLink,
-    chrome_web_icon: "/icon-192.png",
-    chrome_web_badge: "/icon-192.png",
+    chrome_web_icon: `${APP_BASE_URL}/icon-192.png`,
+    chrome_web_badge: `${APP_BASE_URL}/icon-192.png`,
     priority: 10,
     ttl: 30,
     android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
@@ -60,7 +75,7 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     ios_interruption_level: "time_sensitive",
     mutable_content: true,
     content_available: true,
-  };
+  });
 
   if (target.mode === "aliases") {
     payload.include_aliases = { external_id: target.externalIds };
@@ -68,6 +83,8 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     payload.included_segments = ["Subscribed Users"];
     payload.filters = [{ field: "tag", key: "role", relation: "=", value: "driver" }];
   }
+
+  console.log("[OneSignal:Request]", JSON.stringify({ target, url: deepLink }));
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
     method: "POST",
@@ -85,6 +102,26 @@ function extractInvalidAliases(json: any): string[] {
   return Array.from(new Set(inv.map((x: any) => String(x))));
 }
 
+function hasApiErrors(json: any): boolean {
+  const e = json?.errors;
+  if (!e) return false;
+  if (Array.isArray(e)) return e.length > 0;
+  return Object.keys(e).length > 0;
+}
+
+function describeError(status: number, json: any): string {
+  const e = json?.errors;
+  const list = Array.isArray(e) ? e.map((x: any) => String(x)) : [];
+  const first = list[0] ?? "";
+  if (status === 401) return "REST API Key inválida ou ausente";
+  if (status === 403) return "Acesso negado pelo OneSignal (chave/app incorretos)";
+  if (/app_id/i.test(first)) return "App ID inválido";
+  if (/subscription/i.test(first)) return "Subscription ID inexistente";
+  if (first) return first;
+  if (status >= 500) return `Erro no OneSignal (HTTP ${status})`;
+  return `Payload inválido (HTTP ${status})`;
+}
+
 async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastErr: any = null;
   let lastJson: any = null;
@@ -93,30 +130,41 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log("[OneSignal] attempt", attempt, "target", target.mode);
+      console.log("[OneSignal:Validation]", { attempt, target: target.mode });
       const res = await sendOneSignal(target, payloadData);
       lastStatus = res.status;
       lastJson = await res.json().catch(() => ({}));
-      console.log("[OneSignal] response", { attempt, status: res.status, body: lastJson });
+      console.log("[OneSignal:Response]", { attempt, status: res.status, body: lastJson });
       const recipients = Number(lastJson?.recipients ?? 0);
-      const hasId = !!lastJson?.id;
-      if (res.ok && hasId && recipients > 0) {
+      const hasId = !!(lastJson?.id || lastJson?.notification_id);
+      const accepted = lastJson?.accepted === true;
+      // Success = OneSignal accepted the notification (id/accepted) and reported
+      // no `errors`. `recipients` may legitimately be absent/0 on the v16 API,
+      // so it must NOT drive the success decision.
+      if (res.ok && (hasId || accepted) && !hasApiErrors(lastJson)) {
+        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients });
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
       // Non-transient failures: do NOT retry.
       const invalid = extractInvalidAliases(lastJson);
       const authError = res.status === 401 || res.status === 403;
-      if (invalid.length > 0 || authError) {
-        console.warn("[OneSignal] non_transient_failure", { invalid, status: res.status });
+      const validationError = res.status === 400 && hasApiErrors(lastJson);
+      if (invalid.length > 0 || authError || validationError) {
+        console.error("[OneSignal:Error] non_transient", { invalid, status: res.status, body: lastJson });
         return {
-          ok: false, attempts: attempt, json: lastJson, status: res.status,
-          recipients, error: authError ? "onesignal_auth_error" : "invalid_aliases",
+          ok: false, attempts: attempt, json: lastJson, status: res.status, recipients,
+          error: authError
+            ? "onesignal_auth_error"
+            : invalid.length > 0
+              ? "invalid_aliases"
+              : "invalid_payload",
+          message: describeError(res.status, lastJson),
         };
       }
-      console.warn("[OneSignal] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
+      console.warn("[OneSignal:Error] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
-      console.error("[OneSignal] attempt", attempt, "threw", e);
+      console.error("[OneSignal:Error] attempt", attempt, "threw", e);
     }
     if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400));
   }
@@ -127,6 +175,7 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
     status: lastStatus,
     recipients: Number(lastJson?.recipients ?? 0),
     error: lastErr ? String(lastErr) : undefined,
+    message: lastErr ? "Erro de rede ao contatar o OneSignal" : describeError(lastStatus, lastJson),
   };
 }
 
@@ -207,7 +256,7 @@ Deno.serve(async (req) => {
           : (result.error ?? "onesignal_send_failed");
         const message = isInvalidAlias
           ? "Este motorista ainda não registrou o dispositivo no OneSignal. Peça para ele abrir o app, conceder permissão de notificação e tentar novamente."
-          : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+          : ((result as any).message ?? `OneSignal respondeu com falha (HTTP ${result.status}).`);
         // Return 200 so the client sees the real reason instead of "non-2xx".
         return new Response(
           JSON.stringify({
@@ -227,7 +276,14 @@ Deno.serve(async (req) => {
         request_id, driver_id, recipients: result.recipients, attempts: result.attempts,
       });
       return new Response(
-        JSON.stringify({ sent: 1, recipients: result.recipients, attempts: result.attempts, onesignal: result.json }),
+        JSON.stringify({
+          sent: 1,
+          accepted: true,
+          notification_id: (result.json as any)?.id ?? null,
+          recipients: result.recipients,
+          attempts: result.attempts,
+          onesignal: result.json,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -271,7 +327,7 @@ Deno.serve(async (req) => {
       const reason = noRecipients ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed");
       const message = noRecipients
         ? "Nenhum motorista com dispositivo registrado no OneSignal. Peça para os motoristas abrirem o app e concederem permissão de notificação."
-        : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+        : ((result as any).message ?? `OneSignal respondeu com falha (HTTP ${result.status}).`);
       return new Response(
         JSON.stringify({
           sent: 0,
@@ -290,7 +346,14 @@ Deno.serve(async (req) => {
       request_id, recipients: result.recipients, attempts: result.attempts,
     });
     return new Response(
-      JSON.stringify({ sent: result.recipients, attempts: result.attempts, onesignal: result.json }),
+      // `recipients` can be omitted by the v16 API; `accepted` marks real success.
+      JSON.stringify({
+        sent: result.recipients,
+        accepted: true,
+        notification_id: (result.json as any)?.id ?? null,
+        attempts: result.attempts,
+        onesignal: result.json,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
