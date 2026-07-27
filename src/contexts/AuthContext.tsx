@@ -28,6 +28,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    console.log("[Auth] App iniciou");
+
     // Track last processed uid + access token to avoid re-running side effects
     // for duplicate auth events (INITIAL_SESSION + SIGNED_IN + TOKEN_REFRESHED
     // all fire and each carries a fresh object reference, which was causing
@@ -35,6 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let lastUid: string | null | undefined = undefined;
     let lastToken: string | null | undefined = undefined;
     let handled = false;
+
+
 
     const enforceSuspension = async () => {
       try {
