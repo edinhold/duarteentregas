@@ -1,12 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { setOneSignalExternalUserId, clearOneSignalExternalUserId, registerDeviceForUser } from "@/lib/onesignal";
+
+export type AppRole = "admin" | "store_owner" | "driver" | "customer";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  role: AppRole | null;
+  roleLoading: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -16,6 +20,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<AppRole | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
+  // Guards against double initialization (React StrictMode / remounts):
+  // only ONE getSession() + ONE onAuthStateChange listener may exist.
+  const initializedRef = useRef(false);
+
 
   useEffect(() => {
     // Track last processed uid + access token to avoid re-running side effects
