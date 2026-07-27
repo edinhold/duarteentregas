@@ -21,25 +21,32 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
+  // Deep link straight to the delivery so PWA/native clients open the offer.
+  const deepLink = payloadData.request_id
+    ? `/entregador?entrega=${payloadData.request_id}`
+    : "/entregador";
   const payload: Record<string, unknown> = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
     contents: {
-      en: `Você recebeu uma nova solicitação de entrega. Toque para visualizar. ${subtitle}`,
-      pt: `Você recebeu uma nova solicitação de entrega. Toque para visualizar. ${subtitle}`,
+      en: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
+      pt: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
     },
     data: {
       pedido_id: payloadData.request_id,
       tipo: "nova_entrega",
-      rota: "/entregador",
+      rota: deepLink,
       request_id: payloadData.request_id,
       driver_fee: payloadData.driver_fee,
       pickup_address: payloadData.pickup_address,
       delivery_address: payloadData.delivery_address,
-      url: "/entregador",
+      url: deepLink,
     },
-    url: "/entregador",
+    url: deepLink,
+    web_url: deepLink,
+    chrome_web_icon: "/icon-192.png",
+    chrome_web_badge: "/icon-192.png",
     priority: 10,
     ttl: 30,
     android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
@@ -82,7 +89,9 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   let lastErr: any = null;
   let lastJson: any = null;
   let lastStatus = 0;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // Send once and retry a single time on transient failures (spec requirement).
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       console.log("[OneSignal] attempt", attempt, "target", target.mode);
       const res = await sendOneSignal(target, payloadData);
@@ -109,11 +118,11 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
       lastErr = e;
       console.error("[OneSignal] attempt", attempt, "threw", e);
     }
-    await new Promise((r) => setTimeout(r, 300 * Math.pow(3, attempt - 1)));
+    if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400));
   }
   return {
     ok: false,
-    attempts: 3,
+    attempts: MAX_ATTEMPTS,
     json: lastJson,
     status: lastStatus,
     recipients: Number(lastJson?.recipients ?? 0),
