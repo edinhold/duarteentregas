@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
       const { data: drivers } = await supabase
         .from("drivers")
         .select("user_id")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("approval_status", "approved");
       targetUserIds = (drivers ?? []).map((d: any) => d.user_id).filter(Boolean);
     }
 
@@ -52,27 +53,55 @@ Deno.serve(async (req) => {
       .in("user_id", targetUserIds);
 
     const payload = JSON.stringify({
-      title: "Nova entrega disponível",
-      body: `R$ ${Number(driver_fee ?? 0).toFixed(2)} • ${pickup_address ?? ""} → ${delivery_address ?? ""}`,
-      data: { request_id, url: "/motorista" },
+      title: "🚚 Nova entrega disponível",
+      body: "Você recebeu uma nova entrega. Toque para visualizar.",
+      data: {
+        request_id,
+        driver_fee,
+        pickup_address,
+        delivery_address,
+        url: "/entregador",
+      },
     });
+
+    // Deduplicate endpoints so the same device is never notified twice.
+    const seen = new Set<string>();
 
     let sent = 0;
     const deadIds: string[] = [];
 
     await Promise.all(
       (subs ?? []).map(async (s: any) => {
-        try {
-          await webpush.sendNotification(
+        if (seen.has(s.endpoint)) return;
+        seen.add(s.endpoint);
+        const send = () =>
+          webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
             payload,
-            { TTL: 60, urgency: "high" },
+            { TTL: 30, urgency: "high" },
           );
+        try {
+          await send();
           sent++;
         } catch (err: any) {
           const code = err?.statusCode;
-          if (code === 404 || code === 410) deadIds.push(s.id);
-          console.error("push fail", code, err?.body ?? err?.message);
+          if (code === 404 || code === 410) {
+            deadIds.push(s.id);
+            console.error("[WebPush] subscription gone", { user_id: s.user_id, code });
+            return;
+          }
+          console.error("[WebPush] send failed, retrying once", {
+            user_id: s.user_id, code, body: err?.body ?? err?.message, request_id,
+          });
+          // Retry exactly once for transient failures.
+          try {
+            await send();
+            sent++;
+          } catch (err2: any) {
+            console.error("[WebPush] retry failed", {
+              user_id: s.user_id, code: err2?.statusCode, body: err2?.body ?? err2?.message, request_id,
+            });
+          }
         }
       }),
     );
@@ -80,6 +109,10 @@ Deno.serve(async (req) => {
     if (deadIds.length) {
       await supabase.from("push_subscriptions").delete().in("id", deadIds);
     }
+
+    console.log("[WebPush] delivery call dispatched", {
+      at: new Date().toISOString(), request_id, targets: targetUserIds.length, sent, removed: deadIds.length,
+    });
 
     return new Response(JSON.stringify({ sent, removed: deadIds.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
