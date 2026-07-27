@@ -57,7 +57,12 @@ const Auth = () => {
           }
 
           localStorage.setItem("lastRoute", targetPath);
+          // Marca o redirect como já efetuado para esta sessão, evitando um
+          // segundo redirect automático na home (loop de navegação).
+          try { sessionStorage.setItem("authRedirectDone", uid); } catch {}
+          console.log("[Auth] Redirect:", targetPath);
           navigate(targetPath, { replace: true });
+
         } else {
           navigate("/");
         }
