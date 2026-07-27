@@ -32,7 +32,7 @@ const Index = () => {
   // Só ocorre depois que a sessão e a role foram carregadas, e apenas
   // uma vez por sessão do navegador (evita loop ao voltar para a home).
   useEffect(() => {
-    if (loading || roleChecking(loading, user, roleLoading)) return;
+    if (loading || roleLoading) return;
     if (!user || !role) return;
     if (redirectedRef.current) return;
 
