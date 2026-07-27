@@ -146,25 +146,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[Auth] onAuthStateChange:", event);
       apply(session, `event:${event}`);
     });
+    console.log("[Auth] Listener registrado");
 
+    console.log("[Auth] Recuperando sessão");
     supabase.auth.getSession().then(({ data: { session } }) => {
       apply(session, "getSession");
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      console.log("[Auth] Listener removido");
+    };
   }, []);
 
 
 
   const signOut = async () => {
     try { await clearOneSignalExternalUserId(); } catch {}
+    try { sessionStorage.removeItem("authRedirectDone"); } catch {}
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, role, roleLoading, signOut }}>
+
       {children}
     </AuthContext.Provider>
   );
