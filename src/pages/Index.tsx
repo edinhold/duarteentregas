@@ -3,7 +3,6 @@ import logoDuarte from "@/assets/logo-duarte.jpeg";
 import { useNavigate } from "react-router-dom";
 import { useCategories, useRestaurants } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import CategoryBar from "@/components/CategoryBar";
 import RestaurantCard from "@/components/RestaurantCard";
 import RestaurantMap from "@/components/RestaurantMap";
