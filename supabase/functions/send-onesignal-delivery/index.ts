@@ -276,7 +276,14 @@ Deno.serve(async (req) => {
         request_id, driver_id, recipients: result.recipients, attempts: result.attempts,
       });
       return new Response(
-        JSON.stringify({ sent: 1, recipients: result.recipients, attempts: result.attempts, onesignal: result.json }),
+        JSON.stringify({
+          sent: 1,
+          accepted: true,
+          notification_id: (result.json as any)?.id ?? null,
+          recipients: result.recipients,
+          attempts: result.attempts,
+          onesignal: result.json,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
