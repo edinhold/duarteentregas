@@ -339,7 +339,14 @@ Deno.serve(async (req) => {
       request_id, recipients: result.recipients, attempts: result.attempts,
     });
     return new Response(
-      JSON.stringify({ sent: result.recipients, attempts: result.attempts, onesignal: result.json }),
+      // `recipients` can be omitted by the v16 API; `accepted` marks real success.
+      JSON.stringify({
+        sent: result.recipients,
+        accepted: true,
+        notification_id: (result.json as any)?.id ?? null,
+        attempts: result.attempts,
+        onesignal: result.json,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
