@@ -17,49 +17,35 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
 
+const ROLE_HOME: Record<string, string> = {
+  admin: "/admin",
+  store_owner: "/lojista",
+  driver: "/entregador",
+};
+
 const Index = () => {
   const navigate = useNavigate();
-  const { user, signOut, loading } = useAuth();
-  const [roleChecking, setRoleChecking] = useState(false);
+  const { user, signOut, loading, role, roleLoading } = useAuth();
+  const redirectedRef = useRef(false);
 
-  // Se o usuário estiver logado, redirecionar para o painel correspondente
+  // Redirecionamento ÚNICO para o painel correspondente.
+  // Só ocorre depois que a sessão e a role foram carregadas, e apenas
+  // uma vez por sessão do navegador (evita loop ao voltar para a home).
   useEffect(() => {
-    if (loading) return;
-    if (!user) return;
-    let cancelled = false;
-    setRoleChecking(true);
-    (async () => {
-      const uid = user.id;
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
-      const userRoles = roles?.map(r => r.role) || [];
+    if (loading || roleChecking(loading, user, roleLoading)) return;
+    if (!user || !role) return;
+    if (redirectedRef.current) return;
 
-      let target: string | null = null;
-      if (userRoles.includes("admin")) target = "/admin";
-      else if (userRoles.includes("store_owner")) target = "/lojista";
-      else if (userRoles.includes("driver")) target = "/entregador";
-      else {
-        const [{ data: driverProfile }, { data: ownedRest }] = await Promise.all([
-          supabase.from("drivers").select("id").eq("user_id", uid).maybeSingle(),
-          supabase.from("restaurants").select("id").eq("owner_id", uid).maybeSingle(),
-        ]);
-        if (driverProfile) {
-          target = "/entregador";
-          await supabase.from("user_roles").insert({ user_id: uid, role: "driver" as any }).then(() => {}, () => {});
-        } else if (ownedRest) {
-          target = "/lojista";
-          await supabase.from("user_roles").insert({ user_id: uid, role: "store_owner" as any }).then(() => {}, () => {});
-        }
-      }
+    const alreadyRedirected = sessionStorage.getItem("authRedirectDone") === user.id;
+    const target = ROLE_HOME[role];
+    if (!target || alreadyRedirected) return;
 
-      if (cancelled) return;
-      if (target) {
-        navigate(target, { replace: true });
-      } else {
-        setRoleChecking(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id, loading, navigate]);
+    redirectedRef.current = true;
+    sessionStorage.setItem("authRedirectDone", user.id);
+    console.log("[Auth] Redirect:", target);
+    navigate(target, { replace: true });
+  }, [loading, roleLoading, user, role, navigate]);
+
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
