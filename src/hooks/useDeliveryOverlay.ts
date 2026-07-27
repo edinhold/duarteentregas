@@ -62,6 +62,9 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
       window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(dismissedRef.current).slice(-500)));
     } catch {}
   };
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const shownAtRef = useRef<number>(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const standbyRef = useRef(standby);
@@ -76,6 +79,11 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
       clearTimeout(autoCloseRef.current);
       autoCloseRef.current = null;
     }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setSecondsLeft(0);
   }, []);
 
   const close = useCallback(() => {
@@ -95,8 +103,17 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         if ("vibrate" in navigator) navigator.vibrate?.([400, 200, 400]);
       } catch {}
     }, 4000);
+
+    // Local response countdown (UI only — no database polling).
+    shownAtRef.current = Date.now();
+    setSecondsLeft(Math.ceil(timeoutMs / 1000));
+    countdownRef.current = setInterval(() => {
+      const remaining = Math.max(0, timeoutMs - (Date.now() - shownAtRef.current));
+      setSecondsLeft(Math.ceil(remaining / 1000));
+    }, 1000);
+
     autoCloseRef.current = setTimeout(() => {
-      console.log("[DeliveryOverlay] Timeout — fechando overlay");
+      console.log("[DeliveryOverlay] Sem resposta em", timeoutMs, "ms — oferta segue disponível para outros motoristas");
       close();
     }, timeoutMs);
   }, [close, timeoutMs]);
@@ -136,6 +153,44 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     },
     [close, user?.id]
   );
+
+  /** Opens the overlay for a specific delivery (used by push deep links). */
+  const openDelivery = useCallback(
+    (id: string) => {
+      if (!id) return;
+      if (dismissedRef.current.has(id)) dismissedRef.current.delete(id);
+      stopAlerts();
+      startAlerts();
+      loadDelivery(id);
+    },
+    [loadDelivery, startAlerts, stopAlerts]
+  );
+
+  // Deep link (?entrega=<id>) coming from a push notification click, plus
+  // messages posted by the service worker when reusing an existing window.
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+    const consumeParam = () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("entrega");
+      if (!id) return;
+      params.delete("entrega");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      console.log("[DeliveryOverlay] Deep link de push recebido", id);
+      openDelivery(id);
+    };
+    consumeParam();
+
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "OPEN_DELIVERY" && event.data?.requestId) {
+        console.log("[DeliveryOverlay] Clique na notificação (SW)", event.data.requestId);
+        openDelivery(event.data.requestId);
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", onSwMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", onSwMessage);
+  }, [user, openDelivery]);
 
   // Notification / overlay permission check (web fallback for Android SYSTEM_ALERT_WINDOW).
   useEffect(() => {
@@ -267,5 +322,15 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     close();
   }, [delivery, close]);
 
-  return { delivery, state, accept, reject, close, permissionWarning, requestPermission };
+  return {
+    delivery,
+    state,
+    secondsLeft,
+    accept,
+    reject,
+    close,
+    openDelivery,
+    permissionWarning,
+    requestPermission,
+  };
 }
