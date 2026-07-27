@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
           : (result.error ?? "onesignal_send_failed");
         const message = isInvalidAlias
           ? "Este motorista ainda não registrou o dispositivo no OneSignal. Peça para ele abrir o app, conceder permissão de notificação e tentar novamente."
-          : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+          : ((result as any).message ?? `OneSignal respondeu com falha (HTTP ${result.status}).`);
         // Return 200 so the client sees the real reason instead of "non-2xx".
         return new Response(
           JSON.stringify({
