@@ -58,25 +58,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     };
 
-    const handleUser = async (uid: string | undefined) => {
-      if (!uid) {
-        clearOneSignalExternalUserId().catch(() => {});
-        return;
-      }
-      const suspended = await enforceSuspension();
-      if (suspended) return;
-      setOneSignalExternalUserId(uid).catch(() => {});
+    const resolveRole = async (uid: string): Promise<AppRole> => {
       try {
         const { data: roles } = await (supabase as any)
           .from("user_roles")
           .select("role")
           .eq("user_id", uid);
-        const role = Array.isArray(roles) && roles.length > 0 ? String(roles[0].role) : "customer";
-        registerDeviceForUser(uid, { role }).catch(() => {});
-      } catch {
-        registerDeviceForUser(uid, {}).catch(() => {});
-      }
+        const list: string[] = Array.isArray(roles) ? roles.map((r: any) => String(r.role)) : [];
+        if (list.includes("admin")) return "admin";
+        if (list.includes("store_owner")) return "store_owner";
+        if (list.includes("driver")) return "driver";
+
+        // Fallback: infer from associated data (legacy accounts without a row in user_roles)
+        const [{ data: driverProfile }, { data: ownedRest }] = await Promise.all([
+          supabase.from("drivers").select("id").eq("user_id", uid).maybeSingle(),
+          supabase.from("restaurants").select("id").eq("owner_id", uid).maybeSingle(),
+        ]);
+        if (driverProfile) {
+          await supabase.from("user_roles").insert({ user_id: uid, role: "driver" as any }).then(() => {}, () => {});
+          return "driver";
+        }
+        if (ownedRest) {
+          await supabase.from("user_roles").insert({ user_id: uid, role: "store_owner" as any }).then(() => {}, () => {});
+          return "store_owner";
+        }
+      } catch {}
+      return "customer";
     };
+
+    const handleUser = async (uid: string | undefined) => {
+      if (!uid) {
+        setRole(null);
+        setRoleLoading(false);
+        clearOneSignalExternalUserId().catch(() => {});
+        return;
+      }
+      setRoleLoading(true);
+      const suspended = await enforceSuspension();
+      if (suspended) {
+        setRole(null);
+        setRoleLoading(false);
+        return;
+      }
+      setOneSignalExternalUserId(uid).catch(() => {});
+      const resolved = await resolveRole(uid);
+      console.log("[Auth] Role carregada:", resolved);
+      setRole(resolved);
+      setRoleLoading(false);
+      registerDeviceForUser(uid, { role: resolved }).catch(() => {});
+    };
+
 
     const apply = (nextSession: Session | null, source: string) => {
       const uid = nextSession?.user?.id ?? null;
