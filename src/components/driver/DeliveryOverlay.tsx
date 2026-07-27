@@ -45,7 +45,7 @@ const DeliveryOverlay = ({ delivery, state, secondsLeft = 0, permissionWarning, 
             transition={{ duration: 0.2 }}
             className="w-full max-w-md md:max-w-lg md:mt-8 lg:absolute lg:top-6 lg:right-6 lg:max-w-sm"
           >
-            <Card className="shadow-xl border-2 border-primary overflow-hidden transition-all duration-200 animate-pulse-none ring-4 ring-primary/30">
+            <Card className="shadow-xl border-2 border-primary overflow-hidden transition-all duration-200 ring-4 ring-primary/30">
               <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
