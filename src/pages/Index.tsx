@@ -116,7 +116,7 @@ const Index = () => {
 
   const featured = restaurants.filter((r) => r.is_featured && r.is_open);
 
-  if (loading || (user && roleChecking)) {
+  if (loading || (user && roleLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-sm text-muted-foreground">Carregando seu painel...</div>
