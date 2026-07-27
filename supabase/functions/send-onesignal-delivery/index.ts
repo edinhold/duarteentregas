@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
       const reason = noRecipients ? "no_subscribed_drivers" : (result.error ?? "onesignal_send_failed");
       const message = noRecipients
         ? "Nenhum motorista com dispositivo registrado no OneSignal. Peça para os motoristas abrirem o app e concederem permissão de notificação."
-        : `OneSignal respondeu com falha (HTTP ${result.status}).`;
+        : ((result as any).message ?? `OneSignal respondeu com falha (HTTP ${result.status}).`);
       return new Response(
         JSON.stringify({
           sent: 0,
