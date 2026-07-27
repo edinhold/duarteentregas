@@ -17,15 +17,30 @@ const supabase = createClient(
 
 type SendMode = { mode: "aliases"; externalIds: string[] } | { mode: "segment" };
 
+// ROOT CAUSE (HTTP 400): we were sending BOTH `url` and `web_url`, and the value
+// was a relative path. OneSignal answers:
+//   "Url Remove url field when setting app_url or web_url"
+//   "Option Begin your notification web_url with http:// or https://."
+// Fix: send ONLY `url`, always as an absolute https URL.
+const APP_BASE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://duarteentregas.lovable.app")
+  .replace(/\/+$/, "");
+
+function prune(obj: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+  );
+}
+
 async function sendOneSignal(target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
   // Deep link straight to the delivery so PWA/native clients open the offer.
-  const deepLink = payloadData.request_id
+  const path = payloadData.request_id
     ? `/entregador?entrega=${payloadData.request_id}`
     : "/entregador";
-  const payload: Record<string, unknown> = {
+  const deepLink = `${APP_BASE_URL}${path}`;
+  const payload: Record<string, unknown> = prune({
     app_id: ONESIGNAL_APP_ID,
     target_channel: "push",
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
@@ -33,20 +48,20 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
       en: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
       pt: `Você recebeu uma nova entrega. Toque para visualizar. ${subtitle}`,
     },
-    data: {
+    data: prune({
       pedido_id: payloadData.request_id,
       tipo: "nova_entrega",
-      rota: deepLink,
+      rota: path,
       request_id: payloadData.request_id,
       driver_fee: payloadData.driver_fee,
       pickup_address: payloadData.pickup_address,
       delivery_address: payloadData.delivery_address,
       url: deepLink,
-    },
+    }),
+    // Only `url` — never together with `web_url`/`app_url`.
     url: deepLink,
-    web_url: deepLink,
-    chrome_web_icon: "/icon-192.png",
-    chrome_web_badge: "/icon-192.png",
+    chrome_web_icon: `${APP_BASE_URL}/icon-192.png`,
+    chrome_web_badge: `${APP_BASE_URL}/icon-192.png`,
     priority: 10,
     ttl: 30,
     android_channel_id: ONESIGNAL_ANDROID_CHANNEL_ID,
@@ -60,7 +75,7 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     ios_interruption_level: "time_sensitive",
     mutable_content: true,
     content_available: true,
-  };
+  });
 
   if (target.mode === "aliases") {
     payload.include_aliases = { external_id: target.externalIds };
@@ -68,6 +83,8 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     payload.included_segments = ["Subscribed Users"];
     payload.filters = [{ field: "tag", key: "role", relation: "=", value: "driver" }];
   }
+
+  console.log("[OneSignal:Request]", JSON.stringify({ target, url: deepLink }));
 
   return await fetch("https://api.onesignal.com/notifications?c=push", {
     method: "POST",
