@@ -8,6 +8,7 @@ import type { OverlayDelivery, OverlayState } from "@/hooks/useDeliveryOverlay";
 interface Props {
   delivery: OverlayDelivery | null;
   state: OverlayState;
+  secondsLeft?: number;
   permissionWarning: boolean;
   onAccept: () => void;
   onReject: () => void;
@@ -20,7 +21,7 @@ interface Props {
  * SYSTEM_ALERT_WINDOW (Draw Over Other Apps); on the web we render the
  * highest-z modal possible as a fallback.
  */
-const DeliveryOverlay = ({ delivery, state, permissionWarning, onAccept, onReject, onRequestPermission }: Props) => {
+const DeliveryOverlay = ({ delivery, state, secondsLeft = 0, permissionWarning, onAccept, onReject, onRequestPermission }: Props) => {
   const visible = !!delivery || state === "loading" || state === "error";
 
   return (
@@ -44,7 +45,7 @@ const DeliveryOverlay = ({ delivery, state, permissionWarning, onAccept, onRejec
             transition={{ duration: 0.2 }}
             className="w-full max-w-md md:max-w-lg md:mt-8 lg:absolute lg:top-6 lg:right-6 lg:max-w-sm"
           >
-            <Card className="shadow-xl border-primary/40 overflow-hidden transition-all duration-200">
+            <Card className="shadow-xl border-2 border-primary overflow-hidden transition-all duration-200 animate-pulse-none ring-4 ring-primary/30">
               <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
@@ -53,7 +54,9 @@ const DeliveryOverlay = ({ delivery, state, permissionWarning, onAccept, onRejec
                   </span>
                   <p className="text-sm font-semibold">Nova entrega disponível</p>
                 </div>
-                <Badge variant="secondary" className="text-xs">Standby</Badge>
+                <Badge variant="secondary" className="text-xs tabular-nums">
+                  {secondsLeft > 0 ? `${secondsLeft}s para responder` : "Standby"}
+                </Badge>
               </div>
 
               <div className="p-4 space-y-3">
@@ -141,7 +144,7 @@ const DeliveryOverlay = ({ delivery, state, permissionWarning, onAccept, onRejec
                     className="w-full md:flex-1 transition-all duration-200"
                     aria-label="Aceitar entrega"
                   >
-                    <Check className="h-4 w-4 mr-1" /> Aceitar
+                    <Check className="h-4 w-4 mr-1" /> Aceitar{secondsLeft > 0 ? ` (${secondsLeft}s)` : ""}
                   </Button>
                 </div>
               </div>

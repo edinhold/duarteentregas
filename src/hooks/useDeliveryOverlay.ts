@@ -303,7 +303,12 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         p_request_id: delivery.id,
       });
       if (error) throw error;
-      console.log("[Delivery] Motorista aceitou (overlay)", delivery.id);
+      console.log("[Delivery] Motorista aceitou (overlay)", {
+        request_id: delivery.id,
+        driver_user_id: user.id,
+        response_time_ms: shownAtRef.current ? Date.now() - shownAtRef.current : null,
+        at: new Date().toISOString(),
+      });
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
       onAccepted?.(delivery);
@@ -316,7 +321,11 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
 
   const reject = useCallback(() => {
     if (!delivery) return;
-    console.log("[DeliveryOverlay] Entrega recusada", delivery.id);
+    console.log("[DeliveryOverlay] Entrega recusada", {
+      request_id: delivery.id,
+      response_time_ms: shownAtRef.current ? Date.now() - shownAtRef.current : null,
+      at: new Date().toISOString(),
+    });
     dismissedRef.current.add(delivery.id);
     persistDismissed();
     close();
