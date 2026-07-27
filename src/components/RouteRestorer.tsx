@@ -14,6 +14,11 @@ const isExcludedRoute = (path: string) =>
 const isProtectedPanelRoute = (path: string) =>
   PROTECTED_PANEL_ROUTES.some((route) => path === route || path.startsWith(`${route}/`));
 
+// Module-level flag: the saved route may only be restored ONCE per page load.
+// Without it, any remount of the component (or a later auth event) re-navigates
+// and fights with the role-based redirect, producing an infinite loop.
+let restoreAttempted = false;
+
 const RouteRestorer = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,9 +32,11 @@ const RouteRestorer = () => {
     }
   }, [location, user]);
 
-  // On first mount, restore saved route
+  // On first mount, restore saved route (only once, after auth finished loading)
   useEffect(() => {
     if (loading) return;
+    if (restoreAttempted) return;
+    restoreAttempted = true;
     if (isExcludedRoute(location.pathname)) return;
 
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -40,10 +47,12 @@ const RouteRestorer = () => {
       !isExcludedRoute(saved) &&
       (!isProtectedPanelRoute(saved) || user)
     ) {
+      console.log("[Auth] Redirect:", saved);
       navigate(saved, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+
 
   return null;
 };
