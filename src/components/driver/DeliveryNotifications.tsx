@@ -15,7 +15,7 @@ interface Props {
  * entire app whenever a new pending delivery arrives.
  */
 const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
-  const { delivery, state, accept, reject, permissionWarning, requestPermission } = useDeliveryOverlay({
+  const { delivery, state, secondsLeft, accept, reject, permissionWarning, requestPermission } = useDeliveryOverlay({
     standby,
     timeoutMs,
     onAccepted: () => onAccepted?.(),
@@ -97,6 +97,7 @@ const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
     <DeliveryOverlay
       delivery={delivery}
       state={state}
+      secondsLeft={secondsLeft}
       permissionWarning={permissionWarning}
       onAccept={accept}
       onReject={reject}

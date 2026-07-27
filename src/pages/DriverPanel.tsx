@@ -616,6 +616,7 @@ const DriverPanel = () => {
     <SidebarProvider>
       <DeliveryNotifications
         standby={isOnline && !activeRequest}
+        timeoutMs={30000}
         onAccepted={() => setActiveTab("home")}
       />
       <div className="flex min-h-screen w-full bg-background overflow-hidden">
