@@ -636,38 +636,62 @@ export type Database = {
       }
       onesignal_devices: {
         Row: {
+          app_version: string | null
           created_at: string
+          device_model: string | null
           external_id: string
           id: string
           last_synced_at: string
+          onesignal_external_id: string | null
+          onesignal_subscription_id: string | null
           onesignal_user_id: string | null
+          permission_status: string | null
           platform: string | null
+          profile_type: string | null
+          push_token: string | null
           status: string | null
           subscription_id: string | null
+          subscription_status: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          app_version?: string | null
           created_at?: string
+          device_model?: string | null
           external_id: string
           id?: string
           last_synced_at?: string
+          onesignal_external_id?: string | null
+          onesignal_subscription_id?: string | null
           onesignal_user_id?: string | null
+          permission_status?: string | null
           platform?: string | null
+          profile_type?: string | null
+          push_token?: string | null
           status?: string | null
           subscription_id?: string | null
+          subscription_status?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          app_version?: string | null
           created_at?: string
+          device_model?: string | null
           external_id?: string
           id?: string
           last_synced_at?: string
+          onesignal_external_id?: string | null
+          onesignal_subscription_id?: string | null
           onesignal_user_id?: string | null
+          permission_status?: string | null
           platform?: string | null
+          profile_type?: string | null
+          push_token?: string | null
           status?: string | null
           subscription_id?: string | null
+          subscription_status?: string | null
           updated_at?: string
           user_id?: string
         }

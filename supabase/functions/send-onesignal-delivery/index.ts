@@ -55,12 +55,17 @@ function validateRequestBody(body: any) {
   const driverFee = Number(body?.driver_fee ?? 0);
   const pickupAddress = String(body?.pickup_address ?? "").trim();
   const deliveryAddress = String(body?.delivery_address ?? "").trim();
+  const testMode = body?.test_mode === true;
+  const testSubscriptionId = body?.test_subscription_id ? String(body.test_subscription_id).trim() : "";
 
   if (!isUuid(requestId)) {
     return { ok: false as const, message: "request_id ausente ou inválido. Envie um UUID válido da entrega." };
   }
   if (driverId && !isUuid(driverId)) {
     return { ok: false as const, message: "driver_id inválido. Envie o UUID do motorista ou deixe vazio para broadcast." };
+  }
+  if (testSubscriptionId && !isUuid(testSubscriptionId)) {
+    return { ok: false as const, message: "test_subscription_id inválido." };
   }
   if (!Number.isFinite(driverFee) || driverFee < 0) {
     return { ok: false as const, message: "driver_fee inválido." };
@@ -77,6 +82,8 @@ function validateRequestBody(body: any) {
       driver_fee: driverFee,
       pickup_address: pickupAddress,
       delivery_address: deliveryAddress,
+      test_mode: testMode,
+      test_subscription_id: testSubscriptionId || null,
     },
   };
 }
@@ -144,17 +151,17 @@ async function getDriverSubscriptionIds(config: OneSignalConfig, driverId: strin
 
   const { data, error } = await (supabase as any)
     .from("onesignal_devices")
-    .select("subscription_id,status")
+    .select("subscription_id,onesignal_subscription_id,status,subscription_status,permission_status")
     .eq("user_id", driverId)
-    .eq("status", "active")
-    .not("subscription_id", "is", null)
+    .or("status.eq.active,subscription_status.eq.subscribed")
+    .neq("permission_status", "denied")
     .order("last_synced_at", { ascending: false });
 
   if (error) {
     console.error("[OneSignal:SubscriptionLookupError]", { driver_id: driverId, error });
     return { ids: [], source: "none" };
   }
-  const ids = validSubscriptionIds((data ?? []).map((row: any) => row.subscription_id));
+  const ids = validSubscriptionIds((data ?? []).flatMap((row: any) => [row.onesignal_subscription_id, row.subscription_id]));
   return { ids, source: ids.length > 0 ? "database" : "none" };
 }
 
@@ -361,12 +368,15 @@ Deno.serve(async (req) => {
       driver_fee,
       pickup_address,
       delivery_address,
+      test_mode,
+      test_subscription_id,
     } = parsed.data;
 
     console.log("[OneSignal] request received", {
       request_id,
       driver_id,
       has_pickup: !!pickup_address,
+      test_mode,
       config: safeOneSignalLogConfig(config),
     });
 
@@ -375,7 +385,9 @@ Deno.serve(async (req) => {
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
-      const subscriptionTarget = await getDriverSubscriptionIds(config, driver_id);
+      const subscriptionTarget = test_mode && test_subscription_id
+        ? { ids: [test_subscription_id], source: "selected_device" as const }
+        : await getDriverSubscriptionIds(config, driver_id);
       const subscriptionIds = subscriptionTarget.ids;
       if (subscriptionTarget.error) {
         console.error("[OneSignal:ValidationError] subscription validation failed", {
@@ -404,22 +416,25 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Idempotent reservation for the specific driver via unique-violation catch
-      const { error: resErr } = await supabase
-        .from("push_notification_logs")
-        .insert([{ request_id, driver_user_id: driver_id, status: "reserved", attempts: 0, response: null, error: null }]);
-      if (resErr) {
-        if ((resErr as any).code === "23505") {
-          return new Response(
-            JSON.stringify({ sent: 0, reason: "already_notified" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
+      // Idempotent reservation for real deliveries. Test pushes use fake UUIDs
+      // and should not depend on delivery/log foreign keys.
+      if (!test_mode) {
+        const { error: resErr } = await supabase
+          .from("push_notification_logs")
+          .insert([{ request_id, driver_user_id: driver_id, status: "reserved", attempts: 0, response: null, error: null }]);
+        if (resErr) {
+          if ((resErr as any).code === "23505") {
+            return new Response(
+              JSON.stringify({ sent: 0, reason: "already_notified" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+          console.error("[PushNotifications] reservation error", resErr);
+          return new Response(JSON.stringify({ error: resErr.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-        console.error("[PushNotifications] reservation error", resErr);
-        return new Response(JSON.stringify({ error: resErr.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
 
       const result = await sendWithRetry(
@@ -429,38 +444,40 @@ Deno.serve(async (req) => {
       );
       const invalid = extractInvalidAliases(result.json);
       const targetedNotificationId = (result.json as any)?.id ?? null;
-      if (targetedNotificationId) {
+      if (targetedNotificationId && !test_mode) {
         await (supabase as any)
           .from("delivery_requests")
           .update({ onesignal_notification_id: targetedNotificationId })
           .eq("id", request_id);
       }
-      await (supabase as any).from("push_delivery_events").insert([{
-        pedido_id: request_id,
-        event_type: result.ok
-          ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
-          : "nova_entrega_erro",
-        onesignal_notification_id: targetedNotificationId,
-        recipients_count: result.recipients ?? 0,
-        status: result.ok ? "ok" : "error",
-        response_status: result.status ?? null,
-        response_body_sanitized: result.json ?? null,
-      }]);
+      if (!test_mode) {
+        await (supabase as any).from("push_delivery_events").insert([{
+          pedido_id: request_id,
+          event_type: result.ok
+            ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
+            : "nova_entrega_erro",
+          onesignal_notification_id: targetedNotificationId,
+          recipients_count: result.recipients ?? 0,
+          status: result.ok ? "ok" : "error",
+          response_status: result.status ?? null,
+          response_body_sanitized: result.json ?? null,
+        }]);
 
-      await supabase
-        .from("push_notification_logs")
-        .update({
-          status: result.ok ? "sent" : "failed",
-          attempts: result.attempts,
-          response: result.json ?? null,
-          error: result.ok
-            ? null
-            : (invalid.length > 0
-                ? `invalid_alias:${invalid.join(",")}`
-                : (result.error ?? `http_${result.status}`)),
-        })
-        .eq("request_id", request_id)
-        .eq("driver_user_id", driver_id);
+        await supabase
+          .from("push_notification_logs")
+          .update({
+            status: result.ok ? "sent" : "failed",
+            attempts: result.attempts,
+            response: result.json ?? null,
+            error: result.ok
+              ? null
+              : (invalid.length > 0
+                  ? `invalid_alias:${invalid.join(",")}`
+                  : (result.error ?? `http_${result.status}`)),
+          })
+          .eq("request_id", request_id)
+          .eq("driver_user_id", driver_id);
+      }
 
       if (!result.ok) {
         const isInvalidAlias = invalid.length > 0;
@@ -490,10 +507,11 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({
-          sent: 1,
+          sent: result.recipients > 0 ? 1 : 0,
           accepted: true,
           notification_id: (result.json as any)?.id ?? null,
           recipients: result.recipients,
+          test_mode,
           warning: result.recipients === 0
             ? "aceito_sem_destinatarios"
             : undefined,
@@ -514,21 +532,23 @@ Deno.serve(async (req) => {
     // Reserve one broadcast slot per request so we never send twice for the
     // same delivery even if the trigger fires multiple times.
     const BROADCAST_UUID = "00000000-0000-0000-0000-000000000000";
-    const { error: resErr } = await supabase
-      .from("push_notification_logs")
-      .insert([{ request_id, driver_user_id: BROADCAST_UUID, status: "reserved", attempts: 0, response: null, error: null }]);
-    if (resErr) {
-      if ((resErr as any).code === "23505") {
-        return new Response(
-          JSON.stringify({ sent: 0, reason: "already_broadcast" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+    if (!test_mode) {
+      const { error: resErr } = await supabase
+        .from("push_notification_logs")
+        .insert([{ request_id, driver_user_id: BROADCAST_UUID, status: "reserved", attempts: 0, response: null, error: null }]);
+      if (resErr) {
+        if ((resErr as any).code === "23505") {
+          return new Response(
+            JSON.stringify({ sent: 0, reason: "already_broadcast" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        console.error("[PushNotifications] broadcast reservation error", resErr);
+        return new Response(JSON.stringify({ error: resErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      console.error("[PushNotifications] broadcast reservation error", resErr);
-      return new Response(JSON.stringify({ error: resErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // Prefer explicit aliases of approved drivers (tags may be missing on some
@@ -548,11 +568,14 @@ Deno.serve(async (req) => {
     if (externalIds.length > 0) {
       const { data: devices } = await (supabase as any)
         .from("onesignal_devices")
-        .select("subscription_id")
+        .select("subscription_id,onesignal_subscription_id,permission_status,subscription_status,status,platform,last_synced_at")
         .in("user_id", externalIds)
-        .eq("status", "active")
-        .not("subscription_id", "is", null);
-      deviceSubscriptionIds = validSubscriptionIds((devices ?? []).map((d: any) => d.subscription_id)).slice(0, 2000);
+        .or("status.eq.active,subscription_status.eq.subscribed")
+        .neq("permission_status", "denied")
+        .order("last_synced_at", { ascending: false });
+      deviceSubscriptionIds = validSubscriptionIds(
+        (devices ?? []).flatMap((d: any) => [d.onesignal_subscription_id, d.subscription_id]),
+      ).slice(0, 2000);
     }
 
     const broadcastTarget: SendMode = deviceSubscriptionIds.length > 0
@@ -592,36 +615,37 @@ Deno.serve(async (req) => {
 
 
     // Persist the notification id so the accept flow can cancel it later.
-    if (notificationId) {
+    if (notificationId && !test_mode) {
       await (supabase as any)
         .from("delivery_requests")
         .update({ onesignal_notification_id: notificationId })
         .eq("id", request_id);
     }
 
-    await (supabase as any).from("push_delivery_events").insert([{
-      pedido_id: request_id,
-      event_type: result.ok
-        ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
-        : "nova_entrega_erro",
-      onesignal_notification_id: notificationId,
-      recipients_count: result.recipients ?? 0,
-      status: result.ok ? "ok" : "error",
-      response_status: result.status ?? null,
-      response_body_sanitized: result.json ?? null,
-    }]);
+    if (!test_mode) {
+      await (supabase as any).from("push_delivery_events").insert([{
+        pedido_id: request_id,
+        event_type: result.ok
+          ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
+          : "nova_entrega_erro",
+        onesignal_notification_id: notificationId,
+        recipients_count: result.recipients ?? 0,
+        status: result.ok ? "ok" : "error",
+        response_status: result.status ?? null,
+        response_body_sanitized: result.json ?? null,
+      }]);
 
-
-    await supabase
-      .from("push_notification_logs")
-      .update({
-        status: result.ok ? "sent" : "failed",
-        attempts: result.attempts,
-        response: result.json ?? null,
-        error: result.ok ? null : (result.error ?? `http_${result.status}_recipients_${result.recipients}`),
-      })
-      .eq("request_id", request_id)
-      .eq("driver_user_id", BROADCAST_UUID);
+      await supabase
+        .from("push_notification_logs")
+        .update({
+          status: result.ok ? "sent" : "failed",
+          attempts: result.attempts,
+          response: result.json ?? null,
+          error: result.ok ? null : (result.error ?? `http_${result.status}_recipients_${result.recipients}`),
+        })
+        .eq("request_id", request_id)
+        .eq("driver_user_id", BROADCAST_UUID);
+    }
 
     if (!result.ok) {
       console.error("[OneSignal] broadcast failed", result.status, result.json);
@@ -656,6 +680,7 @@ Deno.serve(async (req) => {
         recipients: result.recipients,
         targeted_drivers: externalIds.length,
         target_mode: broadcastTarget.mode,
+        test_mode,
         invalid_aliases: extractInvalidAliases(result.json),
         warning: result.recipients === 0 ? "aceito_sem_destinatarios" : undefined,
         message: result.recipients === 0
