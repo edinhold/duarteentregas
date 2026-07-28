@@ -283,10 +283,13 @@ async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadD
       const accepted = lastJson?.accepted === true;
       const invalidAliases = extractInvalidAliases(lastJson);
       // Success = OneSignal accepted the notification (id/accepted). Invalid
-      // aliases are tolerated on broadcasts: the valid ones still receive it.
+      // aliases / stale subscription ids are tolerated: valid ones still receive it.
+      const TOLERATED = ["invalid_aliases", "invalid_player_ids", "invalid_external_user_ids"];
+      const errorKeys = Object.keys(lastJson?.errors ?? {});
       const onlyInvalidAliasErrors =
-        invalidAliases.length > 0 && Object.keys(lastJson?.errors ?? {}).every((k) => k === "invalid_aliases");
+        errorKeys.length > 0 && errorKeys.every((k) => TOLERATED.includes(k)) && recipients > 0;
       if (res.ok && (hasId || accepted) && (!hasApiErrors(lastJson) || onlyInvalidAliasErrors)) {
+
         console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients, invalid: invalidAliases.length });
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
