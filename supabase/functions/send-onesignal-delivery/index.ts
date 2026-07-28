@@ -567,11 +567,20 @@ Deno.serve(async (req) => {
         sent: result.recipients,
         accepted: true,
         notification_id: (result.json as any)?.id ?? null,
+        recipients: result.recipients,
+        targeted_drivers: externalIds.length,
+        target_mode: broadcastTarget.mode,
+        invalid_aliases: extractInvalidAliases(result.json),
+        warning: result.recipients === 0 ? "aceito_sem_destinatarios" : undefined,
+        message: result.recipients === 0
+          ? "OneSignal aceitou a notificação, mas nenhum dispositivo estava inscrito/ativo no momento. Peça aos motoristas para abrir o app e permitir notificações."
+          : undefined,
         attempts: result.attempts,
         onesignal: result.json,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
+
   } catch (err: any) {
     console.error("[PushNotifications] handler error", err);
     return new Response(JSON.stringify({ error: err?.message ?? "error" }), {
