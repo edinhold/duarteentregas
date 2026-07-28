@@ -388,6 +388,8 @@ const DriverPanel = () => {
       supabase.removeChannel(channel); 
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener("delivery-unavailable", handleUnavailable);
+
     };
   }, [user, activeRequest?.id, driverProfile?.id]);
   
