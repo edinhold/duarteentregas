@@ -169,3 +169,34 @@ export function safeOneSignalLogConfig(config: OneSignalConfig): Record<string, 
     key_meta: config.keyMeta,
   };
 }
+
+export function summarizeOneSignalUser(value: any): Record<string, unknown> {
+  const subscriptions = Array.isArray(value?.subscriptions) ? value.subscriptions : [];
+  return {
+    identity: value?.identity ?? null,
+    properties: value?.properties
+      ? {
+          tags: value.properties.tags ?? null,
+          language: value.properties.language ?? null,
+          country: value.properties.country ?? null,
+          timezone_id: value.properties.timezone_id ?? null,
+          first_active: value.properties.first_active ?? null,
+          last_active: value.properties.last_active ?? null,
+        }
+      : null,
+    subscription_count: subscriptions.length,
+    active_subscription_count: subscriptions.filter((subscription: any) => (
+      subscription?.enabled && Number(subscription?.notification_types ?? 0) > 0
+    )).length,
+    subscriptions: subscriptions.map((subscription: any) => ({
+      id: subscription?.id ?? null,
+      type: subscription?.type ?? null,
+      enabled: subscription?.enabled ?? null,
+      notification_types: subscription?.notification_types ?? null,
+      session_count: subscription?.session_count ?? null,
+      device_model: subscription?.device_model ?? null,
+      device_os: subscription?.device_os ?? null,
+      app_version: subscription?.app_version ?? null,
+    })),
+  };
+}

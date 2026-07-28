@@ -9,6 +9,7 @@ import {
   oneSignalHeaders,
   readOneSignalResponse,
   safeOneSignalLogConfig,
+  summarizeOneSignalUser,
   type OneSignalConfig,
 } from "../_shared/onesignal.ts";
 
@@ -84,7 +85,63 @@ function validSubscriptionIds(values: unknown[]): string[] {
   return Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(isUuid)));
 }
 
-async function getDriverSubscriptionIds(driverId: string): Promise<string[]> {
+async function getOneSignalSubscriptionIds(config: OneSignalConfig, driverId: string): Promise<{
+  ids: string[];
+  error?: { status: number; body: any; message: string; endpoint: string };
+}> {
+  const endpoint = `https://api.onesignal.com/apps/${config.appId}/users/by/external_id/${encodeURIComponent(driverId)}`;
+  try {
+    const res = await fetch(endpoint, { headers: oneSignalHeaders(config) });
+    const body = await readOneSignalResponse(res);
+    console.log("[OneSignal:SubscriptionValidation]", {
+      driver_id: driverId,
+      endpoint,
+      status: res.status,
+      ok: res.ok,
+      body: summarizeOneSignalUser(body),
+    });
+
+    if (!res.ok) {
+      return {
+        ids: [],
+        error: {
+          status: res.status,
+          body,
+          endpoint,
+          message: describeError(res.status, body),
+        },
+      };
+    }
+
+    const subscriptions = Array.isArray(body?.subscriptions) ? body.subscriptions : [];
+    const active = subscriptions
+      .filter((subscription: any) => subscription?.enabled && Number(subscription?.notification_types ?? 0) > 0)
+      .map((subscription: any) => subscription?.id);
+    return { ids: validSubscriptionIds(active) };
+  } catch (error: any) {
+    console.error("[OneSignal:SubscriptionValidationError]", { driver_id: driverId, endpoint, error: error?.message ?? String(error) });
+    return {
+      ids: [],
+      error: {
+        status: 0,
+        body: null,
+        endpoint,
+        message: "Erro de rede ao validar Subscription ID no OneSignal.",
+      },
+    };
+  }
+}
+
+async function getDriverSubscriptionIds(config: OneSignalConfig, driverId: string): Promise<{
+  ids: string[];
+  source: "onesignal" | "database" | "none";
+  error?: { status: number; body: any; message: string; endpoint: string };
+}> {
+  const remote = await getOneSignalSubscriptionIds(config, driverId);
+  if (remote.ids.length > 0 || remote.error) {
+    return { ids: remote.ids, source: remote.ids.length > 0 ? "onesignal" : "none", error: remote.error };
+  }
+
   const { data, error } = await (supabase as any)
     .from("onesignal_devices")
     .select("subscription_id,status")
@@ -95,9 +152,10 @@ async function getDriverSubscriptionIds(driverId: string): Promise<string[]> {
 
   if (error) {
     console.error("[OneSignal:SubscriptionLookupError]", { driver_id: driverId, error });
-    return [];
+    return { ids: [], source: "none" };
   }
-  return validSubscriptionIds((data ?? []).map((row: any) => row.subscription_id));
+  const ids = validSubscriptionIds((data ?? []).map((row: any) => row.subscription_id));
+  return { ids, source: ids.length > 0 ? "database" : "none" };
 }
 
 async function sendOneSignal(config: OneSignalConfig, target: SendMode, payloadData: any) {
@@ -311,9 +369,27 @@ Deno.serve(async (req) => {
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
-      const subscriptionIds = await getDriverSubscriptionIds(driver_id);
+      const subscriptionTarget = await getDriverSubscriptionIds(config, driver_id);
+      const subscriptionIds = subscriptionTarget.ids;
+      if (subscriptionTarget.error) {
+        console.error("[OneSignal:ValidationError] subscription validation failed", {
+          request_id,
+          driver_id,
+          error: subscriptionTarget.error,
+        });
+        return errorResponse(200, {
+          sent: 0,
+          reason: subscriptionTarget.error.status === 401 || subscriptionTarget.error.status === 403
+            ? "onesignal_auth_error"
+            : "onesignal_subscription_validation_failed",
+          message: subscriptionTarget.error.message,
+          status: subscriptionTarget.error.status,
+          details: subscriptionTarget.error.body,
+          endpoint: subscriptionTarget.error.endpoint,
+        });
+      }
       if (subscriptionIds.length === 0) {
-        console.error("[OneSignal:ValidationError] no valid subscription_id", { request_id, driver_id });
+        console.error("[OneSignal:ValidationError] no valid subscription_id", { request_id, driver_id, source: subscriptionTarget.source });
         return errorResponse(200, {
           sent: 0,
           reason: "driver_not_subscribed",
@@ -385,7 +461,7 @@ Deno.serve(async (req) => {
       }
 
       console.log("[PushNotifications] sent (targeted)", {
-        request_id, driver_id, recipients: result.recipients, attempts: result.attempts,
+        request_id, driver_id, recipients: result.recipients, attempts: result.attempts, subscription_source: subscriptionTarget.source,
       });
       return new Response(
         JSON.stringify({
@@ -394,6 +470,8 @@ Deno.serve(async (req) => {
           notification_id: (result.json as any)?.id ?? null,
           recipients: result.recipients,
           attempts: result.attempts,
+          subscription_source: subscriptionTarget.source,
+          subscription_count: subscriptionIds.length,
           onesignal: result.json,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
