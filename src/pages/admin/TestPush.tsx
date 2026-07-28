@@ -116,12 +116,29 @@ interface DriverRow {
   last_seen_at: string | null;
 }
 
+interface DeviceRow {
+  id: string;
+  user_id: string;
+  platform: string | null;
+  status: string | null;
+  permission_status: string | null;
+  subscription_status: string | null;
+  subscription_id: string | null;
+  onesignal_subscription_id: string | null;
+  push_token: string | null;
+  device_model: string | null;
+  app_version: string | null;
+  last_synced_at: string | null;
+}
+
 const TestPush = () => {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
+  const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [driverId, setDriverId] = useState<string>("");
+  const [deviceId, setDeviceId] = useState<string>("auto");
   const [fee, setFee] = useState("8.50");
   const [pickup, setPickup] = useState("Loja Teste, Primavera do Leste - MT");
   const [delivery, setDelivery] = useState("Rua Exemplo, 123 - Primavera do Leste - MT");
@@ -176,6 +193,16 @@ const TestPush = () => {
         .order("full_name", { ascending: true });
       if (error) { toast.error("Erro ao listar motoristas: " + error.message); return; }
       setDrivers(data ?? []);
+
+      const { data: deviceData, error: deviceError } = await (supabase as any)
+        .from("onesignal_devices")
+        .select("id,user_id,platform,status,permission_status,subscription_status,subscription_id,onesignal_subscription_id,push_token,device_model,app_version,last_synced_at")
+        .order("last_synced_at", { ascending: false });
+      if (deviceError) {
+        toast.error("Erro ao listar dispositivos: " + deviceError.message);
+      } else {
+        setDevices(deviceData ?? []);
+      }
     };
     init();
   }, [navigate]);
@@ -194,6 +221,12 @@ const TestPush = () => {
       if (!broadcast) {
         if (!driverId) { toast.error("Selecione um motorista ou marque broadcast"); setSending(false); return; }
         payload.driver_id = driverId;
+        payload.test_mode = true;
+        const chosenDevice = devices.find((device) => device.id === deviceId);
+        const chosenSubscription = chosenDevice?.onesignal_subscription_id || chosenDevice?.subscription_id;
+        if (chosenSubscription) payload.test_subscription_id = chosenSubscription;
+      } else {
+        payload.test_mode = true;
       }
       const { data, error, raw } = await invokeFunctionWithFallback("send-onesignal-delivery", payload);
       if (error) {
@@ -274,7 +307,7 @@ const TestPush = () => {
             {!broadcast && (
               <div className="space-y-2">
                 <Label>Motorista</Label>
-                <Select value={driverId} onValueChange={setDriverId}>
+                <Select value={driverId} onValueChange={(value) => { setDriverId(value); setDeviceId("auto"); }}>
                   <SelectTrigger><SelectValue placeholder="Selecione um motorista" /></SelectTrigger>
                   <SelectContent>
                     {drivers.map((d) => (
@@ -288,6 +321,29 @@ const TestPush = () => {
                 <p className="text-xs text-muted-foreground">
                   {drivers.length} motoristas cadastrados ({drivers.filter(d => d.is_online).length} online)
                 </p>
+                {driverId && (
+                  <div className="space-y-2">
+                    <Label>Dispositivo registrado</Label>
+                    <Select value={deviceId} onValueChange={setDeviceId}>
+                      <SelectTrigger><SelectValue placeholder="Escolher dispositivo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Automático: usar inscrições ativas</SelectItem>
+                        {devices.filter((device) => device.user_id === driverId).map((device) => {
+                          const subId = device.onesignal_subscription_id || device.subscription_id;
+                          const labelStatus = `${device.subscription_status || device.status || "sem status"}${device.permission_status ? ` / ${device.permission_status}` : ""}`;
+                          return (
+                            <SelectItem key={device.id} value={device.id} disabled={!subId}>
+                              {(device.platform || "app").toUpperCase()} • {labelStatus} • {device.device_model || "dispositivo"}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {devices.filter((device) => device.user_id === driverId).length} dispositivo(s) encontrado(s) para este motorista.
+                    </p>
+                  </div>
+                )}
                 <Button
                   size="sm"
                   variant="secondary"
