@@ -311,7 +311,7 @@ const DriverPanel = () => {
 
     // Silent sync push ("entrega_indisponivel") — refresh the available list.
     const handleUnavailable = () => {
-      stopStandbyAlertLoop();
+      stopStandbyMode();
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
     };
     window.addEventListener("delivery-unavailable", handleUnavailable);
