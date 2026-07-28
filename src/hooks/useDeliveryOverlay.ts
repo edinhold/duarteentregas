@@ -187,15 +187,38 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     };
     consumeParam();
 
+    const handleUnavailable = (pedidoId?: string | null) => {
+      setDelivery((current) => {
+        if (!current) return current;
+        if (pedidoId && current.id !== pedidoId) return current;
+        stopAlerts();
+        setState("empty");
+        toast.info("Esta entrega já foi aceita por outro motorista.");
+        return null;
+      });
+    };
+
     const onSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "OPEN_DELIVERY" && event.data?.requestId) {
         console.log("[DeliveryOverlay] Clique na notificação (SW)", event.data.requestId);
         openDelivery(event.data.requestId);
       }
+      if (event.data?.type === "DELIVERY_UNAVAILABLE") {
+        console.log("[DeliveryOverlay] Entrega indisponível (SW)", event.data.requestId);
+        handleUnavailable(event.data.requestId);
+      }
+    };
+    const onUnavailable = (event: Event) => {
+      handleUnavailable((event as CustomEvent).detail?.pedidoId);
     };
     navigator.serviceWorker?.addEventListener("message", onSwMessage);
-    return () => navigator.serviceWorker?.removeEventListener("message", onSwMessage);
-  }, [user, openDelivery]);
+    window.addEventListener("delivery-unavailable", onUnavailable as EventListener);
+    return () => {
+      navigator.serviceWorker?.removeEventListener("message", onSwMessage);
+      window.removeEventListener("delivery-unavailable", onUnavailable as EventListener);
+    };
+  }, [user, openDelivery, stopAlerts]);
+
 
   // Notification / overlay permission check (web fallback for Android SYSTEM_ALERT_WINDOW).
   useEffect(() => {
