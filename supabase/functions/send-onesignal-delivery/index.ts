@@ -425,6 +425,25 @@ Deno.serve(async (req) => {
         payloadData,
       );
       const invalid = extractInvalidAliases(result.json);
+      const targetedNotificationId = (result.json as any)?.id ?? null;
+      if (targetedNotificationId) {
+        await (supabase as any)
+          .from("delivery_requests")
+          .update({ onesignal_notification_id: targetedNotificationId })
+          .eq("id", request_id);
+      }
+      await (supabase as any).from("push_delivery_events").insert([{
+        pedido_id: request_id,
+        event_type: result.ok
+          ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
+          : "nova_entrega_erro",
+        onesignal_notification_id: targetedNotificationId,
+        recipients_count: result.recipients ?? 0,
+        status: result.ok ? "ok" : "error",
+        response_status: result.status ?? null,
+        response_body_sanitized: result.json ?? null,
+      }]);
+
       await supabase
         .from("push_notification_logs")
         .update({
