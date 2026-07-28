@@ -507,7 +507,7 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({
-          sent: 1,
+          sent: result.recipients > 0 ? 1 : 0,
           accepted: true,
           notification_id: (result.json as any)?.id ?? null,
           recipients: result.recipients,
