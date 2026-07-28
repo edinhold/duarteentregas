@@ -26,6 +26,9 @@ export function emitDeliveryUnavailable(pedidoId?: string | null) {
     log("entrega_indisponivel", pedidoId);
     window.dispatchEvent(new CustomEvent("delivery-unavailable", { detail: { pedidoId: pedidoId ?? null } }));
   } catch {}
+}
+
+
 
 function err(...args: any[]) {
   try { console.error("[OneSignal]", ...args); } catch {}
