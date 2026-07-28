@@ -204,7 +204,11 @@ const TestPush = () => {
       const d = data as any;
       // OneSignal v16 may accept the notification without returning `recipients`,
       // so `accepted`/`notification_id` also count as success.
-      if (d?.sent > 0) {
+      if (d?.warning === "aceito_sem_destinatarios") {
+        toast.warning(d.message ?? "Aceito pelo OneSignal, porém sem destinatários ativos.");
+      } else if (d?.recipients > 0) {
+        toast.success(`Push entregue a ${d.recipients} dispositivo(s)`);
+      } else if (d?.sent > 0) {
         toast.success(`Push enviado para ${d.sent} motorista(s)`);
       } else if (d?.accepted || d?.notification_id) {
         toast.success("Push aceito pelo OneSignal e enviado aos dispositivos inscritos");
@@ -213,6 +217,7 @@ const TestPush = () => {
       } else {
         toast.warning(`Nenhum push enviado (${d?.reason ?? "ver detalhes abaixo"})`);
       }
+
     } catch (e: any) {
       toast.error("Falha ao enviar: " + (e?.message ?? String(e)));
       setLastResult((current: any) => current ?? { error: e?.message ?? String(e) });

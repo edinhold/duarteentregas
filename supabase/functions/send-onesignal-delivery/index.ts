@@ -281,15 +281,17 @@ async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadD
       const recipients = Number(lastJson?.recipients ?? 0);
       const hasId = !!(lastJson?.id || lastJson?.notification_id);
       const accepted = lastJson?.accepted === true;
-      // Success = OneSignal accepted the notification (id/accepted) and reported
-      // no `errors`. `recipients` may legitimately be absent/0 on the v16 API,
-      // so it must NOT drive the success decision.
-      if (res.ok && (hasId || accepted) && !hasApiErrors(lastJson)) {
-        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients });
+      const invalidAliases = extractInvalidAliases(lastJson);
+      // Success = OneSignal accepted the notification (id/accepted). Invalid
+      // aliases are tolerated on broadcasts: the valid ones still receive it.
+      const onlyInvalidAliasErrors =
+        invalidAliases.length > 0 && Object.keys(lastJson?.errors ?? {}).every((k) => k === "invalid_aliases");
+      if (res.ok && (hasId || accepted) && (!hasApiErrors(lastJson) || onlyInvalidAliasErrors)) {
+        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients, invalid: invalidAliases.length });
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
       // Non-transient failures: do NOT retry.
-      const invalid = extractInvalidAliases(lastJson);
+      const invalid = invalidAliases;
       const authError = res.status === 401 || res.status === 403;
       const validationError = res.status === 400 && hasApiErrors(lastJson);
       if (invalid.length > 0 || authError || validationError) {
@@ -310,6 +312,7 @@ async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadD
           message: describeError(res.status, lastJson),
         };
       }
+
       console.warn("[OneSignal:Error] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
@@ -469,6 +472,12 @@ Deno.serve(async (req) => {
           accepted: true,
           notification_id: (result.json as any)?.id ?? null,
           recipients: result.recipients,
+          warning: result.recipients === 0
+            ? "aceito_sem_destinatarios"
+            : undefined,
+          message: result.recipients === 0
+            ? "OneSignal aceitou a notificação, mas informou 0 destinatários. O dispositivo do motorista provavelmente revogou a permissão de notificação ou a inscrição está desativada — peça para abrir o app e reativar as notificações."
+            : undefined,
           attempts: result.attempts,
           subscription_source: subscriptionTarget.source,
           subscription_count: subscriptionIds.length,
@@ -477,6 +486,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
 
     // ---------- Broadcast: all drivers via segment + tag filter ----------
     // Reserve one broadcast slot per request so we never send twice for the
@@ -499,7 +509,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const result = await sendWithRetry(config, { mode: "segment" }, payloadData);
+    // Prefer explicit aliases of approved drivers (tags may be missing on some
+    // devices, which makes the segment/tag filter resolve to 0 recipients).
+    const { data: approvedDrivers } = await supabase
+      .from("drivers")
+      .select("user_id")
+      .eq("approval_status", "approved")
+      .eq("is_active", true);
+    const externalIds = Array.from(
+      new Set((approvedDrivers ?? []).map((row: any) => String(row.user_id ?? "")).filter(isUuid)),
+    ).slice(0, 2000);
+    const broadcastTarget: SendMode = externalIds.length > 0
+      ? { mode: "aliases", externalIds }
+      : { mode: "segment" };
+    console.log("[OneSignal] broadcast target", { mode: broadcastTarget.mode, drivers: externalIds.length });
+
+    const result = await sendWithRetry(config, broadcastTarget, payloadData);
+
     await supabase
       .from("push_notification_logs")
       .update({
@@ -541,11 +567,20 @@ Deno.serve(async (req) => {
         sent: result.recipients,
         accepted: true,
         notification_id: (result.json as any)?.id ?? null,
+        recipients: result.recipients,
+        targeted_drivers: externalIds.length,
+        target_mode: broadcastTarget.mode,
+        invalid_aliases: extractInvalidAliases(result.json),
+        warning: result.recipients === 0 ? "aceito_sem_destinatarios" : undefined,
+        message: result.recipients === 0
+          ? "OneSignal aceitou a notificação, mas nenhum dispositivo estava inscrito/ativo no momento. Peça aos motoristas para abrir o app e permitir notificações."
+          : undefined,
         attempts: result.attempts,
         onesignal: result.json,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
+
   } catch (err: any) {
     console.error("[PushNotifications] handler error", err);
     return new Response(JSON.stringify({ error: err?.message ?? "error" }), {
