@@ -16,6 +16,20 @@ function buildUrl(data) {
   return base.includes("?") ? `${base}&entrega=${id}` : `${base}?entrega=${id}`;
 }
 
+async function removeLocalNotification(pedidoId) {
+  const list = await self.registration.getNotifications();
+  for (const n of list) {
+    const d = n.data || {};
+    if (!pedidoId || d.pedido_id === pedidoId || d.request_id === pedidoId || n.tag === `delivery-${pedidoId}`) {
+      n.close();
+    }
+  }
+  const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clientList) {
+    client.postMessage({ type: "DELIVERY_UNAVAILABLE", requestId: pedidoId || null });
+  }
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -24,6 +38,14 @@ self.addEventListener("push", (event) => {
     data = { title: "🚚 Nova entrega disponível", body: event.data ? event.data.text() : "" };
   }
   const payload = data.data || {};
+
+  // Silent sync event: another driver accepted — remove the offer locally and
+  // never show a second visible notification.
+  if (payload.tipo === "entrega_indisponivel") {
+    event.waitUntil(removeLocalNotification(payload.pedido_id || payload.request_id));
+    return;
+  }
+
   const title = data.title || "🚚 Nova entrega disponível";
   const options = {
     body: data.body || "Você recebeu uma nova entrega. Toque para visualizar.",
@@ -38,6 +60,7 @@ self.addEventListener("push", (event) => {
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
+
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
