@@ -19,6 +19,14 @@ function log(...args: any[]) {
 function warn(...args: any[]) {
   try { console.warn("[OneSignal]", ...args); } catch {}
 }
+
+/** Notifies the app that a delivery is no longer available (silent sync event). */
+export function emitDeliveryUnavailable(pedidoId?: string | null) {
+  try {
+    log("entrega_indisponivel", pedidoId);
+    window.dispatchEvent(new CustomEvent("delivery-unavailable", { detail: { pedidoId: pedidoId ?? null } }));
+  } catch {}
+
 function err(...args: any[]) {
   try { console.error("[OneSignal]", ...args); } catch {}
 }
