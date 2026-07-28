@@ -309,6 +309,14 @@ const DriverPanel = () => {
     window.addEventListener('click', handleFirstInteraction);
     window.addEventListener('touchstart', handleFirstInteraction);
 
+    // Silent sync push ("entrega_indisponivel") — refresh the available list.
+    const handleUnavailable = () => {
+      stopStandbyAlertLoop();
+      queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+    };
+    window.addEventListener("delivery-unavailable", handleUnavailable);
+
+
     const channel = supabase.channel("driver-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "delivery_requests" }, (payload) => {
         console.log("New delivery request received:", payload);
