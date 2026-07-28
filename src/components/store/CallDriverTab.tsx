@@ -487,30 +487,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setManualDistanceEnabled(false);
       
       try {
-        if (GOOGLE_MAPS_API_KEY) {
-          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.[0]) {
-            const first = data.results[0];
-            const comps = first.address_components;
-            const streetNumber = comps.find((c: any) => c.types.includes("street_number"))?.long_name || "";
-            
-            // Format without number for the main field
-            const itemForFormat = { ...first, address: comps };
-            const formatted = formatAddress(itemForFormat, false);
-            
-            setCallForm(f => ({ 
-              ...f, 
-              delivery: formatted,
-              delivery_number: streetNumber 
-            }));
-            return;
-          }
-        }
-
-        // Fallback to Nominatim
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-        const data = await res.json();
+        const data = await reverseGeocodeService(lat, lng);
         if (data) {
           const formatted = formatAddress(data, false);
           const streetNumber = data.address?.house_number || "";
