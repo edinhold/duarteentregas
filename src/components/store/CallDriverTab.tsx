@@ -15,7 +15,8 @@ import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
+import { MAP_LAYERS } from "@/config/maps";
+import { reverseGeocode as reverseGeocodeService, searchAddress } from "@/services/maps/geocoding";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -303,16 +304,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      if (GOOGLE_MAPS_API_KEY) {
-        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-        const data = await res.json();
-        if (data.status === "OK" && data.results?.[0]) {
-          setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
-          return;
-        }
-      }
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-      const data = await res.json();
+      const data = await reverseGeocodeService(lat, lng);
       if (data) {
         const formatted = formatAddress(data, true); // Include number for pickup address
         setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });

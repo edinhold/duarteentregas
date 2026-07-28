@@ -1,4 +1,6 @@
-import maplibregl, { Map as MLMap, Marker as MLMarker, LngLatBounds } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import type { Map as MLMap, Marker as MLMarker } from "maplibre-gl";
+const { LngLatBounds } = maplibregl;
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MAPLIBRE_OSM_STYLE, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/config/maps";
 import { searchAddress, reverseGeocode, geocodeToCoords } from "./geocoding";
