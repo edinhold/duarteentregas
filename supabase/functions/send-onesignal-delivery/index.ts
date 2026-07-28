@@ -566,8 +566,30 @@ Deno.serve(async (req) => {
       devices: deviceSubscriptionIds.length,
     });
 
-    const result = await sendWithRetry(config, broadcastTarget, payloadData);
+    let result = await sendWithRetry(config, broadcastTarget, payloadData);
+
+    // Stale Subscription IDs (invalid_player_ids) reach nobody. Deactivate them
+    // and fall back to external-id aliases so the offer still gets delivered.
+    const invalidPlayerIds: string[] = Array.isArray((result.json as any)?.errors?.invalid_player_ids)
+      ? (result.json as any).errors.invalid_player_ids.map((x: any) => String(x))
+      : [];
+    if (invalidPlayerIds.length > 0) {
+      await (supabase as any)
+        .from("onesignal_devices")
+        .update({ status: "invalid" })
+        .in("subscription_id", invalidPlayerIds);
+      console.warn("[OneSignal] subscriptions invalidadas", invalidPlayerIds.length);
+    }
+    if (
+      broadcastTarget.mode === "subscriptions" &&
+      (result.recipients ?? 0) === 0 &&
+      externalIds.length > 0
+    ) {
+      console.log("[OneSignal] fallback para aliases (0 destinatários por subscription_id)");
+      result = await sendWithRetry(config, { mode: "aliases", externalIds }, payloadData);
+    }
     const notificationId = (result.json as any)?.id ?? null;
+
 
     // Persist the notification id so the accept flow can cancel it later.
     if (notificationId) {
