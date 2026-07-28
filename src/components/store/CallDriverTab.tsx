@@ -398,39 +398,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        if (GOOGLE_MAPS_API_KEY) {
-          let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR&components=country:BR`;
-          if (storeLat && storeLng) {
-            googleUrl += `&location=${storeLat},${storeLng}&radius=50000`;
-          }
-          const res = await fetch(googleUrl);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.length > 0) {
-            const mapped = data.results.map((r: any) => ({
-              display_name: r.formatted_address,
-              lat: r.geometry.location.lat.toString(),
-              lon: r.geometry.location.lng.toString(),
-              address: r.address_components
-            }));
-            setAddressSuggestions(mapped);
-            setShowSuggestions(true);
-            setSearchingAddress(false);
-            return;
-          }
-        }
-
-        // Nominatim: acrescenta cidade/UF quando o usuário só digitou rua/bairro
-        const hasCity = /primavera do leste|\bmt\b|mato grosso/i.test(address);
-        const query = hasCity ? address : `${address}, Primavera do Leste, MT`;
-        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
-
-        if (storeLat && storeLng) {
-          const delta = 0.25;
-          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`;
-        }
-        
-        const res = await fetch(searchUrl);
-        const data = await res.json();
+        const data = await searchAddress(address, { lat: storeLat, lng: storeLng, limit: 5 });
         if (data && data.length > 0) {
           if (storeLat && storeLng) {
             data.sort((a: any, b: any) => {
