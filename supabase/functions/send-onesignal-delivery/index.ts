@@ -472,6 +472,12 @@ Deno.serve(async (req) => {
           accepted: true,
           notification_id: (result.json as any)?.id ?? null,
           recipients: result.recipients,
+          warning: result.recipients === 0
+            ? "aceito_sem_destinatarios"
+            : undefined,
+          message: result.recipients === 0
+            ? "OneSignal aceitou a notificação, mas informou 0 destinatários. O dispositivo do motorista provavelmente revogou a permissão de notificação ou a inscrição está desativada — peça para abrir o app e reativar as notificações."
+            : undefined,
           attempts: result.attempts,
           subscription_source: subscriptionTarget.source,
           subscription_count: subscriptionIds.length,
@@ -480,6 +486,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
 
     // ---------- Broadcast: all drivers via segment + tag filter ----------
     // Reserve one broadcast slot per request so we never send twice for the
