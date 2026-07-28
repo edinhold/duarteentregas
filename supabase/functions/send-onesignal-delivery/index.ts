@@ -1,21 +1,31 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import {
+  configErrorResponse,
+  getOneSignalConfig,
+  isUuid,
+  ONESIGNAL_API_ENDPOINT,
+  oneSignalHeaders,
+  readOneSignalResponse,
+  safeOneSignalLogConfig,
+  type OneSignalConfig,
+} from "../_shared/onesignal.ts";
 
-const ONESIGNAL_APP_ID = "52d432a9-3b18-428f-ab87-eff19a2d5a6a";
-const ONESIGNAL_REST_API_KEY = Deno.env.get("ONESIGNAL_REST_API_KEY")!;
 // Optional: OneSignal Android Notification Category UUID (created in dashboard or via REST).
 // If unset, OneSignal uses the default high-importance channel "Miscellaneous".
 const ONESIGNAL_ANDROID_CHANNEL_ID = Deno.env.get("ONESIGNAL_ANDROID_CHANNEL_ID") || undefined;
 // Optional: iOS APNs Notification Category for action buttons/critical sound config.
 const ONESIGNAL_IOS_CATEGORY = Deno.env.get("ONESIGNAL_IOS_CATEGORY") || "NEW_DELIVERY";
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-type SendMode = { mode: "aliases"; externalIds: string[] } | { mode: "segment" };
+type SendMode =
+  | { mode: "subscriptions"; subscriptionIds: string[]; externalId?: string }
+  | { mode: "aliases"; externalIds: string[] }
+  | { mode: "segment" };
 
 // ROOT CAUSE (HTTP 400): we were sending BOTH `url` and `web_url`, and the value
 // was a relative path. OneSignal answers:
@@ -31,7 +41,66 @@ function prune(obj: Record<string, unknown>) {
   );
 }
 
-async function sendOneSignal(target: SendMode, payloadData: any) {
+function errorResponse(status: number, body: Record<string, unknown>) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function validateRequestBody(body: any) {
+  const requestId = String(body?.request_id ?? "").trim();
+  const driverId = body?.driver_id ? String(body.driver_id).trim() : "";
+  const driverFee = Number(body?.driver_fee ?? 0);
+  const pickupAddress = String(body?.pickup_address ?? "").trim();
+  const deliveryAddress = String(body?.delivery_address ?? "").trim();
+
+  if (!isUuid(requestId)) {
+    return { ok: false as const, message: "request_id ausente ou inválido. Envie um UUID válido da entrega." };
+  }
+  if (driverId && !isUuid(driverId)) {
+    return { ok: false as const, message: "driver_id inválido. Envie o UUID do motorista ou deixe vazio para broadcast." };
+  }
+  if (!Number.isFinite(driverFee) || driverFee < 0) {
+    return { ok: false as const, message: "driver_fee inválido." };
+  }
+  if (!pickupAddress || !deliveryAddress) {
+    return { ok: false as const, message: "pickup_address e delivery_address são obrigatórios." };
+  }
+
+  return {
+    ok: true as const,
+    data: {
+      request_id: requestId,
+      driver_id: driverId || null,
+      driver_fee: driverFee,
+      pickup_address: pickupAddress,
+      delivery_address: deliveryAddress,
+    },
+  };
+}
+
+function validSubscriptionIds(values: unknown[]): string[] {
+  return Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(isUuid)));
+}
+
+async function getDriverSubscriptionIds(driverId: string): Promise<string[]> {
+  const { data, error } = await (supabase as any)
+    .from("onesignal_devices")
+    .select("subscription_id,status")
+    .eq("user_id", driverId)
+    .eq("status", "active")
+    .not("subscription_id", "is", null)
+    .order("last_synced_at", { ascending: false });
+
+  if (error) {
+    console.error("[OneSignal:SubscriptionLookupError]", { driver_id: driverId, error });
+    return [];
+  }
+  return validSubscriptionIds((data ?? []).map((row: any) => row.subscription_id));
+}
+
+async function sendOneSignal(config: OneSignalConfig, target: SendMode, payloadData: any) {
   const fee = Number(payloadData.driver_fee ?? 0).toFixed(2);
   const subtitle =
     `R$ ${fee} • ${payloadData.pickup_address ?? ""} → ${payloadData.delivery_address ?? ""}`;
@@ -41,7 +110,7 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     : "/entregador";
   const deepLink = `${APP_BASE_URL}${path}`;
   const payload: Record<string, unknown> = prune({
-    app_id: ONESIGNAL_APP_ID,
+    app_id: config.appId,
     target_channel: "push",
     headings: { en: "🚚 Nova entrega disponível", pt: "🚚 Nova entrega disponível" },
     contents: {
@@ -77,21 +146,27 @@ async function sendOneSignal(target: SendMode, payloadData: any) {
     content_available: true,
   });
 
-  if (target.mode === "aliases") {
+  if (target.mode === "subscriptions") {
+    payload.include_subscription_ids = target.subscriptionIds;
+  } else if (target.mode === "aliases") {
     payload.include_aliases = { external_id: target.externalIds };
   } else {
     payload.included_segments = ["Subscribed Users"];
     payload.filters = [{ field: "tag", key: "role", relation: "=", value: "driver" }];
   }
 
-  console.log("[OneSignal:Request]", JSON.stringify({ target, url: deepLink }));
+  console.log("[OneSignal:Request]", JSON.stringify({
+    target: target.mode === "subscriptions"
+      ? { mode: target.mode, externalId: target.externalId, subscriptionCount: target.subscriptionIds.length }
+      : target,
+    url: deepLink,
+    endpoint: ONESIGNAL_API_ENDPOINT,
+    auth_scheme: config.authScheme,
+  }));
 
-  return await fetch("https://api.onesignal.com/notifications?c=push", {
+  return await fetch(ONESIGNAL_API_ENDPOINT, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Key ${ONESIGNAL_REST_API_KEY}`,
-    },
+    headers: oneSignalHeaders(config),
     body: JSON.stringify(payload),
   });
 }
@@ -113,8 +188,8 @@ function describeError(status: number, json: any): string {
   const e = json?.errors;
   const list = Array.isArray(e) ? e.map((x: any) => String(x)) : [];
   const first = list[0] ?? "";
-  if (status === 401) return "REST API Key inválida ou ausente";
-  if (status === 403) return "Acesso negado pelo OneSignal (chave/app incorretos)";
+  if (status === 401) return "REST API Key inválida, ausente ou com prefixo incorreto. Use a REST API Key do aplicativo OneSignal configurado.";
+  if (status === 403) return "Acesso negado pelo OneSignal: REST API Key não pertence a este App ID ou não tem permissão.";
   if (/app_id/i.test(first)) return "App ID inválido";
   if (/subscription/i.test(first)) return "Subscription ID inexistente";
   if (first) return first;
@@ -122,7 +197,7 @@ function describeError(status: number, json: any): string {
   return `Payload inválido (HTTP ${status})`;
 }
 
-async function sendWithRetry(target: SendMode, payloadData: any) {
+async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadData: any) {
   let lastErr: any = null;
   let lastJson: any = null;
   let lastStatus = 0;
@@ -130,11 +205,21 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
   const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log("[OneSignal:Validation]", { attempt, target: target.mode });
-      const res = await sendOneSignal(target, payloadData);
+      console.log("[OneSignal:Validation]", {
+        attempt,
+        target: target.mode,
+        config: safeOneSignalLogConfig(config),
+      });
+      const res = await sendOneSignal(config, target, payloadData);
       lastStatus = res.status;
-      lastJson = await res.json().catch(() => ({}));
-      console.log("[OneSignal:Response]", { attempt, status: res.status, body: lastJson });
+      lastJson = await readOneSignalResponse(res);
+      console.log("[OneSignal:Response]", {
+        attempt,
+        endpoint: ONESIGNAL_API_ENDPOINT,
+        status: res.status,
+        ok: res.ok,
+        body: lastJson,
+      });
       const recipients = Number(lastJson?.recipients ?? 0);
       const hasId = !!(lastJson?.id || lastJson?.notification_id);
       const accepted = lastJson?.accepted === true;
@@ -150,7 +235,13 @@ async function sendWithRetry(target: SendMode, payloadData: any) {
       const authError = res.status === 401 || res.status === 403;
       const validationError = res.status === 400 && hasApiErrors(lastJson);
       if (invalid.length > 0 || authError || validationError) {
-        console.error("[OneSignal:Error] non_transient", { invalid, status: res.status, body: lastJson });
+        console.error("[OneSignal:Error] non_transient", {
+          invalid,
+          endpoint: ONESIGNAL_API_ENDPOINT,
+          status: res.status,
+          body: lastJson,
+          message: describeError(res.status, lastJson),
+        });
         return {
           ok: false, attempts: attempt, json: lastJson, status: res.status, recipients,
           error: authError
@@ -183,37 +274,54 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const configResult = getOneSignalConfig();
+    if (!configResult.ok) {
+      const response = configErrorResponse(configResult);
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { config } = configResult;
+
     const body = await req.json().catch(() => ({}));
+    const parsed = validateRequestBody(body);
+    if (!parsed.ok) {
+      console.error("[OneSignal:PayloadError]", { message: parsed.message, body_keys: Object.keys(body ?? {}) });
+      return errorResponse(400, { error: "invalid_payload", message: parsed.message });
+    }
+
     const {
       request_id,
       driver_id,
       driver_fee,
       pickup_address,
       delivery_address,
-    } = body ?? {};
+    } = parsed.data;
 
-    console.log("[OneSignal] request received", { request_id, driver_id, has_pickup: !!pickup_address });
-
-    if (!ONESIGNAL_REST_API_KEY) {
-      console.error("[OneSignal] missing ONESIGNAL_REST_API_KEY secret");
-      return new Response(
-        JSON.stringify({ error: "config_error", message: "ONESIGNAL_REST_API_KEY não configurada no backend." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    if (!request_id) {
-      return new Response(JSON.stringify({ error: "missing request_id" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log("[OneSignal] request received", {
+      request_id,
+      driver_id,
+      has_pickup: !!pickup_address,
+      config: safeOneSignalLogConfig(config),
+    });
 
     const payloadData = { request_id, driver_fee, pickup_address, delivery_address };
 
 
     // ---------- Targeted delivery: single driver ----------
     if (driver_id) {
+      const subscriptionIds = await getDriverSubscriptionIds(driver_id);
+      if (subscriptionIds.length === 0) {
+        console.error("[OneSignal:ValidationError] no valid subscription_id", { request_id, driver_id });
+        return errorResponse(200, {
+          sent: 0,
+          reason: "driver_not_subscribed",
+          message: "Este motorista não possui Subscription ID ativo/válido no OneSignal. Peça para ele abrir o app, conceder permissão de notificação e tentar novamente.",
+          status: 0,
+        });
+      }
+
       // Idempotent reservation for the specific driver via unique-violation catch
       const { error: resErr } = await supabase
         .from("push_notification_logs")
@@ -232,7 +340,11 @@ Deno.serve(async (req) => {
         });
       }
 
-      const result = await sendWithRetry({ mode: "aliases", externalIds: [driver_id] }, payloadData);
+      const result = await sendWithRetry(
+        config,
+        { mode: "subscriptions", subscriptionIds, externalId: driver_id },
+        payloadData,
+      );
       const invalid = extractInvalidAliases(result.json);
       await supabase
         .from("push_notification_logs")
@@ -309,7 +421,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const result = await sendWithRetry({ mode: "segment" }, payloadData);
+    const result = await sendWithRetry(config, { mode: "segment" }, payloadData);
     await supabase
       .from("push_notification_logs")
       .update({

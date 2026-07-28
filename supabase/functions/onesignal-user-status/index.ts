@@ -1,8 +1,12 @@
 // deno-lint-ignore-file no-explicit-any
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-
-const ONESIGNAL_APP_ID = "52d432a9-3b18-428f-ab87-eff19a2d5a6a";
-const ONESIGNAL_REST_API_KEY = Deno.env.get("ONESIGNAL_REST_API_KEY")!;
+import {
+  configErrorResponse,
+  getOneSignalConfig,
+  oneSignalHeaders,
+  readOneSignalResponse,
+  safeOneSignalLogConfig,
+} from "../_shared/onesignal.ts";
 
 // OneSignal device_type codes we care about
 const DEVICE_TYPE_LABEL: Record<string, string> = {
@@ -25,6 +29,16 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const configResult = getOneSignalConfig();
+    if (!configResult.ok) {
+      const response = configErrorResponse(configResult);
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { config } = configResult;
+
     const { external_id } = await req.json().catch(() => ({}));
     if (!external_id) {
       return new Response(JSON.stringify({ error: "missing external_id" }), {
@@ -33,21 +47,30 @@ Deno.serve(async (req) => {
       });
     }
 
-    const url = `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/external_id/${encodeURIComponent(external_id)}`;
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Key ${ONESIGNAL_REST_API_KEY}`,
-        Accept: "application/json",
-      },
+    const url = `https://api.onesignal.com/apps/${config.appId}/users/by/external_id/${encodeURIComponent(external_id)}`;
+    console.log("[OneSignal:UserStatusRequest]", {
+      external_id,
+      endpoint: url,
+      config: safeOneSignalLogConfig(config),
     });
-    const json = await res.json().catch(() => ({}));
+    const res = await fetch(url, {
+      headers: oneSignalHeaders(config),
+    });
+    const json = await readOneSignalResponse(res);
+    console.log("[OneSignal:UserStatusResponse]", { status: res.status, ok: res.ok, body: json, endpoint: url });
 
     if (!res.ok) {
       return new Response(
         JSON.stringify({
           error: json?.errors ?? `http_${res.status}`,
+          message: res.status === 401
+            ? "REST API Key inválida, ausente ou com prefixo incorreto. Use a REST API Key do aplicativo OneSignal configurado."
+            : res.status === 403
+              ? "Acesso negado pelo OneSignal: REST API Key não pertence a este App ID ou não tem permissão."
+              : "Falha ao consultar inscrição no OneSignal.",
           status: res.status,
           raw: json,
+          endpoint: url,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
