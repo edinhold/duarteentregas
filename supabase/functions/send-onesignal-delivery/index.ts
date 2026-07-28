@@ -606,6 +606,7 @@ Deno.serve(async (req) => {
       console.warn("[OneSignal] subscriptions invalidadas", invalidPlayerIds.length);
     }
     if (
+      !test_mode &&
       broadcastTarget.mode === "subscriptions" &&
       (result.recipients ?? 0) === 0 &&
       externalIds.length > 0
