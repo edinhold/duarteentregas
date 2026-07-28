@@ -133,13 +133,16 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         return;
       }
       if ((data as any).status !== "pending") {
+        toast.info("Esta entrega já foi aceita por outro motorista.");
         close();
         return;
       }
       if ((data as any).driver_id && (data as any).driver_id !== user?.id) {
+        toast.info("Esta entrega já foi aceita por outro motorista.");
         close();
         return;
       }
+
       const next: OverlayDelivery = {
         id: (data as any).id,
         pickup_address: (data as any).pickup_address,
