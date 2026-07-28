@@ -509,7 +509,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const result = await sendWithRetry(config, { mode: "segment" }, payloadData);
+    // Prefer explicit aliases of approved drivers (tags may be missing on some
+    // devices, which makes the segment/tag filter resolve to 0 recipients).
+    const { data: approvedDrivers } = await supabase
+      .from("drivers")
+      .select("user_id")
+      .eq("approval_status", "approved")
+      .eq("is_active", true);
+    const externalIds = Array.from(
+      new Set((approvedDrivers ?? []).map((row: any) => String(row.user_id ?? "")).filter(isUuid)),
+    ).slice(0, 2000);
+    const broadcastTarget: SendMode = externalIds.length > 0
+      ? { mode: "aliases", externalIds }
+      : { mode: "segment" };
+    console.log("[OneSignal] broadcast target", { mode: broadcastTarget.mode, drivers: externalIds.length });
+
+    const result = await sendWithRetry(config, broadcastTarget, payloadData);
+
     await supabase
       .from("push_notification_logs")
       .update({
