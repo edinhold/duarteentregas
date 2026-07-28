@@ -6,6 +6,7 @@ import {
   oneSignalHeaders,
   readOneSignalResponse,
   safeOneSignalLogConfig,
+  summarizeOneSignalUser,
 } from "../_shared/onesignal.ts";
 
 // OneSignal device_type codes we care about
@@ -57,7 +58,12 @@ Deno.serve(async (req) => {
       headers: oneSignalHeaders(config),
     });
     const json = await readOneSignalResponse(res);
-    console.log("[OneSignal:UserStatusResponse]", { status: res.status, ok: res.ok, body: json, endpoint: url });
+    console.log("[OneSignal:UserStatusResponse]", {
+      status: res.status,
+      ok: res.ok,
+      body: summarizeOneSignalUser(json),
+      endpoint: url,
+    });
 
     if (!res.ok) {
       return new Response(

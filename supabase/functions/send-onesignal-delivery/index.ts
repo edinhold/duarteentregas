@@ -9,6 +9,7 @@ import {
   oneSignalHeaders,
   readOneSignalResponse,
   safeOneSignalLogConfig,
+  summarizeOneSignalUser,
   type OneSignalConfig,
 } from "../_shared/onesignal.ts";
 
@@ -97,7 +98,7 @@ async function getOneSignalSubscriptionIds(config: OneSignalConfig, driverId: st
       endpoint,
       status: res.status,
       ok: res.ok,
-      body,
+      body: summarizeOneSignalUser(body),
     });
 
     if (!res.ok) {
