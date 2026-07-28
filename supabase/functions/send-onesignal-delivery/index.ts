@@ -519,12 +519,54 @@ Deno.serve(async (req) => {
     const externalIds = Array.from(
       new Set((approvedDrivers ?? []).map((row: any) => String(row.user_id ?? "")).filter(isUuid)),
     ).slice(0, 2000);
-    const broadcastTarget: SendMode = externalIds.length > 0
-      ? { mode: "aliases", externalIds }
-      : { mode: "segment" };
-    console.log("[OneSignal] broadcast target", { mode: broadcastTarget.mode, drivers: externalIds.length });
+
+    // Most reliable target: every ACTIVE device (PWA + APK) of those drivers,
+    // deduplicated by Subscription ID. Falls back to aliases, then to segment.
+    let deviceSubscriptionIds: string[] = [];
+    if (externalIds.length > 0) {
+      const { data: devices } = await (supabase as any)
+        .from("onesignal_devices")
+        .select("subscription_id")
+        .in("user_id", externalIds)
+        .eq("status", "active")
+        .not("subscription_id", "is", null);
+      deviceSubscriptionIds = validSubscriptionIds((devices ?? []).map((d: any) => d.subscription_id)).slice(0, 2000);
+    }
+
+    const broadcastTarget: SendMode = deviceSubscriptionIds.length > 0
+      ? { mode: "subscriptions", subscriptionIds: deviceSubscriptionIds }
+      : externalIds.length > 0
+        ? { mode: "aliases", externalIds }
+        : { mode: "segment" };
+    console.log("[OneSignal] broadcast target", {
+      mode: broadcastTarget.mode,
+      drivers: externalIds.length,
+      devices: deviceSubscriptionIds.length,
+    });
 
     const result = await sendWithRetry(config, broadcastTarget, payloadData);
+    const notificationId = (result.json as any)?.id ?? null;
+
+    // Persist the notification id so the accept flow can cancel it later.
+    if (notificationId) {
+      await (supabase as any)
+        .from("delivery_requests")
+        .update({ onesignal_notification_id: notificationId })
+        .eq("id", request_id);
+    }
+
+    await (supabase as any).from("push_delivery_events").insert([{
+      pedido_id: request_id,
+      event_type: result.ok
+        ? (result.recipients === 0 ? "nova_entrega_sem_destinatarios" : "nova_entrega_enviada")
+        : "nova_entrega_erro",
+      onesignal_notification_id: notificationId,
+      recipients_count: result.recipients ?? 0,
+      status: result.ok ? "ok" : "error",
+      response_status: result.status ?? null,
+      response_body_sanitized: result.json ?? null,
+    }]);
+
 
     await supabase
       .from("push_notification_logs")
