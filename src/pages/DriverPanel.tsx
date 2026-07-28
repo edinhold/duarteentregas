@@ -424,15 +424,17 @@ const DriverPanel = () => {
       if (error) throw error;
       const fee = Number((data as any)?.driver_fee || 0);
       console.log("[Delivery] Motorista aceitou", requestId, data);
-      toast.success(fee > 0 ? `Entrega aceita! Você ganhará R$ ${fee.toFixed(2)}` : "Entrega aceita!");
+      toast.success(fee > 0 ? `Entrega aceita com sucesso! Você ganhará R$ ${fee.toFixed(2)}` : "Entrega aceita com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
     } catch (err: any) {
-      const msg = err?.message || "Erro ao aceitar";
-      toast.error(msg);
+      const raw = err?.message || "Erro ao aceitar";
+      const conflict = /já foi assumida|já foi aceita|direcionada/i.test(raw);
+      toast.error(conflict ? "Esta entrega já foi aceita por outro motorista." : raw);
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
     }
   };
+
 
   const updateStatus = async (requestId: string, status: string) => {
     try {
