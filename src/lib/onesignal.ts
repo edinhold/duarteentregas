@@ -124,8 +124,23 @@ async function initOneSignalWeb(): Promise<void> {
           allowLocalhostAsSecureOrigin: true,
           notifyButton: { enable: false },
         });
+        try {
+          OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
+            const extra = event?.notification?.additionalData ?? {};
+            if (extra?.tipo === "entrega_indisponivel") {
+              try { event?.preventDefault?.(); } catch {}
+              emitDeliveryUnavailable(extra?.pedido_id);
+            }
+          });
+        } catch {}
         OneSignal.Notifications.addEventListener("click", (event: any) => {
           log("web click", event);
+          const extraData = event?.notification?.additionalData ?? {};
+          if (extraData?.tipo === "entrega_indisponivel") {
+            emitDeliveryUnavailable(extraData?.pedido_id);
+            return;
+          }
+
           try {
             const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
             window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
