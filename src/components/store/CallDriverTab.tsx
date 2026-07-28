@@ -906,7 +906,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "google" ? "Google" : mapType === "streets" ? "OSM" : "Satélite"}
+              {mapType === "google" ? "OSM HOT" : mapType === "streets" ? "OSM" : "Satélite"}
             </Button>
           </div>
         </CardHeader>
