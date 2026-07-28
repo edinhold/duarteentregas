@@ -281,15 +281,17 @@ async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadD
       const recipients = Number(lastJson?.recipients ?? 0);
       const hasId = !!(lastJson?.id || lastJson?.notification_id);
       const accepted = lastJson?.accepted === true;
-      // Success = OneSignal accepted the notification (id/accepted) and reported
-      // no `errors`. `recipients` may legitimately be absent/0 on the v16 API,
-      // so it must NOT drive the success decision.
-      if (res.ok && (hasId || accepted) && !hasApiErrors(lastJson)) {
-        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients });
+      const invalidAliases = extractInvalidAliases(lastJson);
+      // Success = OneSignal accepted the notification (id/accepted). Invalid
+      // aliases are tolerated on broadcasts: the valid ones still receive it.
+      const onlyInvalidAliasErrors =
+        invalidAliases.length > 0 && Object.keys(lastJson?.errors ?? {}).every((k) => k === "invalid_aliases");
+      if (res.ok && (hasId || accepted) && (!hasApiErrors(lastJson) || onlyInvalidAliasErrors)) {
+        console.log("[OneSignal:Success]", { attempt, id: lastJson?.id, recipients, invalid: invalidAliases.length });
         return { ok: true, attempts: attempt, json: lastJson, status: res.status, recipients };
       }
       // Non-transient failures: do NOT retry.
-      const invalid = extractInvalidAliases(lastJson);
+      const invalid = invalidAliases;
       const authError = res.status === 401 || res.status === 403;
       const validationError = res.status === 400 && hasApiErrors(lastJson);
       if (invalid.length > 0 || authError || validationError) {
@@ -310,6 +312,7 @@ async function sendWithRetry(config: OneSignalConfig, target: SendMode, payloadD
           message: describeError(res.status, lastJson),
         };
       }
+
       console.warn("[OneSignal:Error] attempt", attempt, "no_recipients", { status: res.status, body: lastJson });
     } catch (e) {
       lastErr = e;
