@@ -3,6 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { playUrgentNotification } from "@/lib/notificationSound";
+import { toast } from "sonner";
+
 
 export type OverlayState = "loading" | "success" | "error" | "empty";
 
@@ -133,13 +135,16 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         return;
       }
       if ((data as any).status !== "pending") {
+        toast.info("Esta entrega já foi aceita por outro motorista.");
         close();
         return;
       }
       if ((data as any).driver_id && (data as any).driver_id !== user?.id) {
+        toast.info("Esta entrega já foi aceita por outro motorista.");
         close();
         return;
       }
+
       const next: OverlayDelivery = {
         id: (data as any).id,
         pickup_address: (data as any).pickup_address,
@@ -182,15 +187,38 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
     };
     consumeParam();
 
+    const handleUnavailable = (pedidoId?: string | null) => {
+      setDelivery((current) => {
+        if (!current) return current;
+        if (pedidoId && current.id !== pedidoId) return current;
+        stopAlerts();
+        setState("empty");
+        toast.info("Esta entrega já foi aceita por outro motorista.");
+        return null;
+      });
+    };
+
     const onSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "OPEN_DELIVERY" && event.data?.requestId) {
         console.log("[DeliveryOverlay] Clique na notificação (SW)", event.data.requestId);
         openDelivery(event.data.requestId);
       }
+      if (event.data?.type === "DELIVERY_UNAVAILABLE") {
+        console.log("[DeliveryOverlay] Entrega indisponível (SW)", event.data.requestId);
+        handleUnavailable(event.data.requestId);
+      }
+    };
+    const onUnavailable = (event: Event) => {
+      handleUnavailable((event as CustomEvent).detail?.pedidoId);
     };
     navigator.serviceWorker?.addEventListener("message", onSwMessage);
-    return () => navigator.serviceWorker?.removeEventListener("message", onSwMessage);
-  }, [user, openDelivery]);
+    window.addEventListener("delivery-unavailable", onUnavailable as EventListener);
+    return () => {
+      navigator.serviceWorker?.removeEventListener("message", onSwMessage);
+      window.removeEventListener("delivery-unavailable", onUnavailable as EventListener);
+    };
+  }, [user, openDelivery, stopAlerts]);
+
 
   // Notification / overlay permission check (web fallback for Android SYSTEM_ALERT_WINDOW).
   useEffect(() => {
@@ -315,7 +343,15 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
       close();
     } catch (err: any) {
       console.log("[DeliveryOverlay] Falha ao aceitar", err);
+      const msg = String(err?.message ?? "");
+      if (/já foi assumida|já foi aceita|direcionada/i.test(msg)) {
+        toast.info("Esta entrega já foi aceita por outro motorista.");
+        queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+        close();
+        return;
+      }
       setState("error");
+
     }
   }, [delivery, user, queryClient, onAccepted, close]);
 

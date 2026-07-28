@@ -349,6 +349,7 @@ export type Database = {
           group_id: string | null
           id: string
           notes: string | null
+          onesignal_notification_id: string | null
           pickup_address: string | null
           restaurant_id: string | null
           status: string
@@ -366,6 +367,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           notes?: string | null
+          onesignal_notification_id?: string | null
           pickup_address?: string | null
           restaurant_id?: string | null
           status?: string
@@ -383,6 +385,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           notes?: string | null
+          onesignal_notification_id?: string | null
           pickup_address?: string | null
           restaurant_id?: string | null
           status?: string
@@ -884,6 +887,45 @@ export type Database = {
           suspension_reason?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      push_delivery_events: {
+        Row: {
+          accepted_by: string | null
+          created_at: string
+          event_type: string
+          id: string
+          onesignal_notification_id: string | null
+          pedido_id: string | null
+          recipients_count: number
+          response_body_sanitized: Json | null
+          response_status: number | null
+          status: string
+        }
+        Insert: {
+          accepted_by?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          recipients_count?: number
+          response_body_sanitized?: Json | null
+          response_status?: number | null
+          status?: string
+        }
+        Update: {
+          accepted_by?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          recipients_count?: number
+          response_body_sanitized?: Json | null
+          response_status?: number | null
+          status?: string
         }
         Relationships: []
       }

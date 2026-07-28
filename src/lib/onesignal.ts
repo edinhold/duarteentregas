@@ -19,6 +19,17 @@ function log(...args: any[]) {
 function warn(...args: any[]) {
   try { console.warn("[OneSignal]", ...args); } catch {}
 }
+
+/** Notifies the app that a delivery is no longer available (silent sync event). */
+export function emitDeliveryUnavailable(pedidoId?: string | null) {
+  try {
+    log("entrega_indisponivel", pedidoId);
+    window.dispatchEvent(new CustomEvent("delivery-unavailable", { detail: { pedidoId: pedidoId ?? null } }));
+  } catch {}
+}
+
+
+
 function err(...args: any[]) {
   try { console.error("[OneSignal]", ...args); } catch {}
 }
@@ -51,6 +62,14 @@ async function initOneSignalNative(): Promise<any> {
     try {
       OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
         const notification = event?.getNotification?.();
+        const extra = notification?.additionalData ?? {};
+        // Silent sync: another driver accepted — never display it.
+        if (extra?.tipo === "entrega_indisponivel") {
+          try { event?.preventDefault?.(); } catch {}
+          emitDeliveryUnavailable(extra?.pedido_id);
+          try { OneSignal.Notifications?.removeNotification?.(notification?.androidNotificationId); } catch {}
+          return;
+        }
         try { event?.preventDefault?.(); } catch {}
         try { notification?.display?.(); } catch {}
         try { if ("vibrate" in navigator) navigator.vibrate?.([400, 200, 400]); } catch {}
@@ -60,10 +79,16 @@ async function initOneSignalNative(): Promise<any> {
     try {
       OneSignal.Notifications.addEventListener("click", (event: any) => {
         log("native click", event);
-        const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
+        const extra = event?.notification?.additionalData ?? {};
+        if (extra?.tipo === "entrega_indisponivel") {
+          emitDeliveryUnavailable(extra?.pedido_id);
+          return;
+        }
+        const url = extra.url || extra.rota || "/entregador";
         if (typeof window !== "undefined") window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
       });
     } catch {}
+
 
     return OneSignal;
   })();
@@ -99,8 +124,23 @@ async function initOneSignalWeb(): Promise<void> {
           allowLocalhostAsSecureOrigin: true,
           notifyButton: { enable: false },
         });
+        try {
+          OneSignal.Notifications.addEventListener("foregroundWillDisplay", (event: any) => {
+            const extra = event?.notification?.additionalData ?? {};
+            if (extra?.tipo === "entrega_indisponivel") {
+              try { event?.preventDefault?.(); } catch {}
+              emitDeliveryUnavailable(extra?.pedido_id);
+            }
+          });
+        } catch {}
         OneSignal.Notifications.addEventListener("click", (event: any) => {
           log("web click", event);
+          const extraData = event?.notification?.additionalData ?? {};
+          if (extraData?.tipo === "entrega_indisponivel") {
+            emitDeliveryUnavailable(extraData?.pedido_id);
+            return;
+          }
+
           try {
             const url = event?.notification?.additionalData?.url || event?.notification?.additionalData?.rota || "/entregador";
             window.location.assign(url === "/motorista/pedido" ? "/entregador" : url);
