@@ -578,11 +578,13 @@ Deno.serve(async (req) => {
       ).slice(0, 2000);
     }
 
-    const broadcastTarget: SendMode = deviceSubscriptionIds.length > 0
-      ? { mode: "subscriptions", subscriptionIds: deviceSubscriptionIds }
-      : externalIds.length > 0
-        ? { mode: "aliases", externalIds }
-        : { mode: "segment" };
+    const broadcastTarget: SendMode = test_mode && test_subscription_id
+      ? { mode: "subscriptions", subscriptionIds: [test_subscription_id] }
+      : deviceSubscriptionIds.length > 0
+        ? { mode: "subscriptions", subscriptionIds: deviceSubscriptionIds }
+        : externalIds.length > 0
+          ? { mode: "aliases", externalIds }
+          : { mode: "segment" };
     console.log("[OneSignal] broadcast target", {
       mode: broadcastTarget.mode,
       drivers: externalIds.length,
@@ -604,6 +606,7 @@ Deno.serve(async (req) => {
       console.warn("[OneSignal] subscriptions invalidadas", invalidPlayerIds.length);
     }
     if (
+      !test_mode &&
       broadcastTarget.mode === "subscriptions" &&
       (result.recipients ?? 0) === 0 &&
       externalIds.length > 0
