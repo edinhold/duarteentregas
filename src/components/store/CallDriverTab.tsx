@@ -786,29 +786,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       toast.success(`Entregador chamado! Custo: R$ ${(deliveryCost ?? 0).toFixed(2)}`);
 
-      // The backend trigger dispatches the push; report the real audience.
-      if (requestId) {
-        setTimeout(async () => {
-          try {
-            const { data: ev } = await (supabase as any)
-              .from("push_delivery_events")
-              .select("event_type, recipients_count")
-              .eq("pedido_id", requestId)
-              .in("event_type", ["nova_entrega_enviada", "nova_entrega_sem_destinatarios", "nova_entrega_erro"])
-              .order("created_at", { ascending: false })
-              .limit(1);
-            const row = (ev ?? [])[0];
-            if (!row) return;
-            if (row.event_type === "nova_entrega_enviada" && Number(row.recipients_count) > 0) {
-              toast.success(`Pedido criado e enviado para ${row.recipients_count} motorista(s) disponíveis.`);
-            } else {
-              toast.warning("Pedido criado, mas nenhum motorista com notificações ativas foi encontrado.");
-            }
-          } catch {}
-        }, 3000);
-      }
-
-      
       const pickupAddr = restaurant?.address || callForm.pickup;
       setCallForm({ pickup: pickupAddr, delivery: "", delivery_number: "", notes: "" });
       setDeliveryLatLng(null);

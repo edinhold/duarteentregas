@@ -33,7 +33,6 @@ import {
   DriverNotificationSettingsState,
   loadDriverNotificationSettings,
 } from "@/lib/driverNotificationSettings";
-import { registerDeviceForUser } from "@/lib/onesignal";
 
 const DriverPanel = () => {
   const { user, loading } = useAuth();
@@ -231,13 +230,12 @@ const DriverPanel = () => {
     },
   });
 
-  // Request notification permission + register device on OneSignal
+  // Request local notification permission (no push provider configured).
   useEffect(() => {
     if (!user?.id) return;
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }
-    registerDeviceForUser(user.id, { role: "driver" }).catch(() => {});
   }, [user?.id]);
 
   // Keep standby settings active for the whole driver panel (including mobile),

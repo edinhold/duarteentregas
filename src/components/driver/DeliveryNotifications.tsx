@@ -66,27 +66,10 @@ const DeliveryNotifications = ({ standby, onAccepted, timeoutMs }: Props) => {
     const { toast } = await import("sonner");
     const result = await requestPermission();
     if (result === "granted") {
-      try {
-        const { enableWebPush, isPushSupported } = await import("@/lib/webPush");
-        if (!isPushSupported()) {
-          toast.warning("Este navegador não suporta notificações em segundo plano.");
-          return;
-        }
-        const res = await enableWebPush();
-        if (res.ok) {
-          toast.success("Notificações ativadas! Você receberá alertas mesmo com o app fechado.");
-        } else if (res.reason === "not-authenticated") {
-          toast.error("Faça login novamente para ativar as notificações.");
-        } else {
-          toast.error("Falha ao registrar notificações em segundo plano. Tente novamente.");
-        }
-      } catch (e) {
-        console.error("[DeliveryNotifications] enableWebPush error", e);
-        toast.error("Erro ao ativar notificações em segundo plano.");
-      }
+      toast.success("Notificações ativadas neste dispositivo.");
     } else if (result === "denied") {
       toast.warning(
-        "Permissão bloqueada. Habilite notificações nas configurações do navegador/app para receber alertas com o app em segundo plano."
+        "Permissão bloqueada. Habilite notificações nas configurações do navegador/app."
       );
     } else {
       toast.info("Permissão não concedida. Toque em Conceder para tentar novamente.");

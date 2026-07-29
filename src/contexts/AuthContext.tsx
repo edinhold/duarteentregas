@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { setOneSignalExternalUserId, clearOneSignalExternalUserId, registerDeviceForUser } from "@/lib/onesignal";
 
 export type AppRole = "admin" | "store_owner" | "driver" | "customer";
 
@@ -50,7 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const until = new Date(row.suspended_until).toLocaleString("pt-BR");
           const reason = row.suspension_reason ? `\nMotivo: ${row.suspension_reason}` : "";
           alert(`Sua conta está suspensa até ${until}.${reason}`);
-          try { await clearOneSignalExternalUserId(); } catch {}
           await supabase.auth.signOut();
           return true;
         }
@@ -90,7 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!uid) {
         setRole(null);
         setRoleLoading(false);
-        clearOneSignalExternalUserId().catch(() => {});
         return;
       }
       setRoleLoading(true);
@@ -100,12 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRoleLoading(false);
         return;
       }
-      setOneSignalExternalUserId(uid).catch(() => {});
       const resolved = await resolveRole(uid);
       console.log("[Auth] Role carregada:", resolved);
       setRole(resolved);
       setRoleLoading(false);
-      registerDeviceForUser(uid, { role: resolved }).catch(() => {});
     };
 
 
@@ -165,7 +160,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const signOut = async () => {
-    try { await clearOneSignalExternalUserId(); } catch {}
     try { sessionStorage.removeItem("authRedirectDone"); } catch {}
     await supabase.auth.signOut();
   };

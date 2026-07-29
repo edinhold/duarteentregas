@@ -12,7 +12,6 @@ import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import TestPush from "./pages/admin/TestPush";
 import StoreOwnerPanel from "./pages/StoreOwnerPanel";
 import DriverPanel from "./pages/DriverPanel";
 
@@ -50,7 +49,6 @@ const App = () => (
               <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/teste-push" element={<TestPush />} />
               <Route path="/lojista" element={<StoreOwnerPanel />} />
               <Route path="/entregador" element={<DriverPanel />} />
               <Route path="/pedido/:id/rastreio" element={<OrderTracking />} />

@@ -349,7 +349,6 @@ export type Database = {
           group_id: string | null
           id: string
           notes: string | null
-          onesignal_notification_id: string | null
           pickup_address: string | null
           restaurant_id: string | null
           status: string
@@ -367,7 +366,6 @@ export type Database = {
           group_id?: string | null
           id?: string
           notes?: string | null
-          onesignal_notification_id?: string | null
           pickup_address?: string | null
           restaurant_id?: string | null
           status?: string
@@ -385,7 +383,6 @@ export type Database = {
           group_id?: string | null
           id?: string
           notes?: string | null
-          onesignal_notification_id?: string | null
           pickup_address?: string | null
           restaurant_id?: string | null
           status?: string
@@ -634,45 +631,6 @@ export type Database = {
         }
         Relationships: []
       }
-      onesignal_devices: {
-        Row: {
-          created_at: string
-          external_id: string
-          id: string
-          last_synced_at: string
-          onesignal_user_id: string | null
-          platform: string | null
-          status: string | null
-          subscription_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          external_id: string
-          id?: string
-          last_synced_at?: string
-          onesignal_user_id?: string | null
-          platform?: string | null
-          status?: string | null
-          subscription_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          external_id?: string
-          id?: string
-          last_synced_at?: string
-          onesignal_user_id?: string | null
-          platform?: string | null
-          status?: string | null
-          subscription_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       orders: {
         Row: {
           address: string | null
@@ -886,111 +844,6 @@ export type Database = {
           suspended_until?: string | null
           suspension_reason?: string | null
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      push_delivery_events: {
-        Row: {
-          accepted_by: string | null
-          created_at: string
-          event_type: string
-          id: string
-          onesignal_notification_id: string | null
-          pedido_id: string | null
-          recipients_count: number
-          response_body_sanitized: Json | null
-          response_status: number | null
-          status: string
-        }
-        Insert: {
-          accepted_by?: string | null
-          created_at?: string
-          event_type: string
-          id?: string
-          onesignal_notification_id?: string | null
-          pedido_id?: string | null
-          recipients_count?: number
-          response_body_sanitized?: Json | null
-          response_status?: number | null
-          status?: string
-        }
-        Update: {
-          accepted_by?: string | null
-          created_at?: string
-          event_type?: string
-          id?: string
-          onesignal_notification_id?: string | null
-          pedido_id?: string | null
-          recipients_count?: number
-          response_body_sanitized?: Json | null
-          response_status?: number | null
-          status?: string
-        }
-        Relationships: []
-      }
-      push_notification_logs: {
-        Row: {
-          attempts: number
-          created_at: string
-          driver_user_id: string
-          error: string | null
-          id: string
-          request_id: string
-          response: Json | null
-          status: string
-        }
-        Insert: {
-          attempts?: number
-          created_at?: string
-          driver_user_id: string
-          error?: string | null
-          id?: string
-          request_id: string
-          response?: Json | null
-          status: string
-        }
-        Update: {
-          attempts?: number
-          created_at?: string
-          driver_user_id?: string
-          error?: string | null
-          id?: string
-          request_id?: string
-          response?: Json | null
-          status?: string
-        }
-        Relationships: []
-      }
-      push_subscriptions: {
-        Row: {
-          auth: string
-          created_at: string
-          endpoint: string
-          id: string
-          p256dh: string
-          updated_at: string
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          auth: string
-          created_at?: string
-          endpoint: string
-          id?: string
-          p256dh: string
-          updated_at?: string
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          auth?: string
-          created_at?: string
-          endpoint?: string
-          id?: string
-          p256dh?: string
-          updated_at?: string
-          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
