@@ -47,22 +47,27 @@ const PushDiagnosticsTab = () => {
     setSending(true);
     setLastResult(null);
     try {
-      const body = target === "all_drivers" ? { all_drivers: true } : { user_id: target };
-      const { data, error } = await supabase.functions.invoke("push-test", { body });
-      if (error) throw error;
+      const subId =
+        target === "all_drivers"
+          ? undefined
+          : driverSubs.find((s: any) => s.user_id === target)?.onesignal_subscription_id;
+
+      const data = await chamarNotificacao({
+        test_mode: true,
+        ...(subId ? { test_subscription_id: subId } : {}),
+      });
       setLastResult(data);
-      if (data?.success) {
-        toast.success(`Enviado para ${data.recipients} dispositivo(s).`);
-      } else {
-        toast.warning(`Não entregue: ${data?.code ?? "erro"} — ${data?.message ?? "verifique os dispositivos"}`);
-      }
+      toast.success(`Enviado para ${data.recipients ?? 0} dispositivo(s).`);
       refetchLogs();
     } catch (err: any) {
+      setLastResult({ error: err?.message ?? String(err) });
       toast.error(`Falha ao enviar: ${err?.message ?? err}`);
+      refetchLogs();
     } finally {
       setSending(false);
     }
   };
+
 
   return (
     <div className="space-y-4">
