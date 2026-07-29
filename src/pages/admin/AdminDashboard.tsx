@@ -414,7 +414,9 @@ const AdminDashboard = () => {
           <TabsContent value="chat"><ChatTab /></TabsContent>
           <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
           <TabsContent value="customers"><CustomersTab /></TabsContent>
+          <TabsContent value="push"><PushDiagnosticsTab /></TabsContent>
           <TabsContent value="privacy"><PrivacyPolicyTab /></TabsContent>
+
             </motion.div>
           </Tabs>
         </main>
