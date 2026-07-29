@@ -317,7 +317,10 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         p_request_id: delivery.id,
       });
       if (error) throw error;
-      // Push cancellation removed — Realtime removes the offer on other devices.
+      // Silently invalidate the offer on every other driver's device.
+      void invalidarNotificacao(delivery.id);
+
+
 
 
       console.log("[Delivery] Motorista aceitou (overlay)", {
