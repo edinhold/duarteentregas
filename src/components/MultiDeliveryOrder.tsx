@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Plus, Trash2, MapPin, User, Phone, Package, Route, Loader2 } from "lucide-react";
-import { chamarNotificacaoComRetry } from "@/lib/push/notify";
 
 const MAX_STOPS = 10;
 

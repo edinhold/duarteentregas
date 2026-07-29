@@ -26,7 +26,6 @@ import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
 import DeliveryNotifications from "@/components/driver/DeliveryNotifications";
 import DriverGroupedDeliveries from "@/components/driver/DriverGroupedDeliveries";
-import PushStatusCard from "@/components/driver/PushStatusCard";
 
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -1029,8 +1028,6 @@ const DriverPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
-                  {/* Background push notifications */}
-                  <PushStatusCard />
                   {/* Notification Settings */}
                   <DriverNotificationSettings />
                 </TabsContent>
