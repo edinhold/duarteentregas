@@ -58,17 +58,22 @@ Deno.serve(async (req) => {
     const userClient = createClient(url!, anon!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claims, error: claimsError } = await userClient.auth.getClaims(
-      authHeader.replace(/^Bearer\s+/i, ""),
-    );
-    if (claimsError || !claims?.claims?.sub) {
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: claims, error: claimsError } = await userClient.auth.getClaims(token);
+    let callerId = claims?.claims?.sub as string | undefined;
+
+    if (claimsError || !callerId) {
+      const { data: userData, error: userError } = await userClient.auth.getUser(token);
+      if (!userError && userData?.user?.id) callerId = userData.user.id;
+    }
+
+    if (!callerId) {
       return json({
         success: false,
         code: "INVALID_SESSION",
         message: "Sua sessão expirou ou é inválida. Entre novamente.",
       }, 401);
     }
-    const callerId = claims.claims.sub as string;
 
     let body: any;
     try {

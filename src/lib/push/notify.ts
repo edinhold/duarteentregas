@@ -11,6 +11,39 @@ export interface PushInvokeResult {
 }
 
 const FUNCTION_NAME = "notify-available-drivers";
+const NON_BLOCKING_CODES = new Set([
+  "JA_ENVIADO",
+  "NO_RECIPIENTS",
+  "NO_ACTIVE_SUBSCRIPTIONS",
+]);
+
+function notificationFunctionUrl() {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!baseUrl) {
+    throw new Error("Configuração do backend ausente para notificações.");
+  }
+  return `${baseUrl.replace(/\/$/, "")}/functions/v1/${FUNCTION_NAME}`;
+}
+
+async function readResponseBody(response: Response): Promise<PushInvokeResult> {
+  const text = await response.text();
+  if (!text) return { success: response.ok };
+
+  try {
+    return JSON.parse(text) as PushInvokeResult;
+  } catch {
+    return {
+      success: false,
+      code: `HTTP_${response.status}`,
+      message: text,
+    };
+  }
+}
+
+function formatPushError(result: PushInvokeResult, fallback: string) {
+  const message = result.message || result.code || fallback;
+  return `${message}${result.request_id ? ` (id: ${result.request_id})` : ""}`;
+}
 
 /**
  * Calls the push Edge Function with a validated session and surfaces the real
@@ -29,44 +62,31 @@ export async function chamarNotificacao(
     throw new Error("Sua sessão expirou. Entre novamente no sistema.");
   }
 
-  const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, {
-    body,
-    headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
-  });
-
-  if (error) {
-    console.error("[push] erro ao chamar Edge Function", {
-      name: (error as any)?.name,
-      message: error.message,
+  let response: Response;
+  try {
+    response = await fetch(notificationFunctionUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        "x-client-info": "duarte-entregas-push",
+      },
+      body: JSON.stringify(body),
     });
-
-    const ctx = (error as any)?.context;
-    if (ctx instanceof Response) {
-      try {
-        const details = await ctx.clone().json();
-        throw new Error(
-          `${details?.message ?? `Falha HTTP ${ctx.status}`}${
-            details?.request_id ? ` (id: ${details.request_id})` : ""
-          }`,
-        );
-      } catch (parseError) {
-        if (parseError instanceof Error && parseError.message) throw parseError;
-      }
-      throw new Error(`Falha HTTP ${ctx.status} ao contatar o serviço de notificações.`);
-    }
-
-    throw new Error(
-      error.message || "Não foi possível acessar o serviço de notificações.",
-    );
+  } catch (error: any) {
+    console.error("[push] falha de rede ao chamar função", error);
+    throw new Error(error?.message || "Não foi possível acessar o serviço de notificações.");
   }
 
-  const result = (data ?? {}) as PushInvokeResult;
-  if (!result.success) {
-    throw new Error(
-      `${result.message || "Não foi possível enviar a notificação."}${
-        result.request_id ? ` (id: ${result.request_id})` : ""
-      }`,
-    );
+  const result = await readResponseBody(response);
+
+  if (!response.ok) {
+    throw new Error(formatPushError(result, `Falha HTTP ${response.status}`));
+  }
+
+  if (!result.success && !NON_BLOCKING_CODES.has(String(result.code ?? ""))) {
+    throw new Error(formatPushError(result, "Não foi possível enviar a notificação."));
   }
 
   return result;
