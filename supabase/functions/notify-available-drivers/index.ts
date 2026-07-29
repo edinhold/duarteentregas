@@ -2,7 +2,7 @@
 // Backend trigger: sends the "new delivery" push to every eligible driver device.
 // Called right after a delivery request is committed to the database.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 import { sendOneSignal } from "../_shared/onesignal.ts";
 
 const ANDROID_CHANNEL_ID = "novas_entregas_v1";

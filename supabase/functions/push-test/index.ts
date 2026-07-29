@@ -2,7 +2,7 @@
 // Admin-only: sends a diagnostic push to specific subscriptions and returns
 // the real OneSignal result (never a blind "success").
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 import { sendOneSignal } from "../_shared/onesignal.ts";
 
 Deno.serve(async (req) => {
