@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Plus, Trash2, MapPin, User, Phone, Package, Route, Loader2 } from "lucide-react";
-import { chamarNotificacaoComRetry } from "@/lib/push/notify";
 
 const MAX_STOPS = 10;
 
@@ -191,18 +190,8 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
       });
       if (error) throw error;
 
-      // Notify drivers about every stop created for this route.
-      if (data) {
-        const { data: created } = await supabase
-          .from("delivery_requests")
-          .select("id")
-          .eq("group_id", data as any);
-        for (const req of created ?? []) {
-          void chamarNotificacaoComRetry({ pedido_id: (req as any).id }).catch(
-            (pushError: any) => console.log("[Push] Falha ao notificar rota", pushError?.message),
-          );
-        }
-      }
+      // Push notifications removed — drivers receive new stops via Realtime.
+
 
       toast.success(`Rota criada com ${stops.length} parada(s)!`);
 

@@ -3,23 +3,22 @@ import App from "./App.tsx";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 
-// Cleanup: unregister legacy push service workers from the previous
-// implementation. The current OneSignal worker lives under /onesignal/ and
-// must be preserved.
+// Cleanup: unregister any legacy push service workers left on devices.
+// Only the PWA (Workbox) service worker should remain registered.
 if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
   navigator.serviceWorker
     .getRegistrations()
     .then((regs) => {
       regs.forEach((reg) => {
         const url = reg.active?.scriptURL ?? "";
-        if (url.includes("/onesignal/")) return; // current push worker
-        if (/push-sw|push-worker|OneSignalSDKWorker/i.test(url)) {
+        if (/onesignal|push-sw|push-worker/i.test(url)) {
           reg.unregister().catch(() => {});
         }
       });
     })
     .catch(() => {});
 }
+
 
 
 createRoot(document.getElementById("root")!).render(<App />);
