@@ -767,6 +767,23 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
+      // Backend push trigger: alerts every eligible driver (app closed too).
+      if (requestId) {
+        supabase.functions
+          .invoke("notify-available-drivers", { body: { pedido_id: requestId } })
+          .then(({ data, error: pushError }) => {
+            if (pushError) {
+              console.log("[Push] Falha ao notificar motoristas", pushError.message);
+              return;
+            }
+            console.log("[Push] Motoristas notificados", data);
+            if (data && data.success === false && data.code === "NO_RECIPIENTS") {
+              toast.warning("Nenhum motorista com notificações ativas no momento.");
+            }
+          });
+      }
+
+
       // Play a confirmation sound for the store owner
       try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;

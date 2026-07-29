@@ -1,4 +1,4 @@
-import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut, Star, RefreshCw, Shield, Route, History } from "lucide-react";
+import { Home, Map as MapIcon, Radar, Wallet, Settings, Store, UtensilsCrossed, Truck, CreditCard, Package, ShoppingCart, Users, Ticket, DollarSign, ShieldCheck, MessageSquare, KeyRound, UserCheck, ChevronLeft, ChevronRight, LogOut, Star, RefreshCw, Shield, Route, History, Bell } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -67,6 +67,7 @@ const AppSidebar = ({ role, currentTab, onTabChange }: AppSidebarProps) => {
           { id: "chat", label: "Chat", icon: MessageSquare },
           { id: "password-reset", label: "Senhas", icon: KeyRound },
           { id: "customers", label: "Clientes", icon: UserCheck },
+          { id: "push", label: "Notificações", icon: Bell },
           { id: "privacy", label: "Privacidade", icon: Shield },
         ];
       default:

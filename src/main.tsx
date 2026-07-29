@@ -3,20 +3,23 @@ import App from "./App.tsx";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 
-// Cleanup: unregister legacy push service workers (OneSignal / custom web-push).
-// The push layer was removed; only the PWA service worker should remain.
+// Cleanup: unregister legacy push service workers from the previous
+// implementation. The current OneSignal worker lives under /onesignal/ and
+// must be preserved.
 if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
   navigator.serviceWorker
     .getRegistrations()
     .then((regs) => {
       regs.forEach((reg) => {
         const url = reg.active?.scriptURL ?? "";
-        if (/OneSignalSDK|onesignal|push-sw|push-worker/i.test(url)) {
+        if (url.includes("/onesignal/")) return; // current push worker
+        if (/push-sw|push-worker|OneSignalSDKWorker/i.test(url)) {
           reg.unregister().catch(() => {});
         }
       });
     })
     .catch(() => {});
 }
+
 
 createRoot(document.getElementById("root")!).render(<App />);

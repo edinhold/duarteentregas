@@ -24,6 +24,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RouteRestorer from "./components/RouteRestorer";
 import SplashScreen from "./components/SplashScreen";
 import UpdatePrompt from "./components/UpdatePrompt";
+import PushBootstrap from "./components/PushBootstrap";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
           <Toaster />
           <SplashScreen />
           <UpdatePrompt />
+          <PushBootstrap />
           <Sonner />
           <BrowserRouter>
             <RouteRestorer />
