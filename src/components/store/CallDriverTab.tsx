@@ -767,16 +767,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
-      // Backend push trigger: alerts every eligible driver (app closed too).
-      // Never blocks the delivery creation.
-      if (requestId) {
-        void chamarNotificacaoComRetry({ pedido_id: requestId })
-          .then((res) => console.log("[Push] Motoristas notificados", res))
-          .catch((pushError: any) => {
-            console.log("[Push] Falha ao notificar motoristas", pushError?.message);
-            toast.warning(`Pedido criado, mas o aviso push falhou: ${pushError?.message ?? "erro"}`);
-          });
-      }
+      // Push notifications removed — drivers are alerted via Realtime.
+
 
 
 
