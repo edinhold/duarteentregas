@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Plus, Trash2, MapPin, User, Phone, Package, Route, Loader2 } from "lucide-react";
+import { chamarNotificacaoComRetry } from "@/lib/push/notify";
 
 const MAX_STOPS = 10;
 
@@ -197,11 +198,9 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
           .select("id")
           .eq("group_id", data as any);
         for (const req of created ?? []) {
-          supabase.functions
-            .invoke("notify-available-drivers", { body: { pedido_id: (req as any).id } })
-            .then(({ error: pushError }) => {
-              if (pushError) console.log("[Push] Falha ao notificar rota", pushError.message);
-            });
+          void chamarNotificacaoComRetry({ pedido_id: (req as any).id }).catch(
+            (pushError: any) => console.log("[Push] Falha ao notificar rota", pushError?.message),
+          );
         }
       }
 
