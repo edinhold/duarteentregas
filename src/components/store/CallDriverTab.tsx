@@ -16,6 +16,7 @@ import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
+import { chamarNotificacaoComRetry } from "@/lib/push/notify";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -768,20 +769,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       if (error) throw error;
 
       // Backend push trigger: alerts every eligible driver (app closed too).
+      // Never blocks the delivery creation.
       if (requestId) {
-        supabase.functions
-          .invoke("notify-available-drivers", { body: { pedido_id: requestId } })
-          .then(({ data, error: pushError }) => {
-            if (pushError) {
-              console.log("[Push] Falha ao notificar motoristas", pushError.message);
-              return;
-            }
-            console.log("[Push] Motoristas notificados", data);
-            if (data && data.success === false && data.code === "NO_RECIPIENTS") {
-              toast.warning("Nenhum motorista com notificações ativas no momento.");
-            }
+        void chamarNotificacaoComRetry({ pedido_id: requestId })
+          .then((res) => console.log("[Push] Motoristas notificados", res))
+          .catch((pushError: any) => {
+            console.log("[Push] Falha ao notificar motoristas", pushError?.message);
+            toast.warning(`Pedido criado, mas o aviso push falhou: ${pushError?.message ?? "erro"}`);
           });
       }
+
 
 
       // Play a confirmation sound for the store owner

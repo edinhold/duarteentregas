@@ -2,48 +2,181 @@
 // Backend trigger: sends the "new delivery" push to every eligible driver device.
 // Called right after a delivery request is committed to the database.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 import { sendOneSignal } from "../_shared/onesignal.ts";
 
 const ANDROID_CHANNEL_ID = "novas_entregas_v1";
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
 
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
+  const requestId = crypto.randomUUID();
+
+  const json = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify({ ...body, request_id: requestId }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return json({ success: false, code: "UNAUTHORIZED" }, 401);
+    if (req.method !== "POST") {
+      return json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Método não permitido." }, 405);
     }
 
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const url = Deno.env.get("SUPABASE_URL");
+    const anon = Deno.env.get("SUPABASE_ANON_KEY");
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const appId = Deno.env.get("ONESIGNAL_APP_ID");
+    const apiKey = Deno.env.get("ONESIGNAL_APP_API_KEY") ?? Deno.env.get("ONESIGNAL_REST_API_KEY");
 
-    const userClient = createClient(url, anon, {
+    const missing = [
+      ["SUPABASE_URL", url],
+      ["SUPABASE_ANON_KEY", anon],
+      ["SUPABASE_SERVICE_ROLE_KEY", service],
+      ["ONESIGNAL_APP_ID", appId],
+      ["ONESIGNAL_APP_API_KEY", apiKey],
+    ].filter(([, v]) => !v).map(([k]) => k);
+
+    if (missing.length > 0) {
+      console.error("[notify] secrets ausentes", { requestId, missing });
+      return json({
+        success: false,
+        code: "MISSING_SECRETS",
+        message: `Configuração incompleta: ${missing.join(", ")}`,
+      }, 500);
+    }
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.toLowerCase().startsWith("bearer ")) {
+      return json({
+        success: false,
+        code: "MISSING_AUTHORIZATION",
+        message: "Sessão não encontrada. Entre novamente no sistema.",
+      }, 401);
+    }
+
+    const userClient = createClient(url!, anon!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: claims, error: claimsError } = await userClient.auth.getClaims(
-      authHeader.replace("Bearer ", ""),
+      authHeader.replace(/^Bearer\s+/i, ""),
     );
     if (claimsError || !claims?.claims?.sub) {
-      return json({ success: false, code: "UNAUTHORIZED" }, 401);
+      return json({
+        success: false,
+        code: "INVALID_SESSION",
+        message: "Sua sessão expirou ou é inválida. Entre novamente.",
+      }, 401);
     }
     const callerId = claims.claims.sub as string;
 
-    const body = await req.json().catch(() => ({}));
-    const pedidoId: string | undefined = body?.pedido_id;
-    if (!pedidoId || typeof pedidoId !== "string") {
-      return json({ success: false, code: "INVALID_INPUT", message: "pedido_id obrigatório" }, 400);
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ success: false, code: "INVALID_JSON", message: "Corpo da requisição inválido." }, 400);
     }
 
-    const admin = createClient(url, service);
+    const admin = createClient(url!, service!);
+
+    // ---- Test mode (admin diagnostics) ----------------------------------
+    if (body?.test_mode === true) {
+      const { data: isAdminCaller } = await admin.rpc("has_role", { _user_id: callerId, _role: "admin" });
+      if (!isAdminCaller) {
+        return json({ success: false, code: "FORBIDDEN", message: "Apenas administradores." }, 403);
+      }
+
+      let testIds: string[] = [];
+      const explicit = typeof body?.test_subscription_id === "string" ? body.test_subscription_id.trim() : "";
+      if (explicit) {
+        testIds = [explicit];
+      } else {
+        const { data: subs, error: subsErr } = await admin
+          .from("push_subscriptions")
+          .select("onesignal_subscription_id")
+          .eq("profile_type", "driver")
+          .eq("active", true)
+          .eq("subscription_status", "subscribed");
+        if (subsErr) {
+          return json({
+            success: false,
+            code: "SUBSCRIPTIONS_QUERY_ERROR",
+            message: "Não foi possível consultar os dispositivos.",
+            details: subsErr.message,
+          }, 500);
+        }
+        testIds = Array.from(
+          new Set((subs ?? []).map((s: any) => s.onesignal_subscription_id).filter(Boolean)),
+        );
+      }
+
+      if (testIds.length === 0) {
+        await admin.from("notification_delivery_logs").insert({
+          event_type: "teste_push",
+          recipients_count: 0,
+          error_code: "NO_RECIPIENTS",
+          response_body_sanitized: { request_id: requestId },
+        });
+        return json({
+          success: false,
+          code: "NO_ACTIVE_SUBSCRIPTIONS",
+          message: "Nenhum dispositivo ativo foi encontrado.",
+          recipients: 0,
+        });
+      }
+
+      const testResult = await sendOneSignal({
+        include_subscription_ids: testIds,
+        headings: { pt: "🔔 Teste de notificação", en: "Push test" },
+        contents: {
+          pt: "O sistema de notificações está funcionando neste aparelho.",
+          en: "Push notifications are working on this device.",
+        },
+        data: { tipo: "teste_push", rota: "/entregador" },
+        url: `${Deno.env.get("APP_BASE_URL") ?? "https://duarteentregas.lovable.app"}/entregador`,
+        android_channel_id: ANDROID_CHANNEL_ID,
+        priority: 10,
+        ttl: 300,
+      });
+
+      await admin.from("notification_delivery_logs").insert({
+        event_type: "teste_push",
+        platform: "multi",
+        recipients_count: testResult.recipients,
+        onesignal_notification_id: testResult.notificationId,
+        response_status: testResult.httpStatus,
+        response_body_sanitized: testResult.sanitized,
+        error_code: testResult.errorCode ?? null,
+      });
+
+      console.log("[notify] teste", {
+        requestId,
+        targeted: testIds.length,
+        recipients: testResult.recipients,
+        status: testResult.httpStatus,
+        code: testResult.errorCode,
+      });
+
+      return json({
+        success: testResult.ok,
+        code: testResult.errorCode ?? "NOTIFICATION_ACCEPTED",
+        message: testResult.ok
+          ? "Notificação aceita pelo OneSignal. Verifique o aparelho."
+          : "O OneSignal não entregou a notificação de teste.",
+        targeted: testIds.length,
+        recipients: testResult.recipients,
+        notification_id: testResult.notificationId,
+        http_status: testResult.httpStatus,
+        response: testResult.sanitized,
+      });
+    }
+
+    const pedidoId: string | undefined =
+      typeof body?.pedido_id === "string" ? body.pedido_id.trim() : undefined;
+    if (!pedidoId) {
+      return json({ success: false, code: "MISSING_PEDIDO_ID", message: "O ID do pedido não foi informado." }, 400);
+    }
+
 
     const { data: pedido, error: pedidoError } = await admin
       .from("delivery_requests")
@@ -52,7 +185,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (pedidoError || !pedido) {
-      return json({ success: false, code: "PEDIDO_NAO_ENCONTRADO" }, 404);
+      return json({ success: false, code: "ORDER_NOT_FOUND", message: "Pedido não encontrado." }, 404);
     }
 
     // Only the owner of the request or an admin may trigger the broadcast.
@@ -61,8 +194,9 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (pedido.store_owner_id !== callerId && !isAdmin) {
-      return json({ success: false, code: "FORBIDDEN" }, 403);
+      return json({ success: false, code: "FORBIDDEN", message: "Sem permissão para este pedido." }, 403);
     }
+
 
     if (pedido.status !== "pending") {
       return json({ success: false, code: "PEDIDO_INDISPONIVEL", status: pedido.status });

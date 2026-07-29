@@ -2,7 +2,7 @@
 // Called after a driver accepts (or the request is cancelled): removes the
 // pending notification from the other devices and broadcasts a silent sync.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 import { cancelOneSignal, sendOneSignal } from "../_shared/onesignal.ts";
 
 Deno.serve(async (req) => {
