@@ -767,7 +767,15 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
-      // Push notifications removed — drivers are alerted via Realtime.
+      // Notify available drivers (push never blocks the delivery creation).
+      if (requestId) {
+        const result = await notificarMotoristas(String(requestId));
+        if (!result.ok && !isSilentNotifyCode(result.code)) {
+          console.log("[Push] Falha ao notificar entregadores", result);
+        }
+      }
+
+
 
 
 
