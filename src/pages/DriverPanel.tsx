@@ -1027,9 +1027,12 @@ const DriverPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
+                  {/* Background push notifications */}
+                  <PushStatusCard />
                   {/* Notification Settings */}
                   <DriverNotificationSettings />
                 </TabsContent>
+
               </motion.div>
             </Tabs>
           </main>
