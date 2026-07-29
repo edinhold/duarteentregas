@@ -37,7 +37,9 @@ const App = () => (
           <UpdatePrompt />
           <Sonner />
           <BrowserRouter>
+            <PushBootstrap />
             <RouteRestorer />
+
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/restaurant/:id" element={<RestaurantDetail />} />
