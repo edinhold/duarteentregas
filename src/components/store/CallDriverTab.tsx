@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { notificarMotoristas, isSilentNotifyCode } from "@/lib/push/notify";
+
 import { DriverPhoto } from "@/components/DriverPhoto";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
