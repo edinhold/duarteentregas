@@ -189,7 +189,24 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
         p_group_notes: groupNotes.trim() || null,
       });
       if (error) throw error;
+
+      // Notify drivers about every stop created for this route.
+      if (data) {
+        const { data: created } = await supabase
+          .from("delivery_requests")
+          .select("id")
+          .eq("group_id", data as any);
+        for (const req of created ?? []) {
+          supabase.functions
+            .invoke("notify-available-drivers", { body: { pedido_id: (req as any).id } })
+            .then(({ error: pushError }) => {
+              if (pushError) console.log("[Push] Falha ao notificar rota", pushError.message);
+            });
+        }
+      }
+
       toast.success(`Rota criada com ${stops.length} parada(s)!`);
+
       setStops([emptyStop()]);
       setGroupNotes("");
       queryClient.invalidateQueries({ queryKey: ["my-credits", userId] });
