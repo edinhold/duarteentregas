@@ -315,6 +315,13 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         p_request_id: delivery.id,
       });
       if (error) throw error;
+      // Invalidate the push offer on every other device.
+      supabase.functions
+        .invoke("cancel-delivery-notification", { body: { pedido_id: delivery.id } })
+        .then(({ error: cancelError }) => {
+          if (cancelError) console.log("[Push] Falha ao cancelar notificação", cancelError.message);
+        });
+
       console.log("[Delivery] Motorista aceitou (overlay)", {
         request_id: delivery.id,
         driver_user_id: user.id,
