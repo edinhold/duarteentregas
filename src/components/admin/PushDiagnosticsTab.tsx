@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { chamarNotificacao } from "@/lib/push/notify";
 
 /** Admin diagnostics + test sender for the push notification system. */
 const PushDiagnosticsTab = () => {
