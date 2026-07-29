@@ -52,6 +52,7 @@ function formatPushError(result: PushInvokeResult, fallback: string) {
  */
 export async function chamarNotificacao(
   body: Record<string, unknown>,
+  options: { allowNonBlockingFailure?: boolean } = {},
 ): Promise<PushInvokeResult> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
@@ -85,7 +86,10 @@ export async function chamarNotificacao(
     throw new Error(formatPushError(result, `Falha HTTP ${response.status}`));
   }
 
-  if (!result.success && !NON_BLOCKING_CODES.has(String(result.code ?? ""))) {
+  if (
+    !result.success &&
+    !(options.allowNonBlockingFailure && NON_BLOCKING_CODES.has(String(result.code ?? "")))
+  ) {
     throw new Error(formatPushError(result, "Não foi possível enviar a notificação."));
   }
 
@@ -100,7 +104,7 @@ export async function chamarNotificacaoComRetry(body: Record<string, unknown>) {
   for (const delay of delays) {
     if (delay) await new Promise((r) => setTimeout(r, delay));
     try {
-      return await chamarNotificacao(body);
+      return await chamarNotificacao(body, { allowNonBlockingFailure: true });
     } catch (err: any) {
       lastError = err;
       const msg = String(err?.message ?? "");
