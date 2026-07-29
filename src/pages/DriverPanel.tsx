@@ -26,6 +26,8 @@ import GlobalDriverMap from "@/components/GlobalDriverMap";
 import AppSidebar from "@/components/AppSidebar";
 import DeliveryNotifications from "@/components/driver/DeliveryNotifications";
 import DriverGroupedDeliveries from "@/components/driver/DriverGroupedDeliveries";
+import PushStatusCard from "@/components/driver/PushStatusCard";
+
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
