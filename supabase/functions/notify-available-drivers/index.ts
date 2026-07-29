@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (pedidoError || !pedido) {
-      return json({ success: false, code: "PEDIDO_NAO_ENCONTRADO" }, 404);
+      return json({ success: false, code: "ORDER_NOT_FOUND", message: "Pedido não encontrado." }, 404);
     }
 
     // Only the owner of the request or an admin may trigger the broadcast.
@@ -194,8 +194,9 @@ Deno.serve(async (req) => {
       _role: "admin",
     });
     if (pedido.store_owner_id !== callerId && !isAdmin) {
-      return json({ success: false, code: "FORBIDDEN" }, 403);
+      return json({ success: false, code: "FORBIDDEN", message: "Sem permissão para este pedido." }, 403);
     }
+
 
     if (pedido.status !== "pending") {
       return json({ success: false, code: "PEDIDO_INDISPONIVEL", status: pedido.status });
