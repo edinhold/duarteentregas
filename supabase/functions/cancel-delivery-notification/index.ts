@@ -6,31 +6,60 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { cancelOneSignal, sendOneSignal } from "../_shared/onesignal.ts";
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
+
+  const requestId = crypto.randomUUID();
 
   const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
+    new Response(JSON.stringify({ ...(body as Record<string, unknown>), request_id: requestId }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   try {
+    if (req.method !== "POST") {
+      return json({ success: false, code: "METHOD_NOT_ALLOWED", message: "Método não permitido." }, 405);
+    }
+
     const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) return json({ success: false, code: "UNAUTHORIZED" }, 401);
+    if (!authHeader.toLowerCase().startsWith("bearer ")) {
+      return json({ success: false, code: "UNAUTHORIZED", message: "Sessão não encontrada." }, 401);
+    }
 
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const url = Deno.env.get("SUPABASE_URL");
+    const anon = Deno.env.get("SUPABASE_ANON_KEY");
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-    const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (!claims?.claims?.sub) return json({ success: false, code: "UNAUTHORIZED" }, 401);
+    const missing = [
+      ["SUPABASE_URL", url],
+      ["SUPABASE_ANON_KEY", anon],
+      ["SUPABASE_SERVICE_ROLE_KEY", service],
+    ].filter(([, value]) => !value).map(([key]) => key);
+
+    if (missing.length > 0) {
+      console.error("[cancel] secrets ausentes", { requestId, missing });
+      return json({
+        success: false,
+        code: "MISSING_SECRETS",
+        message: `Configuração incompleta: ${missing.join(", ")}`,
+      }, 500);
+    }
+
+    const userClient = createClient(url!, anon!, { global: { headers: { Authorization: authHeader } } });
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: claims, error: claimsError } = await userClient.auth.getClaims(token);
+    let callerId = claims?.claims?.sub as string | undefined;
+    if (claimsError || !callerId) {
+      const { data: userData, error: userError } = await userClient.auth.getUser(token);
+      if (!userError && userData?.user?.id) callerId = userData.user.id;
+    }
+    if (!callerId) return json({ success: false, code: "UNAUTHORIZED", message: "Sessão inválida." }, 401);
 
     const body = await req.json().catch(() => ({}));
     const pedidoId: string | undefined = body?.pedido_id;
     if (!pedidoId) return json({ success: false, code: "INVALID_INPUT" }, 400);
 
-    const admin = createClient(url, service);
+    const admin = createClient(url!, service!);
 
     const { data: job } = await admin
       .from("notification_jobs")

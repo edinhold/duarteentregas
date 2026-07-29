@@ -3,11 +3,11 @@
  * The App API Key is read from secrets and NEVER returned to clients.
  */
 
-export const ONESIGNAL_API = "https://api.onesignal.com/notifications?c=push";
+export const ONESIGNAL_API = "https://api.onesignal.com/notifications";
 
 export function getOneSignalConfig() {
   const appId = Deno.env.get("ONESIGNAL_APP_ID") ?? "";
-  const apiKey = Deno.env.get("ONESIGNAL_APP_API_KEY") ?? "";
+  const apiKey = Deno.env.get("ONESIGNAL_APP_API_KEY") ?? Deno.env.get("ONESIGNAL_REST_API_KEY") ?? "";
   return { appId, apiKey, configured: Boolean(appId && apiKey) };
 }
 
@@ -67,7 +67,8 @@ export async function sendOneSignal(payload: Record<string, unknown>): Promise<S
     json = { raw: "resposta não-JSON" };
   }
 
-  const recipients = Number(json?.recipients ?? 0);
+  const notificationId = typeof json?.id === "string" ? json.id : null;
+  const recipients = Number(json?.recipients ?? (notificationId ? 1 : 0));
   const hasErrors =
     json?.errors &&
     (Array.isArray(json.errors) ? json.errors.length > 0 : Object.keys(json.errors).length > 0);
@@ -81,7 +82,7 @@ export async function sendOneSignal(payload: Record<string, unknown>): Promise<S
   return {
     ok: res.ok && recipients > 0 && !hasErrors,
     httpStatus: res.status,
-    notificationId: json?.id ?? null,
+    notificationId,
     recipients,
     errors: json?.errors ?? null,
     sanitized: sanitizeResponse(json),
