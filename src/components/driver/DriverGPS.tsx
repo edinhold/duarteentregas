@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation, MapPin, Locate, ExternalLink, Loader2, Signal, SignalZero, Shield, Pause, Crosshair, Layers, RotateCcw } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { DEFAULT_CENTER, MAP_LAYERS } from "@/config/maps";
+import { DEFAULT_CENTER, MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import { resumeAudioContext } from "@/lib/notificationSound";
@@ -252,7 +252,7 @@ const DriverGPS = ({ activeRequest, pendingRequests = [], onAcceptRequest, track
           >
             <Layers className="w-4 h-4" />
             <span className="hidden sm:inline">
-              {mapType === "streets" ? "Ver OSM HOT" : mapType === "google" ? "Ver Satélite" : "Ver Ruas"}
+              {mapType === "streets" ? "Ver Google" : mapType === "google" ? "Ver Satélite" : "Ver Ruas"}
             </span>
           </Button>
 

@@ -15,8 +15,7 @@ import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS } from "@/config/maps";
-import { reverseGeocode as reverseGeocodeService, searchAddress } from "@/services/maps/geocoding";
+import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -304,7 +303,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const data = await reverseGeocodeService(lat, lng);
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
+          return;
+        }
+      }
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
       if (data) {
         const formatted = formatAddress(data, true); // Include number for pickup address
         setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });
@@ -398,7 +406,39 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        const data = await searchAddress(address, { lat: storeLat, lng: storeLng, limit: 5 });
+        if (GOOGLE_MAPS_API_KEY) {
+          let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR&components=country:BR`;
+          if (storeLat && storeLng) {
+            googleUrl += `&location=${storeLat},${storeLng}&radius=50000`;
+          }
+          const res = await fetch(googleUrl);
+          const data = await res.json();
+          if (data.status === "OK" && data.results?.length > 0) {
+            const mapped = data.results.map((r: any) => ({
+              display_name: r.formatted_address,
+              lat: r.geometry.location.lat.toString(),
+              lon: r.geometry.location.lng.toString(),
+              address: r.address_components
+            }));
+            setAddressSuggestions(mapped);
+            setShowSuggestions(true);
+            setSearchingAddress(false);
+            return;
+          }
+        }
+
+        // Nominatim: acrescenta cidade/UF quando o usuário só digitou rua/bairro
+        const hasCity = /primavera do leste|\bmt\b|mato grosso/i.test(address);
+        const query = hasCity ? address : `${address}, Primavera do Leste, MT`;
+        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
+
+        if (storeLat && storeLng) {
+          const delta = 0.25;
+          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`;
+        }
+        
+        const res = await fetch(searchUrl);
+        const data = await res.json();
         if (data && data.length > 0) {
           if (storeLat && storeLng) {
             data.sort((a: any, b: any) => {
@@ -487,7 +527,30 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       setManualDistanceEnabled(false);
       
       try {
-        const data = await reverseGeocodeService(lat, lng);
+        if (GOOGLE_MAPS_API_KEY) {
+          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+          const data = await res.json();
+          if (data.status === "OK" && data.results?.[0]) {
+            const first = data.results[0];
+            const comps = first.address_components;
+            const streetNumber = comps.find((c: any) => c.types.includes("street_number"))?.long_name || "";
+            
+            // Format without number for the main field
+            const itemForFormat = { ...first, address: comps };
+            const formatted = formatAddress(itemForFormat, false);
+            
+            setCallForm(f => ({ 
+              ...f, 
+              delivery: formatted,
+              delivery_number: streetNumber 
+            }));
+            return;
+          }
+        }
+
+        // Fallback to Nominatim
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+        const data = await res.json();
         if (data) {
           const formatted = formatAddress(data, false);
           const streetNumber = data.address?.house_number || "";
@@ -906,7 +969,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               className="gap-1 text-xs h-7"
             >
               <Layers className="w-3 h-3" />
-              {mapType === "google" ? "OSM HOT" : mapType === "streets" ? "OSM" : "Satélite"}
+              {mapType === "google" ? "Google" : mapType === "streets" ? "OSM" : "Satélite"}
             </Button>
           </div>
         </CardHeader>

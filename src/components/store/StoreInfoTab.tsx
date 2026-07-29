@@ -10,8 +10,7 @@ import { toast } from "sonner";
 import { Store, Save, MapPin, Navigation, RotateCcw, Layers } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS } from "@/config/maps";
-import { reverseGeocode as reverseGeocodeService } from "@/services/maps/geocoding";
+import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -97,7 +96,16 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const data = await reverseGeocodeService(lat, lng);
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          setForm(f => ({ ...f, address: data.results[0].formatted_address }));
+          return;
+        }
+      }
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
       if (data?.address) {
         const a = data.address;
         const parts: string[] = [];
@@ -298,7 +306,7 @@ const StoreInfoTab = ({ restaurant, userId }: StoreInfoTabProps) => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Clique no mapa ou arraste o marcador para definir a posição exata da sua loja. Isso garante precisão na navegação.
+            Clique no mapa ou arraste o marcador para definir a posição exata da sua loja. Isso garante precisão no Google Maps e Waze.
           </p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={handleUseGPS} disabled={gpsLoading}>

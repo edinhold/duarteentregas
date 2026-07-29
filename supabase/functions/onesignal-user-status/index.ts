@@ -1,6 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   configErrorResponse,
   getOneSignalConfig,
@@ -9,10 +8,6 @@ import {
   safeOneSignalLogConfig,
   summarizeOneSignalUser,
 } from "../_shared/onesignal.ts";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 // OneSignal device_type codes we care about
 const DEVICE_TYPE_LABEL: Record<string, string> = {
@@ -101,30 +96,6 @@ Deno.serve(async (req) => {
       device_model: s.device_model,
     }));
 
-    const activeSubscriptionIds = summary
-      .filter((s) => s.enabled && (s.notification_types ?? 0) > 0)
-      .map((s) => String(s.id ?? ""))
-      .filter(Boolean);
-
-    const { data: localDevices } = await (supabase as any)
-      .from("onesignal_devices")
-      .select("id,user_id,platform,status,permission_status,subscription_status,subscription_id,onesignal_subscription_id,push_token,device_model,app_version,last_synced_at")
-      .eq("user_id", external_id)
-      .order("last_synced_at", { ascending: false });
-
-    if (activeSubscriptionIds.length > 0) {
-      await (supabase as any)
-        .from("onesignal_devices")
-        .update({
-          status: "active",
-          subscription_status: "subscribed",
-          permission_status: "granted",
-          last_synced_at: new Date().toISOString(),
-        })
-        .eq("user_id", external_id)
-        .in("subscription_id", activeSubscriptionIds);
-    }
-
     const androidActive = summary.some(
       (s) => s.device_label === "Android" && s.enabled && (s.notification_types ?? 0) > 0,
     );
@@ -136,8 +107,6 @@ Deno.serve(async (req) => {
         android_active: androidActive,
         any_active: anyActive,
         subscriptions: summary,
-        local_devices: localDevices ?? [],
-        active_subscription_ids: activeSubscriptionIds,
         identity: json?.identity ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

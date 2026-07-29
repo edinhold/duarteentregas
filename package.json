@@ -58,7 +58,6 @@
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
-    "maplibre-gl": "^6.0.0",
     "next-themes": "^0.3.0",
     "onesignal-cordova-plugin": "^5.4.0",
     "react": "^18.3.1",
