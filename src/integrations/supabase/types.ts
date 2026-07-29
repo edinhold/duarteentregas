@@ -631,6 +631,87 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_delivery_logs: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          event_type: string
+          id: string
+          onesignal_notification_id: string | null
+          pedido_id: string | null
+          platform: string | null
+          recipients_count: number | null
+          response_body_sanitized: Json | null
+          response_status: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          event_type: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          platform?: string | null
+          recipients_count?: number | null
+          response_body_sanitized?: Json | null
+          response_status?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          event_type?: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          platform?: string | null
+          recipients_count?: number | null
+          response_body_sanitized?: Json | null
+          response_status?: number | null
+        }
+        Relationships: []
+      }
+      notification_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          event_key: string
+          event_type: string
+          id: string
+          last_error: string | null
+          onesignal_notification_id: string | null
+          pedido_id: string
+          processed_at: string | null
+          recipients_count: number | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          event_key: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          onesignal_notification_id?: string | null
+          pedido_id: string
+          processed_at?: string | null
+          recipients_count?: number | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          event_key?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          onesignal_notification_id?: string | null
+          pedido_id?: string
+          processed_at?: string | null
+          recipients_count?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string | null
@@ -843,6 +924,60 @@ export type Database = {
           suspended_by?: string | null
           suspended_until?: string | null
           suspension_reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          active: boolean
+          app_version: string | null
+          created_at: string
+          device_model: string | null
+          device_type: string | null
+          id: string
+          last_seen_at: string | null
+          onesignal_external_id: string | null
+          onesignal_subscription_id: string
+          permission_status: string | null
+          platform: string
+          profile_type: string
+          subscription_status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          app_version?: string | null
+          created_at?: string
+          device_model?: string | null
+          device_type?: string | null
+          id?: string
+          last_seen_at?: string | null
+          onesignal_external_id?: string | null
+          onesignal_subscription_id: string
+          permission_status?: string | null
+          platform: string
+          profile_type: string
+          subscription_status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          app_version?: string | null
+          created_at?: string
+          device_model?: string | null
+          device_type?: string | null
+          id?: string
+          last_seen_at?: string | null
+          onesignal_external_id?: string | null
+          onesignal_subscription_id?: string
+          permission_status?: string | null
+          platform?: string
+          profile_type?: string
+          subscription_status?: string | null
           updated_at?: string
           user_id?: string
         }
