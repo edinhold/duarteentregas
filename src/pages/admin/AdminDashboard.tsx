@@ -25,6 +25,8 @@ import ChatTab from "@/components/admin/ChatTab";
 import PasswordResetTab from "@/components/admin/PasswordResetTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import PrivacyPolicyTab from "@/components/admin/PrivacyPolicyTab";
+import PushDiagnosticsTab from "@/components/admin/PushDiagnosticsTab";
+
 
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import GlobalDriverMap from "@/components/GlobalDriverMap";
@@ -417,11 +419,8 @@ const AdminDashboard = () => {
           <TabsContent value="chat"><ChatTab /></TabsContent>
           <TabsContent value="password-reset"><PasswordResetTab /></TabsContent>
           <TabsContent value="customers"><CustomersTab /></TabsContent>
-          <TabsContent value="push">
-            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-              Notificações push em manutenção.
-            </div>
-          </TabsContent>
+          <TabsContent value="push"><PushDiagnosticsTab /></TabsContent>
+
           <TabsContent value="privacy"><PrivacyPolicyTab /></TabsContent>
 
             </motion.div>

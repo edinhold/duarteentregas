@@ -19,6 +19,8 @@ import { playNotificationSound, playUrgentNotification, playStandbyAlert, startS
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
+import PushStatusCard from "@/components/driver/PushStatusCard";
+
 import ChatWidget from "@/components/ChatWidget";
 import AdminSupportPanel from "@/components/AdminSupportPanel";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -1028,9 +1030,12 @@ const DriverPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
+                  {/* Push notification status for this device */}
+                  <PushStatusCard />
                   {/* Notification Settings */}
                   <DriverNotificationSettings />
                 </TabsContent>
+
 
               </motion.div>
             </Tabs>
