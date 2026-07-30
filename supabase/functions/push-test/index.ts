@@ -5,7 +5,7 @@
  * was accepted by OneSignal, never that the phone displayed anything.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { ANDROID_CHANNEL_ID, chunk, getOneSignalConfig, sendOneSignal } from "../_shared/onesignal.ts";
+import { buildPlatformPayload, chunk, getOneSignalConfig, sendOneSignal } from "../_shared/onesignal.ts";
 import { adminClient, jsonResponse, logDelivery, requireUser } from "../_shared/push-auth.ts";
 
 interface Body {
@@ -78,6 +78,14 @@ Deno.serve(async (req) => {
     (s: any) => s.subscription_status === "subscribed" && s.permission_status === "granted",
   );
   const ids = Array.from(new Set(devices.map((s: any) => s.onesignal_subscription_id)));
+  const androidIds = Array.from(
+    new Set(
+      devices
+        .filter((s: any) => s.platform === "android_apk")
+        .map((s: any) => s.onesignal_subscription_id),
+    ),
+  );
+  const webIds = ids.filter((id) => !androidIds.includes(id));
 
   const inspected = (subs ?? []).map((s: any) => ({
     user_id: s.user_id,
@@ -119,19 +127,29 @@ Deno.serve(async (req) => {
   let errorMessage: string | undefined;
   let sanitized: Record<string, unknown> = {};
 
-  for (const batch of chunk(ids)) {
+  const base: Record<string, unknown> = {
+    headings: { pt: "🔔 Teste de notificação", en: "Push test" },
+    contents: {
+      pt: "O sistema de notificações está funcionando neste aparelho.",
+      en: "Push notifications are working on this device.",
+    },
+    data: { tipo: "teste_push", rota: "/entregador" },
+    priority: 10,
+    ttl: 300,
+  };
+  const webPayload = buildPlatformPayload(base, "web");
+  const androidPayload = buildPlatformPayload(base, "android_native");
+
+  const batches: Array<{ platform: "web" | "android_native"; ids: string[] }> = [
+    ...chunk(webIds).map((b) => ({ platform: "web" as const, ids: b })),
+    ...chunk(androidIds).map((b) => ({ platform: "android_native" as const, ids: b })),
+  ];
+
+  for (const batch of batches) {
+    if (batch.ids.length === 0) continue;
     const result = await sendOneSignal({
-      include_subscription_ids: batch,
-      headings: { pt: "🔔 Teste de notificação", en: "Push test" },
-      contents: {
-        pt: "O sistema de notificações está funcionando neste aparelho.",
-        en: "Push notifications are working on this device.",
-      },
-      data: { tipo: "teste_push", rota: "/entregador" },
-      android_channel_id: ANDROID_CHANNEL_ID,
-      android_visibility: 1,
-      priority: 10,
-      ttl: 300,
+      ...(batch.platform === "web" ? webPayload : androidPayload),
+      include_subscription_ids: batch.ids,
     });
     recipients += result.recipients;
     if (!notificationId) notificationId = result.notificationId;

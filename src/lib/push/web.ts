@@ -75,6 +75,13 @@ export async function initWeb(
         notifyButton: { enable: false },
       });
 
+      console.log("[OneSignal:subscription-diagnostic]", {
+        permission: readBrowserPermission(),
+        isPushSupported: Boolean(OneSignal.Notifications?.isPushSupported?.()),
+        optedIn: Boolean(OneSignal.User?.PushSubscription?.optedIn),
+        hasSubscriptionId: Boolean(OneSignal.User?.PushSubscription?.id),
+        hasToken: Boolean(OneSignal.User?.PushSubscription?.token),
+      });
       console.log("[Push] Web SDK inicializado");
       emitPushState({
         initialized: true,
