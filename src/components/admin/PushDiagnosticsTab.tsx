@@ -188,6 +188,25 @@ const PushDiagnosticsTab = () => {
         </Button>
       </div>
 
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="break-words">{loadError}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={load}
+              disabled={loading}
+              aria-label="Tentar carregar o diagnóstico novamente"
+              className="transition-all duration-200"
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {data && !data.configured && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -196,6 +215,7 @@ const PushDiagnosticsTab = () => {
           </AlertDescription>
         </Alert>
       )}
+
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="Entregadores" value={data?.totals.drivers ?? 0} />
