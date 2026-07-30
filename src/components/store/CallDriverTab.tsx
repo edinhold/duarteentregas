@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code, XCircle } from "lucide-react";
+import { Truck, DollarSign, MapPin, Navigation, Search, Route, Car, Bike, Footprints, Clock, Pencil, RotateCcw, AlertTriangle, Layers, Heart, Star, Code, XCircle, Loader2 } from "lucide-react";
 import ReportLocationButton from "@/components/ReportLocationButton";
 import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
