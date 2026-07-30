@@ -360,20 +360,22 @@ const PushDiagnosticsTab = () => {
                     <TableCell>
                       <Badge
                         variant={
-                          l.status === "sent"
+                          !l.error_code
                             ? "default"
-                            : l.status === "skipped"
+                            : l.error_code === "NO_SUBSCRIPTIONS"
                             ? "secondary"
                             : "destructive"
                         }
                       >
-                        {l.status}
+                        {l.error_code ?? "enviado"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs">{l.recipients_count ?? 0}</TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">
-                      {l.error_message ?? l.onesignal_notification_id ?? "—"}
+                      {l.onesignal_notification_id ??
+                        (l.response_status ? `HTTP ${l.response_status}` : "—")}
                     </TableCell>
+
                   </TableRow>
                 ))}
                 {!logs.length && (
