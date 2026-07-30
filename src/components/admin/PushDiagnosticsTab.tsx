@@ -312,9 +312,9 @@ const PushDiagnosticsTab = () => {
                       no sistema não é suficiente: é preciso existir uma Subscription ID válida.
                     </p>
                   )}
-                  {lastResult.onesignal_notification_id && (
+                  {(lastResult.notification_id ?? lastResult.onesignal_notification_id) && (
                     <p className="text-xs text-muted-foreground break-all">
-                      ID OneSignal: {lastResult.onesignal_notification_id}
+                      ID OneSignal: {lastResult.notification_id ?? lastResult.onesignal_notification_id}
                     </p>
                   )}
                   {lastResult.response?.errors && (
