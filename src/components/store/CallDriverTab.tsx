@@ -1185,32 +1185,44 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Auto-detected pickup address (read-only) */}
+          {/* Pickup address — automático com fallback manual */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-green-500" />
-              Endereço de coleta (automático)
+              Endereço de coleta (automático ou manual)
             </Label>
             <div className="flex gap-2">
               <Input
                 value={callForm.pickup}
-                readOnly
-                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Aguardando GPS..."}
-                className="flex-1 bg-muted/30 cursor-default"
+                onChange={(e) => {
+                  pickupManualRef.current = true;
+                  setCallForm((f) => ({ ...f, pickup: e.target.value }));
+                }}
+                onBlur={(e) => {
+                  if (pickupManualRef.current) geocodePickupAddress(e.target.value);
+                }}
+                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Digite o endereço de coleta"}
+                className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={requestGPS}
+                onClick={retryGPS}
                 title="Atualizar localização"
+                disabled={gpsStatus === "requesting"}
               >
                 <Navigation className="w-4 h-4" />
               </Button>
             </div>
-            {callForm.pickup && (
-              <p className="text-[10px] text-green-600 dark:text-green-400">✓ Localização detectada automaticamente</p>
-            )}
+            {callForm.pickup ? (
+              <p className="text-[10px] text-green-600 dark:text-green-400">
+                {pickupManualRef.current ? "✓ Endereço informado manualmente" : "✓ Localização detectada automaticamente"}
+              </p>
+            ) : gpsStatus !== "requesting" && gpsMessage ? (
+              <p className="text-[10px] text-muted-foreground">{gpsMessage} Você pode digitar o endereço manualmente.</p>
+            ) : null}
+          </div>
           </div>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
