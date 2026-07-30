@@ -493,6 +493,139 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     requestGPS();
   }, [requestGPS]);
 
+  // ---------------------------------------------------------------------
+  // Seta de GPS do endereço de coleta — clique único, estados reais
+  // ---------------------------------------------------------------------
+  const [pickupGpsState, setPickupGpsState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const pickupGpsBusyRef = useRef(false);
+
+  const extractNumber = (addr: string): string | null => {
+    const m = addr?.match(/,\s*(\d{1,6})\b/);
+    return m ? m[1] : null;
+  };
+
+  const reverseGeocodeAddress = useCallback(async (lat: number, lng: number): Promise<string | null> => {
+    try {
+      if (GOOGLE_MAPS_API_KEY) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
+        const data = await res.json();
+        if (data.status === "OK" && data.results?.[0]?.formatted_address) {
+          return data.results[0].formatted_address as string;
+        }
+      }
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
+      const data = await res.json();
+      const formatted = formatAddress(data, true);
+      return formatted && formatted.trim().length > 0 ? formatted : null;
+    } catch (e) {
+      console.error(`${GPS_LOG} reverse geocoding falhou`, e);
+      return null;
+    }
+  }, [formatAddress]);
+
+  const handlePickupGpsClick = useCallback(async () => {
+    if (pickupGpsBusyRef.current) {
+      console.info(`${GPS_LOG} clique ignorado — busca em andamento`);
+      return;
+    }
+    pickupGpsBusyRef.current = true;
+    setPickupGpsState("loading");
+    setGpsStatus("requesting");
+    setGpsMessage("Localizando endereço da loja...");
+
+    const savedAddress = (restaurant?.address || callForm.pickup || "").trim();
+    const savedNumber = extractNumber(savedAddress);
+
+    const finishError = (msg: string) => {
+      pickupGpsBusyRef.current = false;
+      setPickupGpsState("error");
+      setGpsMessage(msg);
+      if (savedAddress) {
+        setGpsStatus(restaurant?.latitude && restaurant?.longitude ? "granted" : "error");
+        setCallForm((f) => ({ ...f, pickup: f.pickup || savedAddress }));
+        if (restaurant?.latitude && restaurant?.longitude) {
+          setStoreLatLng([restaurant.latitude, restaurant.longitude]);
+        }
+      } else {
+        setGpsStatus("error");
+      }
+      toast.error(msg);
+    };
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      finishError(savedAddress
+        ? "Não foi possível obter a localização. O endereço salvo da loja foi mantido."
+        : "Não foi possível localizar automaticamente. Digite ou selecione o endereço da loja no mapa.");
+      return;
+    }
+
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        let done = false;
+        const timer = setTimeout(() => { if (!done) { done = true; reject({ code: 3 }); } }, 10000);
+        navigator.geolocation.getCurrentPosition(
+          (p) => { if (!done) { done = true; clearTimeout(timer); resolve(p); } },
+          (e) => { if (!done) { done = true; clearTimeout(timer); reject(e); } },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      if (!isFinite(lat) || !isFinite(lng)) {
+        finishError("Não foi possível obter a localização. O endereço salvo da loja foi mantido.");
+        return;
+      }
+
+      const geocoded = await reverseGeocodeAddress(lat, lng);
+
+      // Endereço oficial da loja tem prioridade; GPS só atualiza coordenadas.
+      let finalAddress = savedAddress;
+      if (!finalAddress) {
+        finalAddress = geocoded || "";
+      } else if (geocoded && savedNumber && !extractNumber(geocoded)) {
+        // mantém número/complemento já informados
+        finalAddress = savedAddress;
+      }
+
+      if (!finalAddress) {
+        finishError("Não foi possível localizar automaticamente. Digite ou selecione o endereço da loja no mapa.");
+        return;
+      }
+
+      pickupManualRef.current = false;
+      setCallForm((f) => ({ ...f, pickup: finalAddress }));
+      setStoreLatLng([lat, lng]);
+      setGpsAccuracy(pos.coords.accuracy ?? null);
+      setGpsStatus("granted");
+      setGpsMessage(null);
+      setPickupGpsState("success");
+      writeGpsCache(lat, lng, pos.coords.accuracy ?? null);
+
+      if (restaurant?.id) {
+        const payload: any = { latitude: lat, longitude: lng };
+        if (!restaurant.address && geocoded) payload.address = finalAddress;
+        const { error } = await supabase.from("restaurants").update(payload).eq("id", restaurant.id);
+        if (error) console.warn(`${GPS_LOG} não foi possível salvar coordenadas`, error.message);
+      }
+
+      toast.success("Endereço de coleta atualizado com sucesso.");
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === 1) {
+        finishError("Permita o acesso à localização para atualizar o endereço da loja.");
+      } else if (savedAddress) {
+        finishError("Não foi possível obter a localização. O endereço salvo da loja foi mantido.");
+      } else {
+        finishError("Não foi possível localizar automaticamente. Digite ou selecione o endereço da loja no mapa.");
+      }
+      return;
+    } finally {
+      pickupGpsBusyRef.current = false;
+    }
+  }, [restaurant, callForm.pickup, reverseGeocodeAddress]);
+
+
   // Geocodifica o endereço digitado manualmente e atualiza o marcador
   const geocodePickupAddress = useCallback(async (address: string) => {
     if (!address || address.trim().length < 5) return;
