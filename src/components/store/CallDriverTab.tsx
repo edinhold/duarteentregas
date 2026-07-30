@@ -309,11 +309,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   }, []);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    if (pickupManualRef.current) return; // não sobrescreve endereço digitado
     try {
       if (GOOGLE_MAPS_API_KEY) {
         const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
         const data = await res.json();
         if (data.status === "OK" && data.results?.[0]) {
+          console.info("[GPS:coleta] endereço obtido via Google", data.results[0].formatted_address);
           setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
           return;
         }
@@ -322,10 +324,12 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       const data = await res.json();
       if (data) {
         const formatted = formatAddress(data, true); // Include number for pickup address
-        setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });
+        console.info("[GPS:coleta] endereço obtido via Nominatim", formatted);
+        setCallForm(f => (f.pickup ? f : { ...f, pickup: formatted }));
       }
     } catch (err) {
-      console.error("Reverse geocode error:", err);
+      console.error("[GPS:coleta] erro no reverse geocoding:", err);
+      setGpsMessage("Erro ao carregar o mapa. Tente novamente.");
     }
   }, [formatAddress]);
 
