@@ -156,6 +156,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return (dl as any)?.driver?.full_name || "Entregador";
   })();
   const gpsWatchRef = useRef<number | null>(null);
+  const gpsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gpsRequestingRef = useRef(false);
+  const gpsInitRef = useRef(false);
+  const pickupManualRef = useRef(false);
 
   // Route profile & road distance state
   const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
