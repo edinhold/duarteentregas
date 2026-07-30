@@ -251,12 +251,10 @@ const PushDiagnosticsTab = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Mensagem"
-              />
+              <p className="text-xs text-muted-foreground">
+                O texto do teste é padronizado pelo servidor para validar canal, som e vibração.
+              </p>
+
               <Button onClick={sendTest} disabled={sending} className="w-full">
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-1" />
