@@ -1338,27 +1338,34 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 onBlur={(e) => {
                   if (pickupManualRef.current) geocodePickupAddress(e.target.value);
                 }}
-                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Digite o endereço de coleta"}
+                placeholder={pickupGpsState === "loading" ? "Localizando endereço da loja..." : "Digite o endereço de coleta"}
                 className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={retryGPS}
+                onClick={handlePickupGpsClick}
                 title="Atualizar localização"
-                disabled={gpsStatus === "requesting"}
+                disabled={pickupGpsState === "loading"}
               >
-                <Navigation className="w-4 h-4" />
+                {pickupGpsState === "loading"
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Navigation className="w-4 h-4" />}
               </Button>
             </div>
-            {callForm.pickup ? (
+            {pickupGpsState === "loading" ? (
+              <p className="text-[10px] text-muted-foreground">Localizando endereço da loja...</p>
+            ) : pickupGpsState === "error" && gpsMessage ? (
+              <p className="text-[10px] text-orange-500">{gpsMessage}</p>
+            ) : callForm.pickup ? (
               <p className="text-[10px] text-green-600 dark:text-green-400">
-                {pickupManualRef.current ? "✓ Endereço informado manualmente" : "✓ Localização detectada automaticamente"}
+                {pickupManualRef.current ? "✓ Endereço informado manualmente" : "✓ Endereço de coleta definido"}
               </p>
-            ) : gpsStatus !== "requesting" && gpsMessage ? (
+            ) : gpsMessage ? (
               <p className="text-[10px] text-muted-foreground">{gpsMessage} Você pode digitar o endereço manualmente.</p>
             ) : null}
+
           </div>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
