@@ -285,7 +285,7 @@ const PushDiagnosticsTab = () => {
               </Button>
 
               {lastResult && (
-                <div className="rounded-md border p-3 text-sm space-y-1">
+                <div className="rounded-md border p-3 text-sm space-y-1 transition-all duration-200">
                   <p className="flex items-center gap-1 font-medium">
                     {lastResult.ok ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -295,11 +295,31 @@ const PushDiagnosticsTab = () => {
                     {lastResult.message}
                   </p>
                   <p className="text-muted-foreground">
-                    Aparelhos alvo: {lastResult.recipients ?? 0} · Código: {lastResult.code}
+                    Aparelhos consultados: {lastResult.targeted_devices ?? 0} · Destinatários
+                    aceitos pelo OneSignal: {lastResult.recipients ?? 0} · Código: {lastResult.code}
+                    {lastResult.http_status ? ` · HTTP ${lastResult.http_status}` : ""}
                   </p>
+                  {!lastResult.ok && (lastResult.targeted_devices ?? 0) > 0 && (
+                    <p className="text-xs text-destructive">
+                      As inscrições enviadas não existem mais no OneSignal (aparelho reinstalado,
+                      dados do site limpos ou App ID diferente). Peça ao entregador para tocar em
+                      “Ativar notificações” novamente para gerar uma nova inscrição.
+                    </p>
+                  )}
+                  {!lastResult.ok && (lastResult.targeted_devices ?? 0) === 0 && (
+                    <p className="text-xs text-destructive">
+                      Nenhum aparelho com permissão concedida e inscrição ativa. Permissão concedida
+                      no sistema não é suficiente: é preciso existir uma Subscription ID válida.
+                    </p>
+                  )}
                   {lastResult.onesignal_notification_id && (
                     <p className="text-xs text-muted-foreground break-all">
                       ID OneSignal: {lastResult.onesignal_notification_id}
+                    </p>
+                  )}
+                  {lastResult.response?.errors && (
+                    <p className="text-xs text-muted-foreground break-all">
+                      Resposta do OneSignal: {JSON.stringify(lastResult.response.errors)}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
