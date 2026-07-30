@@ -69,12 +69,33 @@ interface LogRow {
   id: string;
   created_at: string;
   event_type: string;
-  status: string;
-  delivery_request_id: string | null;
+  response_status: number | null;
+  error_code: string | null;
   recipients_count: number | null;
   onesignal_notification_id: string | null;
-  error_message: string | null;
-  details: any;
+  platform: string | null;
+}
+
+/** Extracts the JSON message an edge function returned with a non-2xx status. */
+async function readFunctionError(error: any): Promise<string> {
+  let message = error?.message ?? "Falha desconhecida";
+  try {
+    const response = error?.context as Response | undefined;
+    if (response && typeof response.clone === "function") {
+      const raw = await response.clone().text();
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          message = parsed.error || parsed.message || message;
+        } catch {
+          message = raw.slice(0, 300);
+        }
+      }
+    }
+  } catch (parseError) {
+    console.error("[PushDiagnostics:parse-error]", parseError);
+  }
+  return message;
 }
 
 /** Admin push health, driver readiness table and manual test sender. */
@@ -82,14 +103,14 @@ const PushDiagnosticsTab = () => {
   const [data, setData] = useState<DiagnosticsData | null>(null);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [target, setTarget] = useState<string>("__all__");
-  const [title, setTitle] = useState("Teste de notificação");
-  const [message, setMessage] = useState("Se você recebeu esta mensagem, o canal está funcionando.");
   const [lastResult, setLastResult] = useState<any>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [diag, logRes] = await Promise.all([
         supabase.functions.invoke("push-diagnostics", { body: {} }),
@@ -99,11 +120,14 @@ const PushDiagnosticsTab = () => {
           .order("created_at", { ascending: false })
           .limit(30),
       ]);
-      if (diag.error) throw diag.error;
+      if (diag.error) throw new Error(await readFunctionError(diag.error));
       setData(diag.data as DiagnosticsData);
       setLogs((logRes.data as any) ?? []);
     } catch (err: any) {
-      toast.error(`Falha ao carregar diagnóstico: ${err?.message ?? err}`);
+      const message = err?.message ?? String(err);
+      console.error("[PushDiagnostics:load-error]", message);
+      setLoadError(message);
+      toast.error(`Falha ao carregar diagnóstico: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -122,10 +146,12 @@ const PushDiagnosticsTab = () => {
     setSending(true);
     setLastResult(null);
     try {
-      const body: Record<string, unknown> = { title, message };
-      if (target !== "__all__") body.driver_user_id = target;
+      const body =
+        target === "__all__"
+          ? { target: "all_drivers" }
+          : { target: "driver", user_id: target };
       const { data: res, error } = await supabase.functions.invoke("push-test", { body });
-      if (error) throw error;
+      if (error) throw new Error(await readFunctionError(error));
       setLastResult(res);
       if (res?.ok) {
         toast.success(
@@ -141,6 +167,7 @@ const PushDiagnosticsTab = () => {
       setSending(false);
     }
   };
+
 
   if (loading && !data) {
     return (
@@ -161,6 +188,25 @@ const PushDiagnosticsTab = () => {
         </Button>
       </div>
 
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="break-words">{loadError}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={load}
+              disabled={loading}
+              aria-label="Tentar carregar o diagnóstico novamente"
+              className="transition-all duration-200"
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {data && !data.configured && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -169,6 +215,7 @@ const PushDiagnosticsTab = () => {
           </AlertDescription>
         </Alert>
       )}
+
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="Entregadores" value={data?.totals.drivers ?? 0} />
@@ -224,12 +271,10 @@ const PushDiagnosticsTab = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Mensagem"
-              />
+              <p className="text-xs text-muted-foreground">
+                O texto do teste é padronizado pelo servidor para validar canal, som e vibração.
+              </p>
+
               <Button onClick={sendTest} disabled={sending} className="w-full">
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -335,20 +380,22 @@ const PushDiagnosticsTab = () => {
                     <TableCell>
                       <Badge
                         variant={
-                          l.status === "sent"
+                          !l.error_code
                             ? "default"
-                            : l.status === "skipped"
+                            : l.error_code === "NO_SUBSCRIPTIONS"
                             ? "secondary"
                             : "destructive"
                         }
                       >
-                        {l.status}
+                        {l.error_code ?? "enviado"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs">{l.recipients_count ?? 0}</TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">
-                      {l.error_message ?? l.onesignal_notification_id ?? "—"}
+                      {l.onesignal_notification_id ??
+                        (l.response_status ? `HTTP ${l.response_status}` : "—")}
                     </TableCell>
+
                   </TableRow>
                 ))}
                 {!logs.length && (
