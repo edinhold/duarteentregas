@@ -69,12 +69,33 @@ interface LogRow {
   id: string;
   created_at: string;
   event_type: string;
-  status: string;
-  delivery_request_id: string | null;
+  response_status: number | null;
+  error_code: string | null;
   recipients_count: number | null;
   onesignal_notification_id: string | null;
-  error_message: string | null;
-  details: any;
+  platform: string | null;
+}
+
+/** Extracts the JSON message an edge function returned with a non-2xx status. */
+async function readFunctionError(error: any): Promise<string> {
+  let message = error?.message ?? "Falha desconhecida";
+  try {
+    const response = error?.context as Response | undefined;
+    if (response && typeof response.clone === "function") {
+      const raw = await response.clone().text();
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          message = parsed.error || parsed.message || message;
+        } catch {
+          message = raw.slice(0, 300);
+        }
+      }
+    }
+  } catch (parseError) {
+    console.error("[PushDiagnostics:parse-error]", parseError);
+  }
+  return message;
 }
 
 /** Admin push health, driver readiness table and manual test sender. */
@@ -82,14 +103,14 @@ const PushDiagnosticsTab = () => {
   const [data, setData] = useState<DiagnosticsData | null>(null);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [target, setTarget] = useState<string>("__all__");
-  const [title, setTitle] = useState("Teste de notificação");
-  const [message, setMessage] = useState("Se você recebeu esta mensagem, o canal está funcionando.");
   const [lastResult, setLastResult] = useState<any>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [diag, logRes] = await Promise.all([
         supabase.functions.invoke("push-diagnostics", { body: {} }),
@@ -99,11 +120,14 @@ const PushDiagnosticsTab = () => {
           .order("created_at", { ascending: false })
           .limit(30),
       ]);
-      if (diag.error) throw diag.error;
+      if (diag.error) throw new Error(await readFunctionError(diag.error));
       setData(diag.data as DiagnosticsData);
       setLogs((logRes.data as any) ?? []);
     } catch (err: any) {
-      toast.error(`Falha ao carregar diagnóstico: ${err?.message ?? err}`);
+      const message = err?.message ?? String(err);
+      console.error("[PushDiagnostics:load-error]", message);
+      setLoadError(message);
+      toast.error(`Falha ao carregar diagnóstico: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -122,10 +146,12 @@ const PushDiagnosticsTab = () => {
     setSending(true);
     setLastResult(null);
     try {
-      const body: Record<string, unknown> = { title, message };
-      if (target !== "__all__") body.driver_user_id = target;
+      const body =
+        target === "__all__"
+          ? { target: "all_drivers" }
+          : { target: "driver", user_id: target };
       const { data: res, error } = await supabase.functions.invoke("push-test", { body });
-      if (error) throw error;
+      if (error) throw new Error(await readFunctionError(error));
       setLastResult(res);
       if (res?.ok) {
         toast.success(
@@ -141,6 +167,7 @@ const PushDiagnosticsTab = () => {
       setSending(false);
     }
   };
+
 
   if (loading && !data) {
     return (
