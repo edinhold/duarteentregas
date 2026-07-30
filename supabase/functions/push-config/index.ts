@@ -7,7 +7,7 @@
  * The App API Key is NEVER part of this response.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { getOneSignalConfig, ANDROID_CHANNEL_ID, maskAppId } from "../_shared/onesignal.ts";
+import { getAndroidChannel, getOneSignalConfig, maskAppId } from "../_shared/onesignal.ts";
 import { jsonResponse, requireUser } from "../_shared/push-auth.ts";
 
 Deno.serve(async (req) => {
@@ -19,12 +19,15 @@ Deno.serve(async (req) => {
   }
 
   const { appId, configured, missing } = getOneSignalConfig();
+  const channel = getAndroidChannel();
 
   return jsonResponse(
     {
       app_id: appId || null,
       app_id_masked: maskAppId(appId),
-      android_channel_id: ANDROID_CHANNEL_ID,
+      android_channel_id: channel.mode === "dashboard" ? channel.id : null,
+      existing_android_channel_id: channel.mode === "native" ? channel.id : null,
+      android_channel_warning: channel.warning ?? null,
       configured,
       missing_secrets: missing,
     },

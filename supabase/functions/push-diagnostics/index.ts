@@ -9,7 +9,7 @@
  * so the frontend can show a useful message instead of a generic non-2xx.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { ANDROID_CHANNEL_ID, getOneSignalConfig, maskAppId } from "../_shared/onesignal.ts";
+import { getAndroidChannel, getOneSignalConfig, maskAppId } from "../_shared/onesignal.ts";
 import { adminClient, jsonResponse, requireUser } from "../_shared/push-auth.ts";
 
 const STALE_HOURS = 72;
@@ -172,7 +172,8 @@ async function overview(
       configured,
       app_id_masked: maskAppId(appId),
       missing_secrets: missing,
-      android_channel_id: ANDROID_CHANNEL_ID,
+      android_channel_id: getAndroidChannel().id,
+      android_channel_mode: getAndroidChannel().mode,
       totals,
       drivers: rows,
       recommendations,
@@ -266,7 +267,9 @@ async function detail(
   }
   if (deviceList.some((d) => d.platform === "android_apk")) {
     recommendations.push(
-      `APK: confirme que o canal “Novas entregas” (${ANDROID_CHANNEL_ID}) está ativo com som e vibração.`,
+      getAndroidChannel().mode === "none"
+        ? "APK: nenhum canal Android configurado — a notificação usa o canal padrão do OneSignal."
+        : `APK: canal Android configurado (${getAndroidChannel().mode}). Confirme som e vibração no aparelho.`,
     );
   }
   if (recommendations.length === 0) {
@@ -285,7 +288,8 @@ async function detail(
       driver_last_seen_at: driver?.last_seen_at ?? null,
       suspended_until: profile?.suspended_until ?? null,
       onesignal_app_id_masked: maskAppId(appId),
-      android_channel_id: ANDROID_CHANNEL_ID,
+      android_channel_id: getAndroidChannel().id,
+      android_channel_mode: getAndroidChannel().mode,
       credentials_configured: configured,
       devices: deviceList,
       recent_logs: lastLogs ?? [],
