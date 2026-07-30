@@ -53,7 +53,7 @@ interface DiagnosticsData {
   configured: boolean;
   app_id_masked: string | null;
   missing_secrets: string[];
-  android_channel_id: string;
+  android_channel_id: string | null;
   totals: {
     drivers: number;
     approved: number;

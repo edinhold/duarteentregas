@@ -26,8 +26,6 @@ export interface PushDeviceState {
   error: string | null;
 }
 
-export const ANDROID_CHANNEL_ID = "novas_entregas_v1";
-
 /** Detects the Median/Cordova bridge; falls back to the browser runtime. */
 export function detectRuntime(): "cordova" | "web" {
   if (typeof window === "undefined") return "web";

@@ -10,7 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface PushConfig {
   appId: string | null;
   appIdMasked: string | null;
-  androidChannelId: string;
+  /** null when no Android channel is configured (Web/PWA only projects). */
+  androidChannelId: string | null;
   configured: boolean;
   missingSecrets: string[];
 }
@@ -29,7 +30,7 @@ export async function getPushConfig(force = false): Promise<PushConfig | null> {
       cache = {
         appId: data?.app_id ?? null,
         appIdMasked: data?.app_id_masked ?? null,
-        androidChannelId: data?.android_channel_id ?? "novas_entregas_v1",
+        androidChannelId: data?.android_channel_id ?? null,
         configured: Boolean(data?.configured),
         missingSecrets: data?.missing_secrets ?? [],
       };
