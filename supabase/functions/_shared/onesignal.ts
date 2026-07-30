@@ -7,8 +7,92 @@
 
 export const ONESIGNAL_ENDPOINT = "https://api.onesignal.com/notifications";
 
-/** Android channel that carries the "urgent" importance + custom sound. */
-export const ANDROID_CHANNEL_ID = "novas_entregas_v1";
+/**
+ * Android notification channel.
+ *
+ * IMPORTANT: `android_channel_id` must be the UUID of a channel created in the
+ * OneSignal dashboard, and `existing_android_channel_id` the *native* channel
+ * id created by an Android app. Sending an invalid/dashboard-less value makes
+ * OneSignal answer 400 "Could not find android_channel_id".
+ *
+ * This project ships a Web/PWA build (plus a Median wrapper), so by default NO
+ * Android channel field is sent. Set one of the secrets below only when a real
+ * channel exists.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface AndroidChannel {
+  /** "dashboard" => android_channel_id, "native" => existing_android_channel_id */
+  mode: "dashboard" | "native" | "none";
+  id: string | null;
+  /** Set when a secret is present but unusable (e.g. not a UUID). */
+  warning?: string;
+}
+
+export function getAndroidChannel(): AndroidChannel {
+  const dashboard = (Deno.env.get("ONESIGNAL_ANDROID_CHANNEL_ID") ?? "").trim();
+  const native = (Deno.env.get("ONESIGNAL_EXISTING_ANDROID_CHANNEL_ID") ?? "").trim();
+
+  if (dashboard && native) {
+    return {
+      mode: "none",
+      id: null,
+      warning:
+        "Defina apenas ONESIGNAL_ANDROID_CHANNEL_ID ou ONESIGNAL_EXISTING_ANDROID_CHANNEL_ID.",
+    };
+  }
+  if (dashboard) {
+    if (!UUID_RE.test(dashboard)) {
+      return {
+        mode: "none",
+        id: null,
+        warning:
+          "ONESIGNAL_ANDROID_CHANNEL_ID não é o UUID do canal no painel do OneSignal — campo ignorado.",
+      };
+    }
+    return { mode: "dashboard", id: dashboard };
+  }
+  if (native) return { mode: "native", id: native };
+  return { mode: "none", id: null };
+}
+
+/** Android-only keys that must never reach a Web Push / PWA payload. */
+const ANDROID_ONLY_KEYS = [
+  "android_channel_id",
+  "existing_android_channel_id",
+  "android_sound",
+  "android_visibility",
+  "small_icon",
+  "large_icon",
+  "adm_small_icon",
+  "adm_large_icon",
+];
+
+/**
+ * Returns a payload tailored to the target platform:
+ *  - "web"           → every Android-only field removed;
+ *  - "android_native"→ the configured channel field added, when valid.
+ */
+export function buildPlatformPayload(
+  base: Record<string, unknown>,
+  platform: "web" | "android_native",
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...base };
+  for (const key of ANDROID_ONLY_KEYS) delete payload[key];
+
+  if (platform === "android_native") {
+    payload.android_visibility = 1;
+    const channel = getAndroidChannel();
+    if (channel.mode === "dashboard" && channel.id) payload.android_channel_id = channel.id;
+    if (channel.mode === "native" && channel.id) payload.existing_android_channel_id = channel.id;
+  }
+
+  // Never ship empty / undefined values — OneSignal rejects them.
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null || value === "") delete payload[key];
+  }
+  return payload;
+}
 
 /** OneSignal accepts up to 20.000 subscription ids per call; stay well under. */
 export const MAX_IDS_PER_REQUEST = 2000;
