@@ -5,7 +5,7 @@
  * was accepted by OneSignal, never that the phone displayed anything.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { ANDROID_CHANNEL_ID, chunk, getOneSignalConfig, sendOneSignal } from "../_shared/onesignal.ts";
+import { buildPlatformPayload, chunk, getOneSignalConfig, sendOneSignal } from "../_shared/onesignal.ts";
 import { adminClient, jsonResponse, logDelivery, requireUser } from "../_shared/push-auth.ts";
 
 interface Body {
