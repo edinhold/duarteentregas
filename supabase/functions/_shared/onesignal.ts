@@ -221,14 +221,22 @@ export async function sendOneSignal(
   }
 
   let json: Record<string, any> = {};
+  const raw = await res.text().catch(() => "");
   try {
-    json = await res.json();
+    json = raw ? JSON.parse(raw) : {};
   } catch {
-    json = { raw: "resposta não-JSON" };
+    json = { raw: raw.slice(0, 1000) || "resposta não-JSON" };
   }
 
   const notificationId = typeof json?.id === "string" && json.id ? json.id : null;
   const recipients = Number(json?.recipients ?? 0);
+
+  console.log("[OneSignal:send-response]", {
+    status: res.status,
+    ok: res.ok,
+    recipients,
+    body: sanitizeResponse(json),
+  });
 
   const rawErrors = json?.errors;
   const errorList: string[] = Array.isArray(rawErrors)
