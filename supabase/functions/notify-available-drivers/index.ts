@@ -198,9 +198,19 @@ Deno.serve(async (req) => {
     .eq("subscription_status", "subscribed")
     .eq("permission_status", "granted");
 
-  const subscriptionIds = Array.from(
-    new Set((subs ?? []).map((s: any) => s.onesignal_subscription_id).filter(Boolean)),
-  );
+  // Split by platform: Web/PWA payloads must never carry Android-only fields.
+  const activeSubs = (subs ?? []).filter((s: any) => s.onesignal_subscription_id);
+  const seen = new Set<string>();
+  const webIds: string[] = [];
+  const androidIds: string[] = [];
+  for (const s of activeSubs as any[]) {
+    const id = s.onesignal_subscription_id as string;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (s.platform === "android_apk") androidIds.push(id);
+    else webIds.push(id);
+  }
+  const subscriptionIds = [...webIds, ...androidIds];
 
   if (subscriptionIds.length === 0) {
     return await finish(
@@ -222,7 +232,7 @@ Deno.serve(async (req) => {
   const rota = `/entregador?entrega=${pedido.id}`;
   const valor = pedido.driver_fee ? ` (R$ ${Number(pedido.driver_fee).toFixed(2)})` : "";
 
-  const basePayload = {
+  const basePayload: Record<string, unknown> = {
     headings: {
       pt: "🚚 Nova entrega disponível",
       en: "New delivery available",
@@ -237,13 +247,7 @@ Deno.serve(async (req) => {
       rota,
       evento_id: eventKey,
     },
-    // Android: urgent channel carries the custom sound, vibration and heads-up.
-    android_channel_id: ANDROID_CHANNEL_ID,
-    android_visibility: 1, // visible on the lock screen
     priority: 10,
-    // Web / PWA
-    web_url: undefined as unknown as string | undefined,
-    url: undefined as unknown as string | undefined,
     // Actions
     buttons: [{ id: "ver_entrega", text: "Ver entrega" }],
     web_buttons: [
@@ -257,10 +261,11 @@ Deno.serve(async (req) => {
     ttl: 900,
     collapse_id: eventKey,
   };
-  delete (basePayload as any).web_url;
-  delete (basePayload as any).url;
 
-  // ---- 7. Send (batched) -------------------------------------------------
+  const webPayload = buildPlatformPayload(basePayload, "web");
+  const androidPayload = buildPlatformPayload(basePayload, "android_native");
+
+  // ---- 7. Send (batched, per platform) -----------------------------------
   let totalRecipients = 0;
   let firstNotificationId: string | null = null;
   let lastError: string | undefined;
@@ -268,10 +273,16 @@ Deno.serve(async (req) => {
   let lastStatus = 0;
   let lastSanitized: Record<string, unknown> = {};
 
-  for (const ids of chunk(subscriptionIds)) {
+  const batches: Array<{ platform: "web" | "android_native"; ids: string[] }> = [
+    ...chunk(webIds).map((ids) => ({ platform: "web" as const, ids })),
+    ...chunk(androidIds).map((ids) => ({ platform: "android_native" as const, ids })),
+  ];
+
+  for (const batch of batches) {
+    if (batch.ids.length === 0) continue;
     const result = await sendOneSignal({
-      ...basePayload,
-      include_subscription_ids: ids,
+      ...(batch.platform === "web" ? webPayload : androidPayload),
+      include_subscription_ids: batch.ids,
     });
     totalRecipients += result.recipients;
     if (!firstNotificationId) firstNotificationId = result.notificationId;
@@ -283,7 +294,8 @@ Deno.serve(async (req) => {
     }
     console.log("[push] lote enviado", {
       pedido_id: pedidoId,
-      ids: ids.length,
+      platform: batch.platform,
+      ids: batch.ids.length,
       recipients: result.recipients,
       http: result.httpStatus,
       code: result.errorCode ?? "ok",
