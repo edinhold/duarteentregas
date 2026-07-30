@@ -113,7 +113,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const [calling, setCalling] = useState(false);
   const [deliveryLatLng, setDeliveryLatLng] = useState<[number, number] | null>(null);
   const [storeLatLng, setStoreLatLng] = useState<[number, number] | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "timeout" | "unsupported" | "error">("idle");
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
@@ -155,6 +156,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     return (dl as any)?.driver?.full_name || "Entregador";
   })();
   const gpsWatchRef = useRef<number | null>(null);
+  const gpsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gpsRequestingRef = useRef(false);
+  const gpsInitRef = useRef(false);
+  const pickupManualRef = useRef(false);
 
   // Route profile & road distance state
   const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
@@ -304,11 +309,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   }, []);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    if (pickupManualRef.current) return; // não sobrescreve endereço digitado
     try {
       if (GOOGLE_MAPS_API_KEY) {
         const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
         const data = await res.json();
         if (data.status === "OK" && data.results?.[0]) {
+          console.info("[GPS:coleta] endereço obtido via Google", data.results[0].formatted_address);
           setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
           return;
         }
@@ -317,85 +324,198 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       const data = await res.json();
       if (data) {
         const formatted = formatAddress(data, true); // Include number for pickup address
-        setCallForm(f => f.pickup ? f : { ...f, pickup: formatted });
+        console.info("[GPS:coleta] endereço obtido via Nominatim", formatted);
+        setCallForm(f => (f.pickup ? f : { ...f, pickup: formatted }));
       }
     } catch (err) {
-      console.error("Reverse geocode error:", err);
+      console.error("[GPS:coleta] erro no reverse geocoding:", err);
+      setGpsMessage("Erro ao carregar o mapa. Tente novamente.");
     }
   }, [formatAddress]);
 
-  const startGPSWatch = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocalização não suportada neste navegador");
-      setGpsStatus("denied");
+  // ---------------------------------------------------------------------
+  // GPS do endereço de coleta — implementação robusta
+  // Regras: 1 pedido por carregamento, timeout de 10s, sem carregamento
+  // infinito, cache de sessão, fallback manual e mensagens claras de erro.
+  // ---------------------------------------------------------------------
+  const GPS_LOG = "[GPS:coleta]";
+  const GPS_CACHE_KEY = "store_pickup_gps_cache";
+  const GPS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  const readGpsCache = (): { lat: number; lng: number; acc: number | null } | null => {
+    try {
+      const raw = sessionStorage.getItem(GPS_CACHE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (!c || typeof c.lat !== "number" || typeof c.lng !== "number") return null;
+      if (Date.now() - (c.ts || 0) > GPS_CACHE_TTL_MS) return null;
+      return { lat: c.lat, lng: c.lng, acc: c.acc ?? null };
+    } catch {
+      return null;
+    }
+  };
+
+  const writeGpsCache = (lat: number, lng: number, acc: number | null) => {
+    try {
+      sessionStorage.setItem(GPS_CACHE_KEY, JSON.stringify({ lat, lng, acc, ts: Date.now() }));
+    } catch { /* storage indisponível — ignora */ }
+  };
+
+  const applyPosition = useCallback((lat: number, lng: number, acc: number | null, source: string) => {
+    console.info(`${GPS_LOG} coordenadas aplicadas (${source})`, { lat, lng, acc });
+    setGpsAccuracy(acc);
+    setStoreLatLng([lat, lng]);
+    setGpsStatus("granted");
+    setGpsMessage(null);
+    writeGpsCache(lat, lng, acc);
+    if (!pickupManualRef.current) reverseGeocode(lat, lng);
+  }, [reverseGeocode]);
+
+  const requestGPS = useCallback((opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      console.warn(`${GPS_LOG} geolocalização não suportada`);
+      setGpsStatus("unsupported");
+      setGpsMessage("Este dispositivo/navegador não suporta GPS. Digite o endereço manualmente.");
       return;
     }
-    if (gpsWatchRef.current !== null) return; // already watching
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setGpsStatus("error");
+      setGpsMessage("Sem conexão com a internet.");
+      return;
+    }
+    if (gpsRequestingRef.current) {
+      console.info(`${GPS_LOG} pedido ignorado — já existe uma requisição em andamento`);
+      return;
+    }
 
+    gpsRequestingRef.current = true;
     setGpsStatus("requesting");
+    setGpsMessage(null);
+    const startedAt = Date.now();
+    console.info(`${GPS_LOG} solicitando posição...`);
 
-    const watchId = navigator.geolocation.watchPosition(
+    let settled = false;
+    const finish = () => {
+      settled = true;
+      gpsRequestingRef.current = false;
+      if (gpsTimerRef.current) {
+        clearTimeout(gpsTimerRef.current);
+        gpsTimerRef.current = null;
+      }
+    };
+
+    // Trava de segurança: nunca deixa a tela carregando para sempre
+    gpsTimerRef.current = setTimeout(() => {
+      if (settled) return;
+      finish();
+      console.warn(`${GPS_LOG} timeout de segurança (11s)`);
+      setGpsStatus("timeout");
+      setGpsMessage("Não foi possível localizar sua posição.");
+      if (!silent) toast.error("Não foi possível obter sua localização automaticamente.");
+    }, 11000);
+
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const acc = pos.coords.accuracy;
-        const prev = storeLatLng;
-
-        setGpsAccuracy(acc);
-        setStoreLatLng([lat, lng]);
-        setGpsStatus("granted");
-
-        // Only reverse-geocode if position changed significantly (>50m) or first time
-        if (!prev || haversineKm(prev[0], prev[1], lat, lng) > 0.05) {
-          reverseGeocode(lat, lng);
-        }
+        if (settled) return;
+        finish();
+        console.info(`${GPS_LOG} permissão concedida — resposta em ${Date.now() - startedAt}ms`);
+        applyPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy ?? null, "getCurrentPosition");
       },
       (err) => {
-        console.error("GPS error:", err);
-        setGpsStatus("denied");
-        if (err.code === 1) {
-          toast.error("Permissão de GPS negada. Ative nas configurações do navegador.");
+        if (settled) return;
+        finish();
+        console.warn(`${GPS_LOG} erro (${err.code}) após ${Date.now() - startedAt}ms: ${err.message}`);
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsStatus("denied");
+          setGpsMessage("Permita o acesso à localização para preencher automaticamente.");
+          if (!silent) toast.error("Permita o acesso à localização para preencher automaticamente.");
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setGpsStatus("error");
+          setGpsMessage("Ative o GPS do aparelho.");
+          if (!silent) toast.error("Ative o GPS do aparelho.");
         } else {
-          toast.error("Não foi possível obter sua localização");
+          setGpsStatus("timeout");
+          setGpsMessage("Não foi possível localizar sua posição.");
+          if (!silent) toast.error("Não foi possível localizar sua posição.");
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 1000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+  }, [applyPosition]);
 
-    gpsWatchRef.current = watchId;
-  }, [reverseGeocode, storeLatLng]);
-
-  const stopGPSWatch = useCallback(() => {
-    if (gpsWatchRef.current !== null) {
-      navigator.geolocation.clearWatch(gpsWatchRef.current);
-      gpsWatchRef.current = null;
-    }
-  }, []);
-
-  // Auto-start GPS or use restaurant coords
+  // Inicialização única por carregamento da tela
   useEffect(() => {
+    if (gpsInitRef.current) return;
+
+    // 1) Coordenadas já cadastradas da loja têm prioridade
     if (restaurant?.latitude && restaurant?.longitude) {
+      gpsInitRef.current = true;
+      console.info(`${GPS_LOG} usando coordenadas cadastradas da loja`);
       setStoreLatLng([restaurant.latitude, restaurant.longitude]);
       setGpsStatus("granted");
       if (restaurant.address) {
-        setCallForm(f => f.pickup ? f : { ...f, pickup: restaurant.address });
+        setCallForm((f) => (f.pickup ? f : { ...f, pickup: restaurant.address }));
       } else {
         reverseGeocode(restaurant.latitude, restaurant.longitude);
       }
-    } else {
-      startGPSWatch();
+      return;
     }
 
-    return () => stopGPSWatch();
-  }, [restaurant?.latitude, restaurant?.longitude]);
+    if (restaurant === undefined) return; // aguarda o carregamento da loja
+    gpsInitRef.current = true;
 
-  // Request GPS manually (button)
-  const requestGPS = useCallback(() => {
-    stopGPSWatch();
-    gpsWatchRef.current = null;
-    startGPSWatch();
-    toast.info("📡 Buscando localização em tempo real...");
-  }, [startGPSWatch, stopGPSWatch]);
+    // 2) Cache da sessão evita novo pedido ao GPS
+    const cached = readGpsCache();
+    if (cached) {
+      console.info(`${GPS_LOG} usando cache da sessão`);
+      applyPosition(cached.lat, cached.lng, cached.acc, "cache");
+      return;
+    }
+
+    // 3) Pede o GPS apenas uma vez (silencioso: fallback manual continua disponível)
+    requestGPS({ silent: true });
+  }, [restaurant, applyPosition, requestGPS, reverseGeocode]);
+
+  useEffect(() => {
+    return () => {
+      if (gpsTimerRef.current) clearTimeout(gpsTimerRef.current);
+      if (gpsWatchRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
+      }
+    };
+  }, []);
+
+  const retryGPS = useCallback(() => {
+    pickupManualRef.current = false;
+    requestGPS();
+  }, [requestGPS]);
+
+  // Geocodifica o endereço digitado manualmente e atualiza o marcador
+  const geocodePickupAddress = useCallback(async (address: string) => {
+    if (!address || address.trim().length < 5) return;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&addressdetails=1&q=${encodeURIComponent(address)}`;
+      const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        console.info(`${GPS_LOG} endereço manual geocodificado`, { lat, lng });
+        setStoreLatLng([lat, lng]);
+        setGpsStatus("granted");
+        setGpsAccuracy(null);
+        setGpsMessage(null);
+      } else {
+        console.warn(`${GPS_LOG} endereço manual não localizado`);
+      }
+    } catch (e) {
+      console.error(`${GPS_LOG} erro ao geocodificar endereço manual`, e);
+      setGpsMessage("Erro ao carregar o mapa. Tente novamente.");
+    }
+  }, []);
 
   const geocodeDeliveryAddress = useCallback((address: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -847,26 +967,28 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 {gpsAccuracy <= 15 ? " (Excelente)" : gpsAccuracy <= 50 ? " (Boa)" : " (Baixa)"}
               </p>
             </div>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={requestGPS}>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={retryGPS}>
               <RotateCcw className="w-3 h-3 mr-1" /> Atualizar
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* GPS Permission — only when not granted */}
+      {/* GPS Permission / erro — only when not granted */}
       {gpsStatus !== "granted" && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex items-center gap-3">
             <Navigation className="w-5 h-5 text-primary flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium">Permitir localização</p>
+              <p className="text-sm font-medium">
+                {gpsStatus === "requesting" ? "Obtendo sua localização..." : "Localização automática"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Ative o GPS para localizar sua loja automaticamente
+                {gpsMessage ?? "Ative o GPS para localizar sua loja automaticamente. Você também pode digitar o endereço de coleta manualmente."}
               </p>
             </div>
-            <Button size="sm" onClick={requestGPS} disabled={gpsStatus === "requesting"}>
-              {gpsStatus === "requesting" ? "Obtendo..." : "Permitir GPS"}
+            <Button size="sm" onClick={retryGPS} disabled={gpsStatus === "requesting"}>
+              {gpsStatus === "requesting" ? "Obtendo..." : gpsStatus === "idle" ? "Permitir GPS" : "Tentar novamente"}
             </Button>
           </CardContent>
         </Card>
@@ -1067,32 +1189,43 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
           <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" /> Chamar Entregador</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Auto-detected pickup address (read-only) */}
+          {/* Pickup address — automático com fallback manual */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-green-500" />
-              Endereço de coleta (automático)
+              Endereço de coleta (automático ou manual)
             </Label>
             <div className="flex gap-2">
               <Input
                 value={callForm.pickup}
-                readOnly
-                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Aguardando GPS..."}
-                className="flex-1 bg-muted/30 cursor-default"
+                onChange={(e) => {
+                  pickupManualRef.current = true;
+                  setCallForm((f) => ({ ...f, pickup: e.target.value }));
+                }}
+                onBlur={(e) => {
+                  if (pickupManualRef.current) geocodePickupAddress(e.target.value);
+                }}
+                placeholder={gpsStatus === "requesting" ? "Buscando localização..." : "Digite o endereço de coleta"}
+                className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={requestGPS}
+                onClick={retryGPS}
                 title="Atualizar localização"
+                disabled={gpsStatus === "requesting"}
               >
                 <Navigation className="w-4 h-4" />
               </Button>
             </div>
-            {callForm.pickup && (
-              <p className="text-[10px] text-green-600 dark:text-green-400">✓ Localização detectada automaticamente</p>
-            )}
+            {callForm.pickup ? (
+              <p className="text-[10px] text-green-600 dark:text-green-400">
+                {pickupManualRef.current ? "✓ Endereço informado manualmente" : "✓ Localização detectada automaticamente"}
+              </p>
+            ) : gpsStatus !== "requesting" && gpsMessage ? (
+              <p className="text-[10px] text-muted-foreground">{gpsMessage} Você pode digitar o endereço manualmente.</p>
+            ) : null}
           </div>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
