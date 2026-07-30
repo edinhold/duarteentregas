@@ -1223,7 +1223,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
               <p className="text-[10px] text-muted-foreground">{gpsMessage} Você pode digitar o endereço manualmente.</p>
             ) : null}
           </div>
-          </div>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-3 space-y-2">
