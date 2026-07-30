@@ -170,7 +170,33 @@ export async function sendOneSignal(
     };
   }
 
-  const body = { app_id: appId, target_channel: "push", ...payload };
+  const body: Record<string, unknown> = { app_id: appId, target_channel: "push", ...payload };
+
+  // Guard: the two channel fields are mutually exclusive, and an empty value
+  // is what produces "Could not find android_channel_id".
+  if (body.android_channel_id && body.existing_android_channel_id) {
+    delete body.existing_android_channel_id;
+  }
+  for (const key of ["android_channel_id", "existing_android_channel_id"]) {
+    const value = body[key];
+    if (typeof value !== "string" || value.trim() === "") delete body[key];
+  }
+
+  console.log("[OneSignal:send-request]", {
+    targetingMode: body.include_subscription_ids
+      ? "subscription_ids"
+      : body.include_aliases
+      ? "external_ids"
+      : body.included_segments
+      ? "segment"
+      : "none",
+    targetCount: Array.isArray(body.include_subscription_ids)
+      ? body.include_subscription_ids.length
+      : Array.isArray((body.include_aliases as any)?.external_id)
+      ? (body.include_aliases as any).external_id.length
+      : null,
+    hasAndroidChannel: Boolean(body.android_channel_id || body.existing_android_channel_id),
+  });
 
   let res: Response;
   try {
