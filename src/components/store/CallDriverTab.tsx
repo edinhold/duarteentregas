@@ -963,26 +963,28 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 {gpsAccuracy <= 15 ? " (Excelente)" : gpsAccuracy <= 50 ? " (Boa)" : " (Baixa)"}
               </p>
             </div>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={requestGPS}>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={retryGPS}>
               <RotateCcw className="w-3 h-3 mr-1" /> Atualizar
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* GPS Permission — only when not granted */}
+      {/* GPS Permission / erro — only when not granted */}
       {gpsStatus !== "granted" && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex items-center gap-3">
             <Navigation className="w-5 h-5 text-primary flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium">Permitir localização</p>
+              <p className="text-sm font-medium">
+                {gpsStatus === "requesting" ? "Obtendo sua localização..." : "Localização automática"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Ative o GPS para localizar sua loja automaticamente
+                {gpsMessage ?? "Ative o GPS para localizar sua loja automaticamente. Você também pode digitar o endereço de coleta manualmente."}
               </p>
             </div>
-            <Button size="sm" onClick={requestGPS} disabled={gpsStatus === "requesting"}>
-              {gpsStatus === "requesting" ? "Obtendo..." : "Permitir GPS"}
+            <Button size="sm" onClick={retryGPS} disabled={gpsStatus === "requesting"}>
+              {gpsStatus === "requesting" ? "Obtendo..." : gpsStatus === "idle" ? "Permitir GPS" : "Tentar novamente"}
             </Button>
           </CardContent>
         </Card>
