@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { notificarMotoristas, isSilentNotifyCode } from "@/lib/push/notify";
 
 import { DriverPhoto } from "@/components/DriverPhoto";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1022,13 +1021,6 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
-      // Notify available drivers (push never blocks the delivery creation).
-      if (requestId) {
-        const result = await notificarMotoristas(String(requestId));
-        if (!result.ok && !isSilentNotifyCode(result.code)) {
-          console.log("[Push] Falha ao notificar entregadores", result);
-        }
-      }
 
 
 

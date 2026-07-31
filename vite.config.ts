@@ -23,11 +23,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "pwa-192x192.png", "pwa-512x512.png"],
       workbox: {
-        // The OneSignal worker lives under /onesignal/ and must never be
-        // precached or intercepted by the Workbox navigation fallback.
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/onesignal\//],
+        navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        globIgnores: ["**/onesignal/**"],
       },
 
 
