@@ -198,7 +198,10 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
       attribution: MAP_LAYERS.streets.attribution,
     }).addTo(map);
 
-    requestAnimationFrame(() => map.invalidateSize());
+    requestAnimationFrame(() => {
+      // Map may already be removed when the component unmounts before this frame
+      if ((map as any)._container && (map as any)._mapPane) map.invalidateSize();
+    });
 
     return () => {
       map.remove();
@@ -301,7 +304,10 @@ const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {
       map.setView([visibleMarkers[0].mapLatitude, visibleMarkers[0].mapLongitude], DEFAULT_ZOOM);
     }
 
-    requestAnimationFrame(() => map.invalidateSize());
+    requestAnimationFrame(() => {
+      // Map may already be removed when the component unmounts before this frame
+      if ((map as any)._container && (map as any)._mapPane) map.invalidateSize();
+    });
 
     // Driver markers
     driverLocations.forEach((d: any) => {
