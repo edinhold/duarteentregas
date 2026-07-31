@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { notificarMotoristas, isSilentNotifyCode } from "@/lib/push/notify";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -191,23 +190,6 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
         p_group_notes: groupNotes.trim() || null,
       });
       if (error) throw error;
-
-      // Notify drivers about the grouped route (uses the first stop as anchor).
-      if (data) {
-        const { data: first } = await supabase
-          .from("delivery_requests")
-          .select("id")
-          .eq("group_id", data as any)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (first?.id) {
-          const result = await notificarMotoristas(first.id);
-          if (!result.ok && !isSilentNotifyCode(result.code)) {
-            console.log("[Push] Falha ao notificar entregadores (rota)", result);
-          }
-        }
-      }
 
 
 

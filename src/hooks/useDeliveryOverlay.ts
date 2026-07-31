@@ -3,7 +3,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { playUrgentNotification } from "@/lib/notificationSound";
-import { invalidarNotificacao } from "@/lib/push/notify";
 
 import { toast } from "sonner";
 
@@ -317,8 +316,6 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         p_request_id: delivery.id,
       });
       if (error) throw error;
-      // Silently invalidate the offer on every other driver's device.
-      void invalidarNotificacao(delivery.id);
 
 
 
