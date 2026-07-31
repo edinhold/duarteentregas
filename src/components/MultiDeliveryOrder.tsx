@@ -191,6 +191,17 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
       });
       if (error) throw error;
 
+      // Notifica motoristas online sobre cada parada criada
+      try {
+        const { data: created } = await supabase
+          .from("delivery_requests")
+          .select("id")
+          .eq("group_id", String(data))
+          .eq("status", "pending");
+        (created ?? []).forEach((r: any) => void notifyAvailableDrivers(r.id));
+      } catch { /* push nunca bloqueia a criação */ }
+
+
 
 
 

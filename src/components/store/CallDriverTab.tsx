@@ -1021,6 +1021,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
+      // Backend dispara o push para todos os motoristas online (nunca bloqueia o pedido)
+      if (requestId) void notifyAvailableDrivers(String(requestId));
+
+
 
 
 
