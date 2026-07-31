@@ -1,3 +1,4 @@
+import { notifyAvailableDrivers } from "@/lib/push";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -190,6 +191,17 @@ const MultiDeliveryOrder = ({ restaurant, userId }: Props) => {
         p_group_notes: groupNotes.trim() || null,
       });
       if (error) throw error;
+
+      // Notifica motoristas online sobre cada parada criada
+      try {
+        const { data: created } = await supabase
+          .from("delivery_requests")
+          .select("id")
+          .eq("group_id", String(data))
+          .eq("status", "pending");
+        (created ?? []).forEach((r: any) => void notifyAvailableDrivers(r.id));
+      } catch { /* push nunca bloqueia a criação */ }
+
 
 
 

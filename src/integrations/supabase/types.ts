@@ -631,6 +631,96 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_delivery_logs: {
+        Row: {
+          created_at: string | null
+          error_code: string | null
+          event_type: string
+          id: string
+          onesignal_notification_id: string | null
+          pedido_id: string | null
+          platform: string | null
+          recipients_found: number
+          recipients_requested: number
+          request_id: string | null
+          response_body_sanitized: string | null
+          response_status: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_code?: string | null
+          event_type: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          platform?: string | null
+          recipients_found?: number
+          recipients_requested?: number
+          request_id?: string | null
+          response_body_sanitized?: string | null
+          response_status?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          error_code?: string | null
+          event_type?: string
+          id?: string
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          platform?: string | null
+          recipients_found?: number
+          recipients_requested?: number
+          request_id?: string | null
+          response_body_sanitized?: string | null
+          response_status?: number | null
+        }
+        Relationships: []
+      }
+      notification_jobs: {
+        Row: {
+          attempts: number
+          created_at: string | null
+          event_key: string
+          event_type: string
+          id: string
+          last_error: string | null
+          next_attempt_at: string | null
+          onesignal_notification_id: string | null
+          pedido_id: string | null
+          processed_at: string | null
+          recipients_count: number
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string | null
+          event_key: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string | null
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          processed_at?: string | null
+          recipients_count?: number
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string | null
+          event_key?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string | null
+          onesignal_notification_id?: string | null
+          pedido_id?: string | null
+          processed_at?: string | null
+          recipients_count?: number
+          status?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string | null
@@ -844,6 +934,60 @@ export type Database = {
           suspended_until?: string | null
           suspension_reason?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          active: boolean
+          app_version: string | null
+          created_at: string | null
+          device_name: string | null
+          id: string
+          last_seen_at: string | null
+          onesignal_external_id: string | null
+          onesignal_subscription_id: string
+          permission_status: string
+          platform: string
+          profile_type: string
+          sdk_version: string | null
+          subscription_status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          app_version?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          id?: string
+          last_seen_at?: string | null
+          onesignal_external_id?: string | null
+          onesignal_subscription_id: string
+          permission_status?: string
+          platform: string
+          profile_type?: string
+          sdk_version?: string | null
+          subscription_status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          app_version?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          id?: string
+          last_seen_at?: string | null
+          onesignal_external_id?: string | null
+          onesignal_subscription_id?: string
+          permission_status?: string
+          platform?: string
+          profile_type?: string
+          sdk_version?: string | null
+          subscription_status?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

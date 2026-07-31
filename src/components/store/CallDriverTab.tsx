@@ -1,3 +1,4 @@
+import { notifyAvailableDrivers } from "@/lib/push";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -1020,6 +1021,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       } as any);
 
       if (error) throw error;
+
+      // Backend dispara o push para todos os motoristas online (nunca bloqueia o pedido)
+      if (requestId) void notifyAvailableDrivers(String(requestId));
+
 
 
 
