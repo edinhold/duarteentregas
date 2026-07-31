@@ -19,6 +19,8 @@ import { playNotificationSound, playUrgentNotification, playStandbyAlert, startS
 import DriverGPS from "@/components/driver/DriverGPS";
 import { useGPSTracking } from "@/hooks/useGPSTracking";
 import DriverNotificationSettings from "@/components/driver/DriverNotificationSettings";
+import PushStatusCard from "@/components/driver/PushStatusCard";
+import { cancelDeliveryNotification } from "@/lib/push";
 
 import ChatWidget from "@/components/ChatWidget";
 import AdminSupportPanel from "@/components/AdminSupportPanel";
@@ -435,6 +437,7 @@ const DriverPanel = () => {
       const fee = Number((data as any)?.driver_fee || 0);
       console.log("[Delivery] Motorista aceitou", requestId, data);
       toast.success(fee > 0 ? `Entrega aceita com sucesso! Você ganhará R$ ${fee.toFixed(2)}` : "Entrega aceita com sucesso!");
+      void cancelDeliveryNotification(requestId);
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
     } catch (err: any) {
@@ -1029,6 +1032,7 @@ const DriverPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4 outline-none m-0">
+                  <PushStatusCard userId={user?.id} />
                   {/* Notification Settings */}
                   <DriverNotificationSettings />
                 </TabsContent>
