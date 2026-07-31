@@ -6,7 +6,7 @@ declare global {
     OneSignal?: any;
     plugins?: any;
     cordova?: any;
-    isMedianApp?: () => boolean;
+    
   }
 }
 
