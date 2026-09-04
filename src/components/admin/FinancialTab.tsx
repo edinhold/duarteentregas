@@ -215,12 +215,92 @@ export const FinancialTab = () => {
   const { data: drivers = [] } = useQuery({
     queryKey: ["financial-drivers"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. Obter dados da tabela drivers
+      const { data: driversData } = await supabase
         .from("drivers")
         .select("*")
         .order("full_name", { ascending: true });
-      if (error) throw error;
-      return (data || []) as DriverProfileRecord[];
+
+      // 2. Obter roles de motorista
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "driver");
+
+      // 3. Coletar IDs únicos de user_id e id de motoristas
+      const idSet = new Set<string>();
+      (driversData || []).forEach((d) => {
+        if (d.user_id) idSet.add(d.user_id);
+        if (d.id) idSet.add(d.id);
+      });
+      (roles || []).forEach((r) => {
+        if (r.user_id) idSet.add(r.user_id);
+      });
+
+      // Coletar também driver_ids de delivery_requests e withdrawal_requests
+      const { data: delReqs } = await supabase.from("delivery_requests").select("driver_id");
+      (delReqs || []).forEach((r) => {
+        if (r.driver_id) idSet.add(r.driver_id);
+      });
+      const { data: withReqs } = await supabase.from("withdrawal_requests").select("driver_id, driver_user_id");
+      (withReqs || []).forEach((w) => {
+        if (w.driver_id) idSet.add(w.driver_id);
+        if (w.driver_user_id) idSet.add(w.driver_user_id);
+      });
+
+      const allIds = Array.from(idSet).filter(Boolean);
+
+      // 4. Buscar profiles para todos esses IDs
+      const profilesMap = new Map<string, { full_name?: string; phone?: string; pix_key?: string; pix_key_type?: string }>();
+      if (allIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, phone, pix_key, pix_key_type")
+          .in("user_id", allIds);
+        (profiles || []).forEach((p) => {
+          if (p.user_id) profilesMap.set(p.user_id, p);
+        });
+      }
+
+      // 5. Mesclar driversData com profiles
+      const list: DriverProfileRecord[] = [];
+      const processedUserIds = new Set<string>();
+
+      (driversData || []).forEach((d) => {
+        const prof = profilesMap.get(d.user_id) || profilesMap.get(d.id);
+        const fullName = (d.full_name && d.full_name.trim()) || (prof?.full_name && prof.full_name.trim()) || "Motorista";
+        const item: DriverProfileRecord = {
+          ...d,
+          full_name: fullName,
+          phone: d.phone || prof?.phone || "",
+          pix_key: d.pix_key || prof?.pix_key || null,
+          pix_key_type: d.pix_key_type || prof?.pix_key_type || null,
+        };
+        list.push(item);
+        if (d.user_id) processedUserIds.add(d.user_id);
+        if (d.id) processedUserIds.add(d.id);
+      });
+
+      // 6. Incluir perfis que não estão na tabela drivers
+      allIds.forEach((id) => {
+        if (!processedUserIds.has(id)) {
+          const prof = profilesMap.get(id);
+          if (prof) {
+            const item: DriverProfileRecord = {
+              id: id,
+              user_id: id,
+              full_name: prof.full_name?.trim() || "Motorista",
+              phone: prof.phone || "",
+              pix_key: prof.pix_key || null,
+              pix_key_type: prof.pix_key_type || null,
+            };
+            list.push(item);
+            processedUserIds.add(id);
+          }
+        }
+      });
+
+      return list.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
     },
   });
 
@@ -459,8 +539,8 @@ export const FinancialTab = () => {
     const mapByUserId = new Map<string, DriverProfileRecord>();
     const mapById = new Map<string, DriverProfileRecord>();
     drivers.forEach((d) => {
-      mapByUserId.set(d.user_id, d);
-      mapById.set(d.id, d);
+      if (d.user_id) mapByUserId.set(d.user_id, d);
+      if (d.id) mapById.set(d.id, d);
     });
     return { mapByUserId, mapById };
   }, [drivers]);
@@ -553,7 +633,9 @@ export const FinancialTab = () => {
       if (selectedStoreId !== "todos" && req.store_owner_id !== selectedStoreId) return false;
 
       if (selectedDriverId !== "todos") {
-        if (req.driver_id !== selectedDriverId) return false;
+        const drvSel = driverMap.mapById.get(selectedDriverId) || driverMap.mapByUserId.get(selectedDriverId);
+        const allowedIds = drvSel ? [drvSel.id, drvSel.user_id].filter(Boolean) : [selectedDriverId];
+        if (!allowedIds.includes(req.driver_id || "")) return false;
       }
 
       if (selectedStatus !== "todos") {
@@ -835,7 +917,8 @@ export const FinancialTab = () => {
               </TableHeader>
               <TableBody>
                 {pendingWithdrawals.map((w) => {
-                  const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id);
+                  const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id) || driverMap.mapByUserId.get(w.driver_id);
+                  const driverDisplayName = drv?.full_name?.trim() || "Motorista —";
                   const availableBal = getDriverAvailableBalance(w.driver_id || w.driver_user_id);
                   const isProcessingThis = processingWithdrawalId === w.id;
 
@@ -843,7 +926,7 @@ export const FinancialTab = () => {
                     <TableRow key={`pending-${w.id}`} className="text-xs bg-background/80">
                       <TableCell className="whitespace-nowrap font-medium">{formatDate(w.created_at)}</TableCell>
                       <TableCell>
-                        <div className="font-semibold text-foreground">{drv?.full_name || "Motorista —"}</div>
+                        <div className="font-semibold text-foreground">{driverDisplayName}</div>
                         <div className="text-[10px] text-muted-foreground">Tel: {drv?.phone || "—"}</div>
                       </TableCell>
                       <TableCell>
@@ -1278,7 +1361,8 @@ export const FinancialTab = () => {
                 <TableBody>
                   {/* Corridas */}
                   {filteredDeliveries.map((req) => {
-                    const drv = driverMap.mapByUserId.get(req.driver_id || "") || driverMap.mapById.get(req.driver_id || "");
+                    const drv = req.driver_id ? (driverMap.mapByUserId.get(req.driver_id) || driverMap.mapById.get(req.driver_id)) : null;
+                    const driverDisplayName = drv?.full_name?.trim() ? drv.full_name : (req.driver_id ? "Motorista" : "Sem Motorista");
                     const rest = restaurants.find((r) => r.id === req.restaurant_id || r.owner_id === req.store_owner_id);
                     const storeName = rest?.name || "Loja Cadastrada";
                     const gross = Number(req.driver_fee || req.credit_cost || 0);
@@ -1289,7 +1373,7 @@ export const FinancialTab = () => {
                     return (
                       <TableRow key={`del-${req.id}`} className="text-xs">
                         <TableCell className="whitespace-nowrap font-medium">{formatDate(req.created_at)}</TableCell>
-                        <TableCell className="font-semibold">{drv?.full_name || "Motorista —"}</TableCell>
+                        <TableCell className="font-semibold">{driverDisplayName}</TableCell>
                         <TableCell className="font-semibold text-foreground">
                           <div className="flex items-center gap-1.5">
                             <Store className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -1320,14 +1404,15 @@ export const FinancialTab = () => {
 
                   {/* Saques e Antecipações */}
                   {filteredWithdrawals.map((w) => {
-                    const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id);
+                    const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id) || driverMap.mapByUserId.get(w.driver_id);
+                    const driverDisplayName = drv?.full_name?.trim() || "Motorista —";
                     const isProcessingThis = processingWithdrawalId === w.id;
                     const isPending = w.status === "pending";
 
                     return (
                       <TableRow key={`with-${w.id}`} className="text-xs bg-muted/20">
                         <TableCell className="whitespace-nowrap font-medium">{formatDate(w.created_at)}</TableCell>
-                        <TableCell className="font-semibold">{drv?.full_name || "Motorista —"}</TableCell>
+                        <TableCell className="font-semibold">{driverDisplayName}</TableCell>
                         <TableCell className="text-muted-foreground">—</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-[10px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
