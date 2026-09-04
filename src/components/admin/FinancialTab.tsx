@@ -60,7 +60,6 @@ const formatDate = (dateStr: string | null | undefined): string => {
   }
 };
 
-// Tipagens estritas das estruturas do Supabase
 export interface CreditCodeRecord {
   id: string;
   code: string;
@@ -136,10 +135,10 @@ export interface StoreOwnerProfileRecord {
 export const FinancialTab = () => {
   const queryClient = useQueryClient();
 
-  // Estado local para controle de ações em andamento (trava de duplo clique)
+  // Trava de ação em andamento
   const [processingWithdrawalId, setProcessingWithdrawalId] = useState<string | null>(null);
 
-  // Estados dos filtros globais
+  // Filtros globais
   const [period, setPeriod] = useState<string>("30d");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -148,11 +147,11 @@ export const FinancialTab = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>("todos");
   const [selectedType, setSelectedType] = useState<string>("todos");
 
-  // Estado de seleção individual para detalhamento
+  // Detalhamento individual
   const [detailDriverId, setDetailDriverId] = useState<string | null>(null);
   const [detailStoreUserId, setDetailStoreUserId] = useState<string | null>(null);
 
-  // 1. CONSULTAS AO BANCO DE DADOS (SUPABASE REAL)
+  // 1. CONSULTAS AO SUPABASE REAL
   const { data: creditCodes = [], isLoading: loadingCodes } = useQuery({
     queryKey: ["financial-credit-codes"],
     queryFn: async () => {
@@ -272,7 +271,7 @@ export const FinancialTab = () => {
     },
   });
 
-  // Inscrever no Realtime do Supabase para atualizar antecipações automaticamente
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel("financial-tab-realtime-withdrawals")
@@ -280,7 +279,6 @@ export const FinancialTab = () => {
         "postgres_changes",
         { event: "*", schema: "public", table: "withdrawal_requests" },
         () => {
-          console.log("[Financeiro:realtime]", "Atualização recebida na tabela withdrawal_requests");
           queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] });
           queryClient.invalidateQueries({ queryKey: ["financial-driver-earnings"] });
         }
@@ -292,7 +290,6 @@ export const FinancialTab = () => {
     };
   }, [queryClient]);
 
-  // Recarregar dados manualmente
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["financial-credit-codes"] });
     queryClient.invalidateQueries({ queryKey: ["financial-store-credits"] });
@@ -304,14 +301,13 @@ export const FinancialTab = () => {
     toast.success("Dados financeiros atualizados com sucesso!");
   };
 
-  // 2. AÇÕES DE ANTECIPAÇÃO (ACEITAR E NEGAR COM VALIDAÇÃO E IMPEDIMENTO DE DUPLO CLIQUE)
+  // Ações de Antecipação
   const handleAcceptWithdrawal = async (withdrawalId: string) => {
     if (processingWithdrawalId) return;
     console.log("[Financeiro:aceitar_antecipacao]", { withdrawalId });
     setProcessingWithdrawalId(withdrawalId);
 
     try {
-      // 1. Validação backend: verifica se a solicitação ainda está pendente no banco
       const { data: currentReq, error: fetchErr } = await supabase
         .from("withdrawal_requests")
         .select("id, status, amount, net_amount, driver_user_id")
@@ -324,12 +320,11 @@ export const FinancialTab = () => {
       }
 
       if (currentReq.status !== "pending") {
-        toast.error(`Esta solicitação já foi processada anteriormente (Status atual: ${currentReq.status}).`);
+        toast.error(`Esta solicitação já foi processada (Status: ${currentReq.status}).`);
         queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] });
         return;
       }
 
-      // 2. Atualização segura para o status 'approved' (Pago)
       const { error: updateErr } = await supabase
         .from("withdrawal_requests")
         .update({
@@ -341,9 +336,8 @@ export const FinancialTab = () => {
 
       if (updateErr) throw updateErr;
 
-      toast.success("Solicitação de antecipação aceita! O pagamento foi registrado com sucesso.");
+      toast.success("Solicitação de antecipação aceita! O pagamento foi registrado.");
 
-      // 3. Atualização automática dos totais e das telas
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] }),
         queryClient.invalidateQueries({ queryKey: ["financial-driver-earnings"] }),
@@ -351,8 +345,7 @@ export const FinancialTab = () => {
         queryClient.invalidateQueries({ queryKey: ["my-withdrawals"] }),
       ]);
     } catch (err: any) {
-      console.error("[Financeiro:erro_aceitar_antecipacao]", err);
-      toast.error(err.message || "Erro ao aprovar a solicitação de antecipação.");
+      toast.error(err.message || "Erro ao aprovar antecipação.");
     } finally {
       setProcessingWithdrawalId(null);
     }
@@ -364,7 +357,6 @@ export const FinancialTab = () => {
     setProcessingWithdrawalId(withdrawalId);
 
     try {
-      // 1. Validação backend: verifica se a solicitação ainda está pendente no banco
       const { data: currentReq, error: fetchErr } = await supabase
         .from("withdrawal_requests")
         .select("id, status")
@@ -382,7 +374,6 @@ export const FinancialTab = () => {
         return;
       }
 
-      // 2. Atualização para o status 'rejected' (Negado)
       const { error: updateErr } = await supabase
         .from("withdrawal_requests")
         .update({
@@ -396,21 +387,19 @@ export const FinancialTab = () => {
 
       toast.success("Solicitação de antecipação negada com sucesso.");
 
-      // 3. Atualização das telas
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] }),
         queryClient.invalidateQueries({ queryKey: ["my-withdrawals"] }),
       ]);
     } catch (err: any) {
-      console.error("[Financeiro:erro_negar_antecipacao]", err);
       toast.error(err.message || "Erro ao negar a solicitação.");
     } finally {
       setProcessingWithdrawalId(null);
     }
   };
 
-  // Cálculo dos limites de datas conforme filtro de período selecionado
+  // Limites de datas
   const dateBounds = useMemo(() => {
     const now = new Date();
     let start: Date | null = null;
@@ -447,7 +436,6 @@ export const FinancialTab = () => {
     return { start, end };
   }, [period, dateFrom, dateTo]);
 
-  // Função auxiliar de checagem de intervalo de data
   const isWithinPeriod = useCallback(
     (dateStr: string | null | undefined): boolean => {
       if (!dateStr) return false;
@@ -461,7 +449,6 @@ export const FinancialTab = () => {
     [dateBounds.start, dateBounds.end]
   );
 
-  // Mapeamentos rápidos por ID
   const storeOwnerMap = useMemo(() => {
     const map = new Map<string, StoreOwnerProfileRecord>();
     storeOwners.forEach((s) => map.set(s.user_id, s));
@@ -478,10 +465,9 @@ export const FinancialTab = () => {
     return { mapByUserId, mapById };
   }, [drivers]);
 
-  // Taxa de comissão do aplicativo configurada
   const appFeePercentConfig = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
 
-  // 3. PROCESSAMENTO E DEDUPLICAÇÃO DE ENTRADAS FINANCEIRAS
+  // ENTRADAS FINANCEIRAS
   const filteredEntries = useMemo(() => {
     const list: Array<{
       id: string;
@@ -497,7 +483,6 @@ export const FinancialTab = () => {
 
     const seenIds = new Set<string>();
 
-    // A. Recargas pagas via credit_codes
     creditCodes.forEach((code) => {
       if (!code.is_used || seenIds.has(code.id)) return;
       seenIds.add(code.id);
@@ -515,7 +500,7 @@ export const FinancialTab = () => {
       list.push({
         id: code.id,
         type: "Recarga",
-        owner_name: owner?.full_name || owner?.email || "Lojista Desconhecido",
+        owner_name: owner?.full_name || owner?.email || "Loja Cadastrada",
         store_name: rest?.name || "Loja Cadastrada",
         value: Number(code.value) || 0,
         status: "Aprovada",
@@ -524,7 +509,6 @@ export const FinancialTab = () => {
       });
     });
 
-    // B. Recarga Direta via store_credits (contabilizada 1 única vez por registro financeiro de crédito)
     storeCredits.forEach((sc) => {
       const directId = `direct-${sc.id}`;
       if (seenIds.has(directId)) return;
@@ -544,7 +528,7 @@ export const FinancialTab = () => {
         list.push({
           id: sc.id,
           type: "Recarga Direta",
-          owner_name: owner?.full_name || owner?.email || "Lojista Desconhecido",
+          owner_name: owner?.full_name || owner?.email || "Loja Cadastrada",
           store_name: rest?.name || "Loja Cadastrada",
           value: val,
           status: "Aprovada",
@@ -557,7 +541,7 @@ export const FinancialTab = () => {
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [creditCodes, storeCredits, isWithinPeriod, selectedStoreId, selectedType, selectedStatus, storeOwnerMap, restaurants]);
 
-  // 4. PROCESSAMENTO DAS CORRIDAS (DELIVERY_REQUESTS)
+  // CORRIDAS
   const filteredDeliveries = useMemo(() => {
     const seenIds = new Set<string>();
     return deliveryRequests.filter((req) => {
@@ -583,7 +567,7 @@ export const FinancialTab = () => {
     });
   }, [deliveryRequests, isWithinPeriod, selectedStoreId, selectedDriverId, selectedStatus, selectedType]);
 
-  // 5. PROCESSAMENTO DOS SAQUES E ANTECIPAÇÕES (WITHDRAWAL_REQUESTS)
+  // SAQUES E ANTECIPAÇÕES
   const filteredWithdrawals = useMemo(() => {
     const seenIds = new Set<string>();
     return withdrawals.filter((w) => {
@@ -609,12 +593,10 @@ export const FinancialTab = () => {
     });
   }, [withdrawals, isWithinPeriod, selectedDriverId, selectedStatus, selectedType]);
 
-  // Lista de solicitações de antecipação PENDENTES de ação do Admin
   const pendingWithdrawals = useMemo(() => {
     return withdrawals.filter((w) => w.status === "pending");
   }, [withdrawals]);
 
-  // 6. MAPA DE GANHOS LÍQUIDOS DOS MOTORISTAS POR ENTREGA (driver_earnings)
   const earningsByDeliveryMap = useMemo(() => {
     const map = new Map<string, number>();
     driverEarnings.forEach((e) => {
@@ -625,7 +607,6 @@ export const FinancialTab = () => {
     return map;
   }, [driverEarnings]);
 
-  // Função utilitária para calcular o saldo real disponível de um motorista
   const getDriverAvailableBalance = useCallback(
     (driverIdOrUserId: string | null | undefined): number => {
       if (!driverIdOrUserId) return 0;
@@ -634,7 +615,6 @@ export const FinancialTab = () => {
 
       const userOrIdList = [driverObj.id, driverObj.user_id];
 
-      // Total líquido de entregas efetuadas
       const myRides = deliveryRequests.filter(
         (r) => userOrIdList.includes(r.driver_id || "") && r.status === "delivered"
       );
@@ -645,13 +625,11 @@ export const FinancialTab = () => {
         return sum + Math.max(0, Number(r.driver_fee || 0) * (1 - appFeePercentConfig / 100));
       }, 0);
 
-      // Saques aprovados/pagos
       const myApprovedWithdrawals = withdrawals.filter(
         (w) => (userOrIdList.includes(w.driver_id) || userOrIdList.includes(w.driver_user_id)) && w.status === "approved"
       );
       const totalPaid = myApprovedWithdrawals.reduce((sum, w) => sum + Number(w.net_amount || 0), 0);
 
-      // Saques pendentes
       const myPendingWithdrawals = withdrawals.filter(
         (w) => (userOrIdList.includes(w.driver_id) || userOrIdList.includes(w.driver_user_id)) && w.status === "pending"
       );
@@ -662,29 +640,24 @@ export const FinancialTab = () => {
     [driverMap, deliveryRequests, earningsByDeliveryMap, appFeePercentConfig, withdrawals]
   );
 
-  // 7. CÁLCULO DOS 10 INDICADORES FINANCEIROS (Formulas Oficiais)
+  // 10 INDICADORES FINANCEIROS
   const metrics = useMemo(() => {
-    // 1. Total de Recargas (Aprovadas/Resgatadas)
     const totalRecargas = filteredEntries
       .filter((e) => e.type === "Recarga" && e.status === "Aprovada")
       .reduce((sum, e) => sum + e.value, 0);
 
-    // 2. Total de Recarga Direta (Efetivadas)
     const totalRecargaDireta = filteredEntries
       .filter((e) => e.type === "Recarga Direta" && e.status === "Aprovada")
       .reduce((sum, e) => sum + e.value, 0);
 
-    // 3. Receita de Entradas = Recargas + Recarga Direta
     const totalEntradas = totalRecargas + totalRecargaDireta;
 
-    // 4. Valor Bruto das Corridas (apenas entregas concluídas)
     const deliveredRides = filteredDeliveries.filter((r) => r.status === "delivered");
     const valorBrutoCorridas = deliveredRides.reduce(
       (sum, r) => sum + Number(r.driver_fee || r.credit_cost || 0),
       0
     );
 
-    // 5. Valor Gerado para os Motoristas (Soma do valor líquido destinado aos motoristas)
     const valorGeradoMotoristas = deliveredRides.reduce((sum, r) => {
       const netFromEarnings = earningsByDeliveryMap.get(r.id);
       if (netFromEarnings !== undefined) {
@@ -695,26 +668,20 @@ export const FinancialTab = () => {
       return sum + net;
     }, 0);
 
-    // 6. Pago aos Motoristas (Saques e antecipações efetivamente concluídos e aprovados)
     const approvedWithdrawalsList = filteredWithdrawals.filter((w) => w.status === "approved");
     const pagoAosMotoristas = approvedWithdrawalsList.reduce(
       (sum, w) => sum + Number(w.net_amount || 0),
       0
     );
 
-    // 7. Comissão das Corridas = Valor Bruto das Corridas - Valor Líquido dos Motoristas
     const comissaoCorridas = Math.max(0, valorBrutoCorridas - valorGeradoMotoristas);
 
-    // 8. Taxas de Antecipação (Soma das taxas cobradas em saques concluídos/aprovados)
     const taxasAntecipacao = approvedWithdrawalsList.reduce(
       (sum, w) => sum + Number(w.fee_amount || 0),
       0
     );
 
-    // 9. Receita Operacional = Comissão das Corridas + Taxas de Antecipação
     const receitaOperacional = comissaoCorridas + taxasAntecipacao;
-
-    // 10. Saldo de Caixa = Receita de Entradas - Total Pago aos Motoristas
     const saldoCaixa = totalEntradas - pagoAosMotoristas;
 
     return {
@@ -733,7 +700,7 @@ export const FinancialTab = () => {
     };
   }, [filteredEntries, filteredDeliveries, filteredWithdrawals, earningsByDeliveryMap, appFeePercentConfig]);
 
-  // Motorista Selecionado para Detalhamento
+  // Motorista Selecionado
   const selectedDriverData = useMemo(() => {
     if (!detailDriverId) return null;
     const driverObj = driverMap.mapById.get(detailDriverId) || driverMap.mapByUserId.get(detailDriverId);
@@ -741,13 +708,11 @@ export const FinancialTab = () => {
 
     const driverUserOrId = [driverObj.id, driverObj.user_id];
 
-    // Corridas do motorista
     const myRides = deliveryRequests.filter(
       (r) => driverUserOrId.includes(r.driver_id || "") && r.status === "delivered"
     );
     const grossTotal = myRides.reduce((sum, r) => sum + Number(r.driver_fee || 0), 0);
 
-    // Ganhos líquidos
     const netGenerated = myRides.reduce((sum, r) => {
       const earningNet = earningsByDeliveryMap.get(r.id);
       if (earningNet !== undefined) return sum + earningNet;
@@ -756,7 +721,6 @@ export const FinancialTab = () => {
 
     const historicCommission = Math.max(0, grossTotal - netGenerated);
 
-    // Saques do motorista
     const myWithdrawals = withdrawals.filter((w) =>
       driverUserOrId.includes(w.driver_id || "") || driverUserOrId.includes(w.driver_user_id || "")
     );
@@ -765,7 +729,6 @@ export const FinancialTab = () => {
     const totalPaid = approvedWithdrawals.reduce((sum, w) => sum + Number(w.net_amount || 0), 0);
     const totalFeesPaid = approvedWithdrawals.reduce((sum, w) => sum + Number(w.fee_amount || 0), 0);
 
-    // Saldo disponível
     const pendingWithdrawalsSum = myWithdrawals
       .filter((w) => w.status === "pending")
       .reduce((sum, w) => sum + Number(w.amount || 0), 0);
@@ -787,20 +750,18 @@ export const FinancialTab = () => {
     };
   }, [detailDriverId, driverMap, deliveryRequests, earningsByDeliveryMap, appFeePercentConfig, withdrawals]);
 
-  // Lojista Selecionado para Detalhamento
+  // Loja Selecionada
   const selectedStoreData = useMemo(() => {
     if (!detailStoreUserId) return null;
     const ownerObj = storeOwnerMap.get(detailStoreUserId);
     const rest = restaurants.find((r) => r.owner_id === detailStoreUserId);
     const creditRecord = storeCredits.find((sc) => sc.user_id === detailStoreUserId);
 
-    // Recargas do lojista
     const myCodes = creditCodes.filter(
       (c) => (c.used_by === detailStoreUserId || c.assigned_to_user_id === detailStoreUserId) && c.is_used
     );
     const totalRecargas = myCodes.reduce((sum, c) => sum + Number(c.value || 0), 0);
 
-    // Corridas realizadas pela loja
     const myDeliveries = deliveryRequests.filter((r) => r.store_owner_id === detailStoreUserId);
     const deliveredCount = myDeliveries.filter((r) => r.status === "delivered").length;
     const usedInDeliveries = myDeliveries
@@ -824,14 +785,14 @@ export const FinancialTab = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Cabeçalho do Módulo Financeiro */}
+      {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-5 rounded-xl border shadow-sm">
         <div>
           <h2 className="text-xl font-black flex items-center gap-2 text-foreground">
             <Wallet className="w-5 h-5 text-primary" /> Módulo Financeiro Admin
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Consolidação em tempo real de recargas, comissões, antecipações, saques e saldo de caixa.
+            Consolidação em tempo real de recargas de lojas, comissões, antecipações, saques e saldo de caixa.
           </p>
         </div>
         <div className="flex gap-2">
@@ -969,20 +930,24 @@ export const FinancialTab = () => {
               </Select>
             </div>
 
-            {/* Lojista */}
+            {/* Loja */}
             <div>
-              <Label className="text-xs">Lojista / Loja</Label>
+              <Label className="text-xs">Loja</Label>
               <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
                 <SelectTrigger className="h-9 text-xs mt-1">
                   <SelectValue placeholder="Todas as lojas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos os Lojistas</SelectItem>
-                  {storeOwners.map((owner) => (
-                    <SelectItem key={owner.user_id} value={owner.user_id}>
-                      {owner.full_name || owner.email}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="todos">Todas as Lojas</SelectItem>
+                  {storeOwners.map((owner) => {
+                    const rest = restaurants.find((r) => r.owner_id === owner.user_id);
+                    const displayName = rest?.name ? `${rest.name} (${owner.full_name || owner.email})` : (owner.full_name || owner.email);
+                    return (
+                      <SelectItem key={owner.user_id} value={owner.user_id}>
+                        {displayName}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -1022,7 +987,6 @@ export const FinancialTab = () => {
             </div>
           </div>
 
-          {/* Segunda linha de filtros: tipo e datas customizadas */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border/40">
             <div>
               <Label className="text-xs">Tipo de Movimentação</Label>
@@ -1066,7 +1030,7 @@ export const FinancialTab = () => {
         </CardContent>
       </Card>
 
-      {/* DASHBOARD DOS 10 INDICADORES OFICIAIS */}
+      {/* DASHBOARD DOS 10 INDICADORES */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {/* 1. Total de Recargas */}
         <Card className="shadow-sm border-border/60">
@@ -1199,7 +1163,7 @@ export const FinancialTab = () => {
         </Card>
       </div>
 
-      {/* ABAS DETALHADAS DE HISTÓRICO E ANÁLISES */}
+      {/* ABAS DETALHADAS */}
       <Tabs defaultValue="entradas" className="w-full space-y-4">
         <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full h-auto p-1 bg-muted/60">
           <TabsTrigger value="entradas" className="text-xs py-2">
@@ -1212,7 +1176,7 @@ export const FinancialTab = () => {
             <User className="w-3.5 h-3.5 mr-1.5 text-primary" /> Por Motorista
           </TabsTrigger>
           <TabsTrigger value="lojistas" className="text-xs py-2">
-            <Store className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> Por Lojista / Loja
+            <Store className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> Por Loja
           </TabsTrigger>
         </TabsList>
 
@@ -1233,7 +1197,7 @@ export const FinancialTab = () => {
                   <TableRow>
                     <TableHead className="text-xs">Data / Hora</TableHead>
                     <TableHead className="text-xs">Tipo de Entrada</TableHead>
-                    <TableHead className="text-xs">Lojista / Loja</TableHead>
+                    <TableHead className="text-xs">Loja</TableHead>
                     <TableHead className="text-xs">Valor</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs text-right">ID da Operação</TableHead>
@@ -1301,6 +1265,7 @@ export const FinancialTab = () => {
                   <TableRow>
                     <TableHead className="text-xs">Data / Hora</TableHead>
                     <TableHead className="text-xs">Motorista</TableHead>
+                    <TableHead className="text-xs">Loja Solicitante</TableHead>
                     <TableHead className="text-xs">Tipo Movimentação</TableHead>
                     <TableHead className="text-xs">Valor Bruto</TableHead>
                     <TableHead className="text-xs">Comissão App</TableHead>
@@ -1314,6 +1279,8 @@ export const FinancialTab = () => {
                   {/* Corridas */}
                   {filteredDeliveries.map((req) => {
                     const drv = driverMap.mapByUserId.get(req.driver_id || "") || driverMap.mapById.get(req.driver_id || "");
+                    const rest = restaurants.find((r) => r.id === req.restaurant_id || r.owner_id === req.store_owner_id);
+                    const storeName = rest?.name || "Loja Cadastrada";
                     const gross = Number(req.driver_fee || req.credit_cost || 0);
                     const earningNet = earningsByDeliveryMap.get(req.id);
                     const net = earningNet !== undefined ? earningNet : Math.max(0, gross * (1 - appFeePercentConfig / 100));
@@ -1321,8 +1288,14 @@ export const FinancialTab = () => {
 
                     return (
                       <TableRow key={`del-${req.id}`} className="text-xs">
-                        <TableCell className="whitespace-nowrap">{formatDate(req.created_at)}</TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">{formatDate(req.created_at)}</TableCell>
                         <TableCell className="font-semibold">{drv?.full_name || "Motorista —"}</TableCell>
+                        <TableCell className="font-semibold text-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Store className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span>{storeName}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
                             Corrida
@@ -1337,7 +1310,7 @@ export const FinancialTab = () => {
                             variant={req.status === "delivered" ? "default" : "secondary"}
                             className="text-[10px]"
                           >
-                            {req.status === "delivered" ? "Concluída" : req.status}
+                            {req.status === "delivered" ? "Concluída" : req.status === "accepted" ? "Em andamento" : req.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground text-[10px]">—</TableCell>
@@ -1353,8 +1326,9 @@ export const FinancialTab = () => {
 
                     return (
                       <TableRow key={`with-${w.id}`} className="text-xs bg-muted/20">
-                        <TableCell className="whitespace-nowrap">{formatDate(w.created_at)}</TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">{formatDate(w.created_at)}</TableCell>
                         <TableCell className="font-semibold">{drv?.full_name || "Motorista —"}</TableCell>
+                        <TableCell className="text-muted-foreground">—</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-[10px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
                             {w.fee_amount > 0 ? "Antecipação" : "Saque"}
@@ -1431,7 +1405,7 @@ export const FinancialTab = () => {
 
                   {filteredDeliveries.length === 0 && filteredWithdrawals.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         Nenhuma movimentação de motorista registrada para os filtros aplicados.
                       </TableCell>
                     </TableRow>
@@ -1644,30 +1618,34 @@ export const FinancialTab = () => {
           </Card>
         </TabsContent>
 
-        {/* TAB 4: DETALHAMENTO POR LOJISTA / LOJA */}
+        {/* TAB 4: DETALHAMENTO POR LOJA */}
         <TabsContent value="lojistas" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-bold flex items-center justify-between">
-                <span>Selecione um Lojista para Visão Consolidada de Créditos</span>
+                <span>Selecione uma Loja para Visão Consolidada de Créditos</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="max-w-xs">
-                <Label className="text-xs">Lojista Destinatário</Label>
+                <Label className="text-xs">Loja Destinatária</Label>
                 <Select
                   value={detailStoreUserId || ""}
                   onValueChange={(val) => setDetailStoreUserId(val || null)}
                 >
                   <SelectTrigger className="h-9 text-xs mt-1">
-                    <SelectValue placeholder="Selecione um lojista" />
+                    <SelectValue placeholder="Selecione uma loja" />
                   </SelectTrigger>
                   <SelectContent>
-                    {storeOwners.map((o) => (
-                      <SelectItem key={o.user_id} value={o.user_id}>
-                        {o.full_name || o.email}
-                      </SelectItem>
-                    ))}
+                    {storeOwners.map((o) => {
+                      const rest = restaurants.find((r) => r.owner_id === o.user_id);
+                      const displayName = rest?.name ? `${rest.name} (${o.full_name || o.email})` : (o.full_name || o.email);
+                      return (
+                        <SelectItem key={o.user_id} value={o.user_id}>
+                          {displayName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -1679,7 +1657,7 @@ export const FinancialTab = () => {
                       <Store className="w-4 h-4 text-blue-600" /> {selectedStoreData.storeName}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Lojista: {selectedStoreData.owner?.full_name || selectedStoreData.owner?.email || detailStoreUserId} · Tel: {selectedStoreData.owner?.phone}
+                      Responsável: {selectedStoreData.owner?.full_name || selectedStoreData.owner?.email || detailStoreUserId} · Tel: {selectedStoreData.owner?.phone}
                     </p>
                   </div>
 
@@ -1704,7 +1682,7 @@ export const FinancialTab = () => {
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground text-xs">
-                  Selecione um lojista no menu acima para consultar o histórico individual de créditos e recargas.
+                  Selecione uma loja no menu acima para consultar o histórico individual de créditos e recargas.
                 </div>
               )}
             </CardContent>

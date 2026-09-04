@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Ticket, Copy, Trash2, Percent, Save, Wallet, User } from "lucide-react";
+import { Ticket, Copy, Trash2, Percent, Save, Wallet, Store } from "lucide-react";
 
 const generateCode = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -34,10 +34,17 @@ const CreditsTab = () => {
   const [directPromo, setDirectPromo] = useState(false);
   const [directLoading, setDirectLoading] = useState(false);
 
+  const { data: restaurants = [] } = useQuery({
+    queryKey: ["admin-restaurants-credits"],
+    queryFn: async () => {
+      const { data } = await supabase.from("restaurants").select("id, name, owner_id");
+      return data || [];
+    },
+  });
+
   const { data: storeOwners = [] } = useQuery({
     queryKey: ["admin-store-owners"],
     queryFn: async () => {
-      // Try the RPC first (includes emails via auth.users)
       const rpc = await supabase.rpc("admin_list_store_owners");
       if (!rpc.error && Array.isArray(rpc.data) && rpc.data.length > 0) {
         return rpc.data as any[];
@@ -45,13 +52,12 @@ const CreditsTab = () => {
       if (rpc.error) {
         console.warn("[CreditsTab] admin_list_store_owners falhou, usando fallback:", rpc.error.message);
       }
-      // Fallback: query user_roles + profiles directly (admin RLS allows it)
       const { data: roles, error: rolesErr } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "store_owner");
       if (rolesErr) {
-        toast.error("Erro ao carregar lojistas: " + rolesErr.message);
+        toast.error("Erro ao carregar lojas: " + rolesErr.message);
         throw rolesErr;
       }
       const ids = (roles || []).map((r: any) => r.user_id);
@@ -100,7 +106,11 @@ const CreditsTab = () => {
     }
   }, [config]);
 
-  const storeLabel = (o: any) => o.full_name?.trim() ? `${o.full_name} — ${o.email}` : o.email;
+  const storeLabel = (o: any) => {
+    const rest = (restaurants as any[]).find((r) => r.owner_id === o.user_id);
+    if (rest?.name) return `${rest.name} (${o.full_name || o.email})`;
+    return o.full_name?.trim() ? `${o.full_name} — ${o.email}` : o.email;
+  };
 
   const handleSavePromo = async () => {
     const percent = parseFloat(promoPercent);
@@ -129,7 +139,7 @@ const CreditsTab = () => {
     const qty = parseInt(quantity) || 1;
     const val = parseFloat(value) || 10;
     if (qty < 1 || qty > 50) { toast.error("Gere entre 1 e 50 códigos"); return; }
-    if (!assignedTo) { toast.error("Selecione o lojista destinatário"); return; }
+    if (!assignedTo) { toast.error("Selecione a loja destinatária"); return; }
     setGenerating(true);
     try {
       const newCodes = Array.from({ length: qty }, () => ({
@@ -139,7 +149,7 @@ const CreditsTab = () => {
       }));
       const { error } = await supabase.from("credit_codes").insert(newCodes as any);
       if (error) throw error;
-      toast.success(`${qty} código(s) gerado(s) para o lojista!`);
+      toast.success(`${qty} código(s) gerado(s) para a loja!`);
       queryClient.invalidateQueries({ queryKey: ["admin-credit-codes"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao gerar");
@@ -150,7 +160,7 @@ const CreditsTab = () => {
 
   const handleDirectRecharge = async () => {
     const amount = parseFloat(directAmount);
-    if (!directStore) { toast.error("Selecione o lojista"); return; }
+    if (!directStore) { toast.error("Selecione a loja"); return; }
     if (isNaN(amount) || amount <= 0) { toast.error("Valor inválido"); return; }
     setDirectLoading(true);
     try {
@@ -197,15 +207,15 @@ const CreditsTab = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Wallet className="w-4 h-4" /> Recarga Direta (crédito imediato no lojista)
+            <Wallet className="w-4 h-4" /> Recarga Direta (crédito imediato na loja)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[1fr_140px_auto_auto] items-end">
             <div className="space-y-2">
-              <Label>Lojista *</Label>
+              <Label>Loja *</Label>
               <Select value={directStore} onValueChange={setDirectStore}>
-                <SelectTrigger><SelectValue placeholder="Selecione o lojista" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
                 <SelectContent>
                   {(storeOwners as any[]).map((o) => (
                     <SelectItem key={o.user_id} value={o.user_id}>{storeLabel(o)}</SelectItem>
@@ -261,15 +271,15 @@ const CreditsTab = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Ticket className="w-4 h-4" /> Gerar Códigos de Crédito (vinculados a um lojista)
+            <Ticket className="w-4 h-4" /> Gerar Códigos de Crédito (vinculados a uma loja)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[1fr_120px_140px_auto] items-end">
             <div className="space-y-2">
-              <Label>Lojista destinatário *</Label>
+              <Label>Loja destinatária *</Label>
               <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger><SelectValue placeholder="Selecione o lojista" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
                 <SelectContent>
                   {(storeOwners as any[]).map((o) => (
                     <SelectItem key={o.user_id} value={o.user_id}>{storeLabel(o)}</SelectItem>
@@ -290,7 +300,7 @@ const CreditsTab = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Apenas o lojista selecionado poderá resgatar estes códigos.
+            Apenas a loja selecionada poderá resgatar estes códigos.
           </p>
         </CardContent>
       </Card>
@@ -318,7 +328,7 @@ const CreditsTab = () => {
                   <TableCell>R$ {Number(c.value).toFixed(2)}</TableCell>
                   <TableCell className="text-xs">
                     <div className="flex items-center gap-1">
-                      <User className="w-3 h-3 opacity-60" />
+                      <Store className="w-3 h-3 opacity-60 text-primary" />
                       {storeNameById(c.assigned_to_user_id)}
                     </div>
                   </TableCell>
