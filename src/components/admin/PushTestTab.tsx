@@ -129,11 +129,46 @@ async function sendPushTestFallback(
   deviceId: string,
   platform: string
 ) {
-  let query = supabase.from("push_subscriptions").select("*");
-  if (mode === "driver" && driverId) {
-    query = query.eq("user_id", driverId);
-  } else if (mode === "device" && deviceId && deviceId !== "all") {
+  let userIdsFilter: string[] = [];
+
+  if (mode === "broadcast") {
+    const ONLINE_WINDOW_MINUTES = 15;
+    const cutoff = new Date(Date.now() - ONLINE_WINDOW_MINUTES * 60 * 1000).toISOString();
+    const { data: onlineDrivers } = await supabase
+      .from("drivers")
+      .select("user_id")
+      .eq("approval_status", "approved")
+      .eq("is_active", true)
+      .eq("is_online", true)
+      .gte("last_seen_at", cutoff);
+    userIdsFilter = (onlineDrivers || []).map((d) => d.user_id);
+  } else if (mode === "driver" && driverId) {
+    userIdsFilter = [driverId];
+  }
+
+  let query = supabase
+    .from("push_subscriptions")
+    .select("*")
+    .eq("active", true)
+    .eq("permission_status", "granted")
+    .eq("subscription_status", "subscribed")
+    .not("onesignal_subscription_id", "is", null);
+
+  if (mode === "device" && deviceId && deviceId !== "all") {
     query = query.eq("onesignal_subscription_id", deviceId);
+  } else if (userIdsFilter.length > 0) {
+    query = query.in("user_id", userIdsFilter);
+  } else if (mode === "broadcast") {
+    // Nenhum motorista online encontrado
+    return {
+      success: false,
+      edge_function_ok: false,
+      onesignal_accepted: false,
+      recipients_requested: 0,
+      recipients_found: 0,
+      results: [],
+      message: "Nenhum motorista online no momento para envio coletivo.",
+    };
   }
 
   if (platform !== "all") {
@@ -150,14 +185,14 @@ async function sendPushTestFallback(
       recipients_requested: count,
       recipients_found: count,
       status: count > 0 ? "sent_fallback" : "no_recipients",
-      payload: { mode, driverId, deviceId, platform, mode_desc: "Fallback Direct DB" },
+      payload: { mode, driverId, deviceId, platform, mode_desc: "Fallback Direct DB", subs_found: count },
     });
   } catch {
     /* ignore logging failure */
   }
 
   return {
-    success: true,
+    success: count > 0,
     edge_function_ok: false,
     onesignal_accepted: count > 0,
     recipients_requested: count,
@@ -171,8 +206,8 @@ async function sendPushTestFallback(
       },
     ],
     message: count > 0
-      ? `Teste de notificação enviado via banco de dados para ${count} dispositivo(s). (Fallback ativo).`
-      : "Nenhum dispositivo cadastrado ou ativo encontrado para o filtro selecionado.",
+      ? `Diagnóstico de teste enviado via banco de dados para ${count} dispositivo(s) ativo(s). (Modo DB ativo).`
+      : "Nenhum dispositivo ativo com permissão concedida foi encontrado para o filtro selecionado.",
   };
 }
 

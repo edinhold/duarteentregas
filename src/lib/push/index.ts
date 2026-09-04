@@ -98,9 +98,13 @@ export async function initPush(): Promise<boolean> {
             await OneSignal.init({
               appId,
               serviceWorkerPath: "/OneSignalSDKWorker.js",
-              serviceWorkerParam: { scope: "/onesignal/" },
+              serviceWorkerParam: { scope: "/" },
               allowLocalhostAsSecureOrigin: true,
             });
+
+            // Registrar event listeners para Web PWA
+            OneSignal.Notifications?.addEventListener?.("click", (ev: any) => handleClick(ev?.notification?.additionalData));
+            OneSignal.User?.PushSubscription?.addEventListener?.("change", () => void syncCurrentSubscription());
           } catch (e) {
             console.warn("[push] init web", e);
           }
@@ -184,9 +188,19 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
       permission = opted ? "granted" : "denied";
     } else {
       const OneSignal = window.OneSignal;
-      subscriptionId = OneSignal?.User?.PushSubscription?.id ?? null;
       const p = OneSignal?.Notifications?.permission;
       permission = p === true ? "granted" : Notification?.permission === "denied" ? "denied" : "default";
+
+      subscriptionId = OneSignal?.User?.PushSubscription?.id ?? null;
+
+      // Se a permissão foi concedida mas o subscriptionId ainda está gerando, aguarda breves retentativas
+      if (permission === "granted" && !subscriptionId) {
+        for (let i = 0; i < 7; i++) {
+          await new Promise((r) => setTimeout(r, 300));
+          subscriptionId = OneSignal?.User?.PushSubscription?.id ?? null;
+          if (subscriptionId) break;
+        }
+      }
     }
   } catch (e) {
     console.warn("[push] sync error", e);
