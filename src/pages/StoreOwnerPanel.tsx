@@ -85,6 +85,7 @@ const StoreOwnerPanel = () => {
     const channel = supabase.channel("store-owner-realtime")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests", filter: `store_owner_id=eq.${user.id}` }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ["my-delivery-requests", user.id] });
+        queryClient.invalidateQueries({ queryKey: ["assigned-driver-info"] });
         if (payload.new?.status === "accepted" && payload.old?.status === "pending") {
           toast.success("🎉 Um entregador aceitou sua entrega!", { duration: 8000 });
           if ("Notification" in window && Notification.permission === "granted") {

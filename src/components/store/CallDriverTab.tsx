@@ -193,13 +193,29 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   // Driver info shown once a driver accepts the active request
   const assignedDriverId = activeRequest?.driver_id || null;
   const activeStatus = activeRequest?.status;
-  const showDriverInfo = !!activeRequest && !!assignedDriverId && ["accepted", "picked_up"].includes(activeStatus);
+  const showDriverInfo = !!activeRequest && !!assignedDriverId && ["accepted", "picked_up", "delivering", "in_transit", "delivered"].includes(activeStatus);
   const { data: assignedDriver } = useQuery({
     queryKey: ["assigned-driver-info", activeRequest?.id, assignedDriverId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_assigned_driver_info", { p_request_id: activeRequest.id });
-      if (error) { console.warn("get_assigned_driver_info error", error); return null; }
-      return Array.isArray(data) ? data[0] : data;
+      if (!activeRequest?.id || !assignedDriverId) return null;
+      try {
+        const { data, error } = await (supabase as any).rpc("get_assigned_driver_info", { p_request_id: activeRequest.id });
+        if (!error && data) {
+          const item = Array.isArray(data) ? data[0] : data;
+          if (item && item.full_name) return item;
+        }
+      } catch {
+        /* fallback to direct query below */
+      }
+
+      // Direct fallback to drivers table if RPC fails or is missing
+      const { data: drv } = await supabase
+        .from("drivers")
+        .select("id, user_id, full_name, photo_url, vehicle_plate, vehicle_type, phone")
+        .or(`id.eq.${assignedDriverId},user_id.eq.${assignedDriverId}`)
+        .maybeSingle();
+
+      return drv || null;
     },
     enabled: showDriverInfo,
   });
