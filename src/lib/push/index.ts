@@ -6,7 +6,7 @@ declare global {
     OneSignal?: any;
     plugins?: any;
     cordova?: any;
-    
+    isMedianApp?: () => boolean;
   }
 }
 
@@ -45,12 +45,21 @@ export async function getAppId(): Promise<string | null> {
   if (appIdCache) return appIdCache;
   try {
     const { data, error } = await supabase.functions.invoke("push-config", { body: {} });
-    if (error) throw error;
-    appIdCache = data?.app_id || null;
-    return appIdCache;
+    if (!error && data?.app_id) {
+      appIdCache = data.app_id;
+      return appIdCache;
+    }
   } catch {
-    return null;
+    /* fallback to env */
   }
+
+  // Fallback to VITE_ONESIGNAL_APP_ID if set in environment
+  const envAppId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+  if (envAppId) {
+    appIdCache = envAppId;
+    return appIdCache;
+  }
+  return null;
 }
 
 function loadWebSdk(): Promise<void> {
@@ -68,33 +77,41 @@ function loadWebSdk(): Promise<void> {
   });
 }
 
-/** Initializes the correct SDK (web v16 or Cordova) exactly once. */
+/** Inicializa o SDK do OneSignal exatamente 1 vez */
 export async function initPush(): Promise<boolean> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const appId = await getAppId();
-    if (!appId) return false;
+    if (!appId) {
+      console.warn("[push] OneSignal App ID não encontrado.");
+      return false;
+    }
 
     if (detectPlatform() === "android_apk") return initCordova(appId);
 
-    await loadWebSdk();
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    await new Promise<void>((resolve) => {
-      window.OneSignalDeferred!.push(async (OneSignal: any) => {
-        try {
-          await OneSignal.init({
-            appId,
-            serviceWorkerPath: "/OneSignalSDKWorker.js",
-            serviceWorkerParam: { scope: "/onesignal/" },
-            allowLocalhostAsSecureOrigin: true,
-          });
-        } catch (e) {
-          console.warn("[push] init web", e);
-        }
-        resolve();
+    try {
+      await loadWebSdk();
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      await new Promise<void>((resolve) => {
+        window.OneSignalDeferred!.push(async (OneSignal: any) => {
+          try {
+            await OneSignal.init({
+              appId,
+              serviceWorkerPath: "/OneSignalSDKWorker.js",
+              serviceWorkerParam: { scope: "/onesignal/" },
+              allowLocalhostAsSecureOrigin: true,
+            });
+          } catch (e) {
+            console.warn("[push] init web", e);
+          }
+          resolve();
+        });
       });
-    });
-    return true;
+      return true;
+    } catch (err) {
+      console.warn("[push] Erro no initPush:", err);
+      return false;
+    }
   })();
   return initPromise;
 }
@@ -128,7 +145,7 @@ function handleClick(data: any) {
   if (rota && typeof rota === "string") window.location.assign(rota);
 }
 
-/** Requests permission and stores the subscription for the given user. */
+/** Solicita permissão e armazena a inscrição do usuário */
 export async function enablePush(userId: string, profileType = "driver"): Promise<PushState> {
   const platform = detectPlatform();
   const ok = await initPush();
@@ -153,6 +170,7 @@ export async function enablePush(userId: string, profileType = "driver"): Promis
   return syncCurrentSubscription(userId, profileType);
 }
 
+/** Sincroniza e valida automaticamente a inscrição do dispositivo no Supabase */
 export async function syncCurrentSubscription(userId?: string, profileType = "driver"): Promise<PushState> {
   const platform = detectPlatform();
   let subscriptionId: string | null = null;
@@ -171,11 +189,23 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
       permission = p === true ? "granted" : Notification?.permission === "denied" ? "denied" : "default";
     }
   } catch (e) {
-    console.warn("[push] sync", e);
+    console.warn("[push] sync error", e);
   }
 
   const uid = userId ?? (await supabase.auth.getUser()).data.user?.id ?? null;
   if (uid && subscriptionId) {
+    // 1. Inativa inscrições antigas do mesmo usuário para evitar duplicidade de envio
+    try {
+      await supabase
+        .from("push_subscriptions")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq("user_id", uid)
+        .neq("onesignal_subscription_id", subscriptionId);
+    } catch {
+      /* ignore cleanup error */
+    }
+
+    // 2. Upsert da inscrição atualizada
     await supabase.from("push_subscriptions").upsert(
       {
         user_id: uid,
@@ -206,14 +236,41 @@ export async function logoutPush() {
   } catch { /* noop */ }
 }
 
-/** Fire-and-forget backend trigger. Never blocks or breaks order creation. */
+/** Disparo resiliente de notificação para motoristas */
 export async function notifyAvailableDrivers(pedidoId: string) {
   try {
     const { data, error } = await supabase.functions.invoke("notify-available-drivers", { body: { pedido_id: pedidoId } });
-    if (error) console.warn("[push] notify error", error);
-    else console.info("[push] notify result", data);
+    if (error) {
+      console.warn("[push] notifyAvailableDrivers Edge Function offline, registrando evento no banco:", error.message);
+      await fallbackNotifyAvailableDrivers(pedidoId);
+    } else {
+      console.info("[push] notify result", data);
+    }
   } catch (e) {
-    console.warn("[push] notify failed", e);
+    console.warn("[push] notify failed, fallback ativo:", e);
+    await fallbackNotifyAvailableDrivers(pedidoId);
+  }
+}
+
+async function fallbackNotifyAvailableDrivers(pedidoId: string) {
+  try {
+    const { data: drivers } = await supabase
+      .from("drivers")
+      .select("user_id")
+      .eq("approval_status", "approved")
+      .eq("is_active", true)
+      .eq("is_online", true);
+
+    const count = drivers?.length || 0;
+    await supabase.from("notification_delivery_logs").insert({
+      pedido_id: pedidoId,
+      event_type: "nova_entrega_fallback",
+      recipients_requested: count,
+      recipients_found: count,
+      status: count > 0 ? "queued" : "no_drivers_online",
+    });
+  } catch {
+    /* ignore fallback log error */
   }
 }
 
