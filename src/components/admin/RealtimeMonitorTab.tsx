@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Layers, Truck, Package, Users, Search, Activity } from "lucide-react";
 import { MAP_LAYERS } from "@/config/maps";
+import { mapboxGeocodeForward } from "@/config/mapbox";
 import MapErrorBoundary from "@/components/MapErrorBoundary";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -41,13 +42,12 @@ const iconDest = svgIcon("#a855f7", 26);
 
 async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address + ", Primavera do Leste, MT")}`,
-      { headers: { Accept: "application/json" } }
-    );
-    const data = await res.json();
-    if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {}
+    const result = await mapboxGeocodeForward({ address });
+    console.log("[RealtimeMonitorTab:geocode]", result);
+    return { lat: result.latitude, lng: result.longitude };
+  } catch (e) {
+    console.error("[RealtimeMonitorTab:geocode:erro]", e);
+  }
   return null;
 }
 

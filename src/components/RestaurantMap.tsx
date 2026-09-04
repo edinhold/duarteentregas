@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Restaurant } from "@/types";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAP_LAYERS } from "@/config/maps";
+import { mapboxGeocodeForward } from "@/config/mapbox";
 import { useNavigate } from "react-router-dom";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
@@ -122,21 +123,17 @@ const geocodeRestaurant = async (restaurant: Restaurant): Promise<RestaurantWith
   const address = getGeocodeAddress(restaurant);
   if (!address) return null;
 
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("limit", "1");
-  url.searchParams.set("countrycodes", "br");
-  url.searchParams.set("q", address);
+  try {
+    const result = await mapboxGeocodeForward({ address });
+    console.log("[RestaurantMap:geocodeRestaurant]", result);
+    if (!isValidCoordinate(result.latitude, result.longitude)) return null;
 
-  const response = await fetch(url.toString());
-  if (!response.ok) return null;
-  const [result] = await response.json();
-  const latitude = Number(result?.lat);
-  const longitude = Number(result?.lon);
-  if (!isValidCoordinate(latitude, longitude)) return null;
-
-  cachePosition(restaurant, latitude, longitude);
-  return { ...restaurant, mapLatitude: latitude, mapLongitude: longitude };
+    cachePosition(restaurant, result.latitude, result.longitude);
+    return { ...restaurant, mapLatitude: result.latitude, mapLongitude: result.longitude };
+  } catch (e) {
+    console.error("[RestaurantMap:geocodeRestaurant:erro]", e);
+    return null;
+  }
 };
 
 const RestaurantMap = ({ restaurants }: RestaurantMapProps) => {

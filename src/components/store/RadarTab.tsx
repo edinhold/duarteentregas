@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Layers, Navigation, Package, Truck, MapPin } from "lucide-react";
 import { MAP_LAYERS } from "@/config/maps";
+import { mapboxGeocodeForward } from "@/config/mapbox";
 import MapErrorBoundary from "@/components/MapErrorBoundary";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -57,14 +58,11 @@ function formatDistance(m: number) {
 
 async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`,
-      { headers: { Accept: "application/json" } }
-    );
-    const data = await res.json();
-    if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    const result = await mapboxGeocodeForward({ address });
+    console.log("[RadarTab:geocode]", result);
+    return { lat: result.latitude, lng: result.longitude };
   } catch (e) {
-    console.error("[RadarTab] geocode error", e);
+    console.error("[RadarTab:geocode:erro]", e);
   }
   return null;
 }

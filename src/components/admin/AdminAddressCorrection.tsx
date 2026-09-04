@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { MapPin, Loader2, Crosshair } from "lucide-react";
+import { mapboxGeocodeForward, mapboxGetDirections } from "@/config/mapbox";
 
 interface Props {
   request: any;
@@ -14,36 +15,13 @@ interface Props {
 
 async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(address)}`;
-    const r = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-    const j = await r.json();
-    if (Array.isArray(j) && j.length > 0) {
-      return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
-    }
+    const result = await mapboxGeocodeForward({ address });
+    console.log("[AdminAddressCorrection:geocode]", result);
+    return { lat: result.latitude, lng: result.longitude };
   } catch (e) {
-    console.error("geocode error", e);
+    console.error("[AdminAddressCorrection:geocode:erro]", e);
   }
   return null;
-}
-
-async function osrmDistanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`;
-    const r = await fetch(url);
-    const j = await r.json();
-    const meters = j?.routes?.[0]?.distance;
-    if (typeof meters === "number") return meters / 1000;
-  } catch (e) {
-    console.error("OSRM error", e);
-  }
-  // fallback haversine
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(la1) * Math.cos(la2);
-  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 const AdminAddressCorrection = ({ request }: Props) => {
@@ -69,12 +47,18 @@ const AdminAddressCorrection = ({ request }: Props) => {
     try {
       const [a, b] = await Promise.all([geocode(pickup), geocode(delivery)]);
       if (!a || !b) {
-        toast.error("Não foi possível localizar um dos endereços no GPS");
+        toast.error("Não foi possível localizar um dos endereços no GPS Mapbox");
         return;
       }
-      const km = await osrmDistanceKm(a, b);
-      setDistanceKm(km);
-      toast.success(`Distância GPS: ${km.toFixed(2)} km`);
+      const route = await mapboxGetDirections({
+        origin: { latitude: a.lat, longitude: a.lng },
+        destination: { latitude: b.lat, longitude: b.lng },
+      });
+      setDistanceKm(route.distanceKm);
+      toast.success(`Distância Rota Mapbox: ${route.distanceKm.toFixed(2)} km`);
+    } catch (routeErr: any) {
+      console.error("[AdminAddressCorrection:recalc:erro]", routeErr);
+      toast.error(routeErr.message || "Erro ao calcular rota na Mapbox");
     } finally {
       setCalculating(false);
     }

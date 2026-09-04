@@ -17,7 +17,15 @@ import ChatWidget from "@/components/ChatWidget";
 import { useDriverLocations } from "@/hooks/useDriverLocations";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_LAYERS, GOOGLE_MAPS_API_KEY } from "@/config/maps";
+import { MAP_LAYERS } from "@/config/maps";
+import {
+  mapboxGeocodeForward,
+  mapboxGeocodeReverse,
+  mapboxAutocompleteSuggest,
+  mapboxGetDirections,
+  MapboxError,
+  MapboxSuggestion,
+} from "@/config/mapbox";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -68,35 +76,33 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 
 type RouteProfile = "driving" | "cycling" | "walking";
 
-const PROFILE_CONFIG: Record<RouteProfile, { label: string; icon: typeof Car; osrmProfile: string }> = {
-  driving: { label: "Carro/Moto", icon: Car, osrmProfile: "driving" },
-  cycling: { label: "Bicicleta", icon: Bike, osrmProfile: "bike" },
-  walking: { label: "A pé", icon: Footprints, osrmProfile: "foot" },
+const PROFILE_CONFIG: Record<RouteProfile, { label: string; icon: typeof Car }> = {
+  driving: { label: "Carro/Moto", icon: Car },
+  cycling: { label: "Bicicleta", icon: Bike },
+  walking: { label: "A pé", icon: Footprints },
 };
 
-// OSRM route fetcher — returns road distance (km), duration (min), and route geometry
-async function fetchOSRMRoute(
+// Mapbox Directions API v5 fetcher — retorna distância (km), duração (min) e geometria
+async function fetchMapboxRoute(
   fromLat: number, fromLng: number, toLat: number, toLng: number,
   profile: RouteProfile = "driving"
 ): Promise<{ distanceKm: number; durationMin: number; geometry: [number, number][] } | null> {
   try {
-    const osrmProfile = PROFILE_CONFIG[profile].osrmProfile;
-    const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&alternatives=false`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code === "Ok" && data.routes?.[0]) {
-      const route = data.routes[0];
-      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
-      return {
-        distanceKm: route.distance / 1000,
-        durationMin: route.duration / 60,
-        geometry: coords,
-      };
-    }
-  } catch (err) {
-    console.error("OSRM route error:", err);
+    const result = await mapboxGetDirections({
+      origin: { latitude: fromLat, longitude: fromLng },
+      destination: { latitude: toLat, longitude: toLng },
+      profile,
+    });
+    console.log("[CallDriverTab:fetchMapboxRoute]", result);
+    return {
+      distanceKm: result.distanceKm,
+      durationMin: result.durationMinutes,
+      geometry: result.geometry,
+    };
+  } catch (err: any) {
+    console.error("[CallDriverTab:fetchMapboxRoute:erro]", err);
+    return null;
   }
-  return null;
 }
 
 interface CallDriverTabProps {
@@ -232,16 +238,14 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   const storeLat = storeLatLng?.[0] ?? restaurant?.latitude;
   const storeLng = storeLatLng?.[1] ?? restaurant?.longitude;
 
-  // Distance logic: manual override > OSRM road > Haversine fallback
-  const autoDistanceKm = roadDistanceKm > 0
-    ? roadDistanceKm
-    : (deliveryLatLng && storeLat && storeLng ? haversineKm(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1]) : 0);
+  // Lógica de Distância: override manual > rota Mapbox
+  const autoDistanceKm = roadDistanceKm > 0 ? roadDistanceKm : 0;
 
   const rawDistanceKm = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
     ? parseFloat(manualDistanceKm)
     : autoDistanceKm;
 
-  // Apply km rules — MUST match server-side deduct_credits_for_delivery exactly
+  // Aplica regras de Km — DEVE corresponder estritamente ao servidor
   let effectiveKm = rawDistanceKm;
   if (roundKmUp && effectiveKm > 0) effectiveKm = Math.ceil(effectiveKm);
   if (minKm > 0 && effectiveKm < minKm) effectiveKm = minKm;
@@ -252,13 +256,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const distanceSource = manualDistanceEnabled && parseFloat(manualDistanceKm) > 0
     ? "manual"
-    : roadDistanceKm > 0 ? "osrm" : (autoDistanceKm > 0 ? "haversine" : "none");
+    : roadDistanceKm > 0 ? "mapbox" : "none";
 
   const statusLabels: Record<string, string> = {
     pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Finalizado", cancelled: "Cancelado",
   };
 
-  // Fetch OSRM route when both points are set or profile changes
+  // Busca rota via Mapbox Directions API v5 quando origem/destino estão definidos ou perfil muda
   useEffect(() => {
     if (!storeLat || !storeLng || !deliveryLatLng) {
       setRoadDistanceKm(0);
@@ -270,7 +274,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     let cancelled = false;
     setLoadingRoute(true);
 
-    fetchOSRMRoute(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1], routeProfile).then((result) => {
+    fetchMapboxRoute(storeLat, storeLng, deliveryLatLng[0], deliveryLatLng[1], routeProfile).then((result) => {
       if (cancelled) return;
       if (result) {
         setRoadDistanceKm(result.distanceKm);
@@ -325,29 +329,16 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   }, []);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
-    if (pickupManualRef.current) return; // não sobrescreve endereço digitado
+    if (pickupManualRef.current) return;
     try {
-      if (GOOGLE_MAPS_API_KEY) {
-        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-        const data = await res.json();
-        if (data.status === "OK" && data.results?.[0]) {
-          console.info("[GPS:coleta] endereço obtido via Google", data.results[0].formatted_address);
-          setCallForm(f => ({ ...f, pickup: data.results[0].formatted_address }));
-          return;
-        }
-      }
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-      const data = await res.json();
-      if (data) {
-        const formatted = formatAddress(data, true); // Include number for pickup address
-        console.info("[GPS:coleta] endereço obtido via Nominatim", formatted);
-        setCallForm(f => (f.pickup ? f : { ...f, pickup: formatted }));
-      }
+      const result = await mapboxGeocodeReverse({ latitude: lat, longitude: lng });
+      console.info("[GPS:coleta] endereço obtido via Mapbox", result);
+      setCallForm(f => (f.pickup ? f : { ...f, pickup: result.formattedAddress }));
     } catch (err) {
-      console.error("[GPS:coleta] erro no reverse geocoding:", err);
-      setGpsMessage("Erro ao carregar o mapa. Tente novamente.");
+      console.error("[GPS:coleta] erro no reverse geocoding Mapbox:", err);
+      setGpsMessage("Erro ao carregar endereço de coleta via Mapbox.");
     }
-  }, [formatAddress]);
+  }, []);
 
   // ---------------------------------------------------------------------
   // GPS do endereço de coleta — implementação robusta
@@ -522,22 +513,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
   const reverseGeocodeAddress = useCallback(async (lat: number, lng: number): Promise<string | null> => {
     try {
-      if (GOOGLE_MAPS_API_KEY) {
-        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-        const data = await res.json();
-        if (data.status === "OK" && data.results?.[0]?.formatted_address) {
-          return data.results[0].formatted_address as string;
-        }
-      }
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-      const data = await res.json();
-      const formatted = formatAddress(data, true);
-      return formatted && formatted.trim().length > 0 ? formatted : null;
+      const result = await mapboxGeocodeReverse({ latitude: lat, longitude: lng });
+      return result.formattedAddress || null;
     } catch (e) {
-      console.error(`${GPS_LOG} reverse geocoding falhou`, e);
+      console.error(`${GPS_LOG} reverse geocoding Mapbox falhou`, e);
       return null;
     }
-  }, [formatAddress]);
+  }, []);
 
   const handlePickupGpsClick = useCallback(async () => {
     if (pickupGpsBusyRef.current) {
@@ -642,116 +624,71 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
   }, [restaurant, callForm.pickup, reverseGeocodeAddress]);
 
 
-  // Geocodifica o endereço digitado manualmente e atualiza o marcador
+  // Geocodifica o endereço digitado manualmente e atualiza o marcador da loja
   const geocodePickupAddress = useCallback(async (address: string) => {
     if (!address || address.trim().length < 5) return;
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&addressdetails=1&q=${encodeURIComponent(address)}`;
-      const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        console.info(`${GPS_LOG} endereço manual geocodificado`, { lat, lng });
-        setStoreLatLng([lat, lng]);
-        setGpsStatus("granted");
-        setGpsAccuracy(null);
-        setGpsMessage(null);
-      } else {
-        console.warn(`${GPS_LOG} endereço manual não localizado`);
-      }
-    } catch (e) {
-      console.error(`${GPS_LOG} erro ao geocodificar endereço manual`, e);
-      setGpsMessage("Erro ao carregar o mapa. Tente novamente.");
+      const result = await mapboxGeocodeForward({ address });
+      console.info(`${GPS_LOG} endereço manual geocodificado Mapbox`, result);
+      setStoreLatLng([result.latitude, result.longitude]);
+      setGpsStatus("granted");
+      setGpsAccuracy(null);
+      setGpsMessage(null);
+    } catch (e: any) {
+      console.error(`${GPS_LOG} erro ao geocodificar endereço manual Mapbox`, e);
+      setGpsMessage("Erro ao geocodificar endereço da loja.");
     }
   }, []);
 
-  const geocodeDeliveryAddress = useCallback((address: string) => {
+  const searchCounterRef = useRef(0);
+
+  const geocodeDeliveryAddress = useCallback((address: string, number?: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (address.trim().length < 5) {
+    if (address.trim().length < 3) {
       setAddressSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
+    const currentRequestId = ++searchCounterRef.current;
+
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingAddress(true);
       try {
-        if (GOOGLE_MAPS_API_KEY) {
-          let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR&components=country:BR`;
-          if (storeLat && storeLng) {
-            googleUrl += `&location=${storeLat},${storeLng}&radius=50000`;
-          }
-          const res = await fetch(googleUrl);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.length > 0) {
-            const mapped = data.results.map((r: any) => ({
-              display_name: r.formatted_address,
-              lat: r.geometry.location.lat.toString(),
-              lon: r.geometry.location.lng.toString(),
-              address: r.address_components
-            }));
-            setAddressSuggestions(mapped);
-            setShowSuggestions(true);
-            setSearchingAddress(false);
-            return;
-          }
-        }
+        const fullQuery = number && number.trim() ? `${address}, ${number.trim()}` : address;
+        const suggestions = await mapboxAutocompleteSuggest({ query: fullQuery, limit: 5 });
 
-        // Nominatim: acrescenta cidade/UF quando o usuário só digitou rua/bairro
-        const hasCity = /primavera do leste|\bmt\b|mato grosso/i.test(address);
-        const query = hasCity ? address : `${address}, Primavera do Leste, MT`;
-        let searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`;
+        if (searchCounterRef.current !== currentRequestId) return;
 
-        if (storeLat && storeLng) {
-          const delta = 0.25;
-          searchUrl += `&viewbox=${storeLng - delta},${storeLat - delta},${storeLng + delta},${storeLat + delta}&bounded=1`;
-        }
-        
-        const res = await fetch(searchUrl);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          if (storeLat && storeLng) {
-            data.sort((a: any, b: any) => {
-              const da = haversineKm(storeLat, storeLng, parseFloat(a.lat), parseFloat(a.lon));
-              const db = haversineKm(storeLat, storeLng, parseFloat(b.lat), parseFloat(b.lon));
-              return da - db;
-            });
-          }
-          setAddressSuggestions(data);
+        if (suggestions.length > 0) {
+          setAddressSuggestions(suggestions);
           setShowSuggestions(true);
         } else {
           setAddressSuggestions([]);
           setShowSuggestions(false);
-          toast.info("Endereço não encontrado. Toque no mapa para marcar a localização manualmente.", { duration: 5000 });
         }
-      } catch (err) {
-        console.error("Geocode error:", err);
+      } catch (err: any) {
+        if (searchCounterRef.current !== currentRequestId) return;
+        console.error("[CallDriverTab:geocodeDeliveryAddress:erro]", err);
       } finally {
-        setSearchingAddress(false);
+        if (searchCounterRef.current === currentRequestId) {
+          setSearchingAddress(false);
+        }
       }
-    }, 800);
-  }, [storeLat, storeLng]);
+    }, 400);
+  }, []);
 
-  const selectSuggestion = useCallback((item: any) => {
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
+  const selectSuggestion = useCallback((item: MapboxSuggestion) => {
+    const lat = item.latitude;
+    const lng = item.longitude;
     setDeliveryLatLng([lat, lng]);
-    
-    // Extract number if present
-    let houseNumber = "";
-    if (item.address) {
-      if (Array.isArray(item.address)) {
-        houseNumber = item.address.find((c: any) => c.types.includes("street_number"))?.long_name || "";
-      } else {
-        houseNumber = item.address.house_number || "";
-      }
-    }
 
-    const formatted = formatAddress(item, false); // Format without number
+    const houseNumber = item.number || callForm.delivery_number || "";
+    const streetName = item.street || item.name;
+
     setCallForm(f => ({ 
       ...f, 
-      delivery: formatted,
+      delivery: streetName,
       delivery_number: houseNumber 
     }));
     
@@ -759,11 +696,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     setShowSuggestions(false);
     setManualDistanceEnabled(false);
 
+    console.log("[CallDriverTab:selectSuggestion]", { item, lat, lng });
+
     if (mapRef.current && storeLat && storeLng) {
       const bounds = L.latLngBounds([[storeLat, storeLng], [lat, lng]]);
       mapRef.current.fitBounds(bounds, { padding: [40, 40] });
     }
-  }, [storeLat, storeLng, formatAddress]);
+  }, [storeLat, storeLng, callForm.delivery_number]);
 
   // Close suggestions on click outside
   useEffect(() => {
@@ -794,45 +733,26 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
     map.on("click", async (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
-      setDeliveryLatLng([lat, lng]);
       setManualDistanceEnabled(false);
       
       try {
-        if (GOOGLE_MAPS_API_KEY) {
-          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&language=pt-BR`);
-          const data = await res.json();
-          if (data.status === "OK" && data.results?.[0]) {
-            const first = data.results[0];
-            const comps = first.address_components;
-            const streetNumber = comps.find((c: any) => c.types.includes("street_number"))?.long_name || "";
-            
-            // Format without number for the main field
-            const itemForFormat = { ...first, address: comps };
-            const formatted = formatAddress(itemForFormat, false);
-            
-            setCallForm(f => ({ 
-              ...f, 
-              delivery: formatted,
-              delivery_number: streetNumber 
-            }));
-            return;
-          }
+        const result = await mapboxGeocodeReverse({ latitude: lat, longitude: lng });
+        console.log("[CallDriverTab:mapClickReverseGeocode]", result);
+        
+        setDeliveryLatLng([result.latitude, result.longitude]);
+        setCallForm(f => ({ 
+          ...f, 
+          delivery: result.street || result.formattedAddress,
+          delivery_number: result.number || f.delivery_number 
+        }));
+        toast.success(`📍 Ponto de entrega definido: ${result.formattedAddress}`);
+      } catch (err: any) {
+        console.error("[CallDriverTab:mapClickReverseGeocode:erro]", err);
+        if (err instanceof MapboxError) {
+          toast.error(err.message);
+        } else {
+          toast.error("Erro ao identificar o endereço no ponto clicado.");
         }
-
-        // Fallback to Nominatim
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-        const data = await res.json();
-        if (data) {
-          const formatted = formatAddress(data, false);
-          const streetNumber = data.address?.house_number || "";
-          setCallForm(f => ({ 
-            ...f, 
-            delivery: formatted,
-            delivery_number: streetNumber 
-          }));
-        }
-      } catch (err) {
-        console.error("Map click geocode error:", err);
       }
     });
 
@@ -894,25 +814,25 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
         .bindPopup("<b>📍 Ponto de Entrega</b><br><small>Arraste para ajustar</small>")
         .openPopup();
 
-      // Reverse geocode on drag end
+      // Reverse geocode na Mapbox ao soltar o marcador
       deliveryMarkerRef.current.on("dragend", async () => {
         const pos = deliveryMarkerRef.current?.getLatLng();
         if (pos) {
-          setDeliveryLatLng([pos.lat, pos.lng]);
           setManualDistanceEnabled(false);
-          
           try {
+            const result = await mapboxGeocodeReverse({ latitude: pos.lat, longitude: pos.lng });
+            console.log("[CallDriverTab:markerDragReverseGeocode]", result);
 
-
-            // Fallback to Nominatim
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&addressdetails=1&zoom=18&accept-language=pt-BR`);
-            const data = await res.json();
-            if (data) {
-              const formatted = formatAddress(data);
-              setCallForm(f => ({ ...f, delivery: formatted }));
+            setDeliveryLatLng([result.latitude, result.longitude]);
+            setCallForm(f => ({ ...f, delivery: result.street || result.formattedAddress, delivery_number: result.number || f.delivery_number }));
+            toast.success(`📍 Ponto de entrega ajustado: ${result.formattedAddress}`);
+          } catch (err: any) {
+            console.error("[CallDriverTab:markerDragReverseGeocode:erro]", err);
+            if (err instanceof MapboxError) {
+              toast.error(err.message);
+            } else {
+              toast.error("Erro ao ajustar o ponto de entrega.");
             }
-          } catch (err) {
-            console.error("Marker drag geocode error:", err);
           }
         }
       });
@@ -980,53 +900,86 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     if (nearest && nearest.distanceKm <= 0.5 && !proximityAlertRef.current) {
       proximityAlertRef.current = true;
       toast.info("🚴 Entregador está a menos de 500m!", { duration: 5000 });
-    } else if (!nearest || nearest.distanceKm > 0.5) {
+    } else if (nearest && nearest.distanceKm > 0.5) {
       proximityAlertRef.current = false;
     }
   }, [driverLocations, storeLat, storeLng]);
 
   const handleDeliveryAddressChange = (value: string) => {
     setCallForm(f => ({ ...f, delivery: value }));
+    // Invalida obrigatoriamente a coordenada antiga ao alterar o endereço
+    setDeliveryLatLng(null);
+    setRoadDistanceKm(0);
+    setRoadDurationMin(0);
+    setRouteCoords([]);
     setManualDistanceEnabled(false);
-    geocodeDeliveryAddress(value);
-    if (value.trim().length < 5) {
+    geocodeDeliveryAddress(value, callForm.delivery_number);
+    if (value.trim().length < 3) {
       setShowSuggestions(false);
+    }
+  };
+
+  const handleDeliveryNumberChange = (value: string) => {
+    setCallForm(f => ({ ...f, delivery_number: value }));
+    // Invalida obrigatoriamente a coordenada antiga ao alterar o número
+    setDeliveryLatLng(null);
+    setRoadDistanceKm(0);
+    setRoadDurationMin(0);
+    setRouteCoords([]);
+    setManualDistanceEnabled(false);
+    if (callForm.delivery.trim()) {
+      geocodeDeliveryAddress(callForm.delivery, value);
     }
   };
 
   const handleCallDriver = async () => {
     if (!callForm.pickup.trim() || !callForm.delivery.trim() || !callForm.delivery_number.trim()) {
-      toast.error("Preencha endereço de coleta, entrega e número");
+      toast.error("Preencha endereço de coleta, entrega e número do imóvel");
       return;
     }
 
-    let finalDistance = distanceKm;
     let finalLatLng = deliveryLatLng;
-    const finalDeliveryAddress = callForm.delivery_number.trim() 
-      ? `${callForm.delivery}, ${callForm.delivery_number}` 
-      : callForm.delivery;
+    let finalDistance = distanceKm;
 
-    // If no coordinates yet, try to use the first suggestion if available
-    if (!finalLatLng && addressSuggestions.length > 0) {
-      const first = addressSuggestions[0];
-      const lat = parseFloat(first.lat);
-      const lng = parseFloat(first.lon);
-      finalLatLng = [lat, lng];
-      setDeliveryLatLng(finalLatLng);
-      
-      // Re-calculate distance with the new coordinates
-      if (storeLat && storeLng) {
-        finalDistance = haversineKm(storeLat, storeLng, lat, lng);
+    // Se as coordenadas foram invalidadas por alteração de texto, executa geocodificação Mapbox
+    if (!finalLatLng) {
+      setCalling(true);
+      try {
+        const fullAddress = `${callForm.delivery}, ${callForm.delivery_number}`;
+        const result = await mapboxGeocodeForward({
+          address: fullAddress,
+          number: callForm.delivery_number,
+        });
+
+        finalLatLng = [result.latitude, result.longitude];
+        setDeliveryLatLng(finalLatLng);
+
+        if (storeLat && storeLng) {
+          const route = await mapboxGetDirections({
+            origin: { latitude: storeLat, longitude: storeLng },
+            destination: { latitude: result.latitude, longitude: result.longitude },
+          });
+          finalDistance = route.distanceKm;
+          setRoadDistanceKm(route.distanceKm);
+          setRoadDurationMin(route.durationMinutes);
+          setRouteCoords(route.geometry);
+        }
+      } catch (geocodeErr: any) {
+        setCalling(false);
+        console.error("[CallDriverTab:handleCallDriver:erroGeocode]", geocodeErr);
+        toast.error(geocodeErr.message || "Erro ao localizar o endereço de entrega na Mapbox.");
+        return;
       }
     }
 
     if (finalDistance <= 0 || !finalLatLng) {
-      toast.error("Localização de entrega não definida. Selecione um endereço da lista ou clique no mapa.");
+      toast.error("Localização de entrega não definida. Selecione um endereço válido em Primavera do Leste.");
       return;
     }
 
     setCalling(true);
     try {
+      const finalDeliveryAddress = `${callForm.delivery}, ${callForm.delivery_number}`;
       const { data: requestId, error } = await supabase.rpc("deduct_credits_for_delivery", {
         p_pickup_address: callForm.pickup,
         p_delivery_address: finalDeliveryAddress,
@@ -1038,15 +991,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
 
       if (error) throw error;
 
-      // Backend dispara o push para todos os motoristas online (nunca bloqueia o pedido)
       if (requestId) void notifyAvailableDrivers(String(requestId));
-
-
-
-
-
-
-
 
       // Play a confirmation sound for the store owner
       try {
@@ -1079,8 +1024,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
       queryClient.invalidateQueries({ queryKey: ["my-delivery-requests"] });
       queryClient.invalidateQueries({ queryKey: ["my-credits"] });
     } catch (err: any) {
-      console.error("Call driver error:", err);
-      toast.error(err.message || "Erro ao chamar entregador. Verifique seus créditos.");
+      console.error("[CallDriverTab:handleCallDriver:erro]", err);
+      toast.error(err.message || "Erro ao chamar entregador.");
     } finally {
       setCalling(false);
     }
@@ -1270,7 +1215,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 <Route className="w-4 h-4 mx-auto mb-1 text-primary" />
                 <p className="text-sm font-bold">{distanceKm.toFixed(1)} km</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {distanceSource === "osrm" ? "Por rota" : distanceSource === "manual" ? "Manual" : "Aprox."}
+                  {distanceSource === "mapbox" ? "Por rota Mapbox" : distanceSource === "manual" ? "Manual" : "Aguardando"}
                 </p>
               </div>
               <div className="rounded-lg bg-muted/50 p-2.5 text-center">
@@ -1399,11 +1344,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                   {/* Autocomplete dropdown */}
                   {showSuggestions && addressSuggestions.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                      {addressSuggestions.map((item: any, idx: number) => {
-                        const formatted = formatAddress(item);
-                        const dist = storeLat && storeLng
-                          ? haversineKm(storeLat, storeLng, parseFloat(item.lat), parseFloat(item.lon))
-                          : null;
+                      {addressSuggestions.map((item: MapboxSuggestion, idx: number) => {
                         return (
                           <button
                             key={idx}
@@ -1411,12 +1352,10 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                             className="w-full text-left px-3 py-2.5 hover:bg-muted/80 border-b border-border/30 last:border-b-0 transition-colors"
                             onClick={() => selectSuggestion(item)}
                           >
-                            <p className="text-sm font-medium leading-tight">{formatted}</p>
-                            {dist !== null && (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">
-                                📍 ~{dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`} da loja
-                              </p>
-                            )}
+                            <p className="text-sm font-medium leading-tight">{item.fullAddress || item.name}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              📍 {item.neighborhood ? `${item.neighborhood}, ` : ""}Primavera do Leste - MT
+                            </p>
                           </button>
                         );
                       })}
@@ -1428,7 +1367,7 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 <Label>Número *</Label>
                 <Input
                   value={callForm.delivery_number}
-                  onChange={(e) => setCallForm(f => ({ ...f, delivery_number: e.target.value }))}
+                  onChange={(e) => handleDeliveryNumberChange(e.target.value)}
                   placeholder="Nº"
                 />
               </div>
@@ -1507,9 +1446,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
                 <div className="flex items-center gap-2 mt-1">
                   <Route className="w-3 h-3 text-muted-foreground" />
                   <span className="text-[10px] text-muted-foreground">
-                    {distanceSource === "osrm" && `Distância por rota (${PROFILE_CONFIG[routeProfile].label}) • ETA: ~${Math.round(roadDurationMin)} min`}
+                    {distanceSource === "mapbox" && `Distância por rota Mapbox (${PROFILE_CONFIG[routeProfile].label}) • ETA: ~${Math.round(roadDurationMin)} min`}
                     {distanceSource === "manual" && "Distância ajustada manualmente"}
-                    {distanceSource === "haversine" && "Distância em linha reta (aproximada)"}
                   </span>
                 </div>
               </div>
