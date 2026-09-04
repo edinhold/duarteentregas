@@ -105,7 +105,9 @@ const AdminDashboard = () => {
               .eq("user_id", w.driver_user_id)
               .maybeSingle();
             if (drv?.full_name) driverName = drv.full_name;
-          } catch {}
+          } catch {
+            /* ignore */
+          }
           toast.info(`💰 Nova solicitação de saque`, {
             description: `${driverName} solicitou R$ ${Number(w.amount).toFixed(2)} • PIX: ${w.pix_key}`,
             duration: 15000,

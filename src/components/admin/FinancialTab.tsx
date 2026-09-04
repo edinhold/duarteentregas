@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2, Sparkles, History } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Key, CalendarDays, Trash2, Sparkles, History, Percent } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -156,12 +156,21 @@ const FinancialTab = () => {
   const appRevenue = Math.max(totalDriverFees - totalDriverEarnings, 0);
   const pendingWithdrawals = withdrawals.filter((w: any) => w.status === "pending");
 
+  const appFeePercent = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
+  const earlyWithdrawalFeePercent = Number((deliveryConfig as any)?.early_withdrawal_fee_percent ?? 10);
+  const baseFee = Number((deliveryConfig as any)?.base_fee ?? 5);
+  const feePerKm = Number((deliveryConfig as any)?.fee_per_km ?? 1.5);
+
   const totalSelected = selectedEarnings.size + selectedWithdrawals.size;
 
   const toggleEarning = (id: string) => {
     setSelectedEarnings(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -169,7 +178,11 @@ const FinancialTab = () => {
   const toggleWithdrawal = (id: string) => {
     setSelectedWithdrawals(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -347,22 +360,66 @@ const FinancialTab = () => {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-extrabold">{drivers.length}</p>
-            <p className="text-xs text-muted-foreground">Motoristas</p>
+            <p className="text-xs text-muted-foreground">Motoristas Ativos</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Configured Fees & Commissions */}
+      <Card className="bg-muted/30 border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Percent className="w-4 h-4 text-primary" /> Taxas & Comissões Configuradas (Aba Taxas)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-background border flex flex-col justify-between shadow-sm">
+              <span className="text-xs text-muted-foreground font-medium">Comissão das Corridas (App)</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black text-primary">{appFeePercent}%</span>
+                <Badge variant="secondary" className="text-[10px]">por corrida</Badge>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-background border flex flex-col justify-between shadow-sm">
+              <span className="text-xs text-muted-foreground font-medium">Taxa de Antecipação (Saque)</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black text-orange-600">{earlyWithdrawalFeePercent}%</span>
+                <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-600">saques antecipados</Badge>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-background border flex flex-col justify-between shadow-sm">
+              <span className="text-xs text-muted-foreground font-medium">Taxa Base de Entrega</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black text-foreground">R$ {baseFee.toFixed(2)}</span>
+                <Badge variant="secondary" className="text-[10px]">valor fixo</Badge>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-background border flex flex-col justify-between shadow-sm">
+              <span className="text-xs text-muted-foreground font-medium">Taxa por Quilômetro</span>
+              <div className="flex items-baseline justify-between mt-2">
+                <span className="text-2xl font-black text-foreground">R$ {feePerKm.toFixed(2)}</span>
+                <Badge variant="secondary" className="text-[10px]">/ km</Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Payment Day Config */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" /> Dia de Pagamento
+            <CalendarDays className="w-4 h-4" /> Dia de Pagamento & Regras de Saque
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-3">
-            Defina o dia da semana em que os motoristas podem solicitar saque.
-            Será cobrada uma taxa fixa de <strong>R$ 1,00</strong> por saque.
+            No dia oficial de saque (<strong>{weekdayLabels[(deliveryConfig as any)?.payment_day ?? 5] || "—"}</strong>), é cobrada do motorista a taxa fixa de apenas <strong>R$ 1,00</strong> por saque.
+            Nos outros dias (saque antecipado), é aplicada a taxa de antecipação configurada na aba Taxas de <strong>{earlyWithdrawalFeePercent}%</strong>.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <Select
@@ -380,9 +437,17 @@ const FinancialTab = () => {
               </SelectContent>
             </Select>
             <Badge variant="secondary">
-              Atual: {weekdayLabels[(deliveryConfig as any)?.payment_day ?? 5] || "—"}
+              Dia Oficial: {weekdayLabels[(deliveryConfig as any)?.payment_day ?? 5] || "—"}
             </Badge>
-            <Badge variant="outline">Taxa: R$ 1,00 por saque</Badge>
+            <Badge variant="outline" className="border-green-600/30 text-green-700 bg-green-50/50">
+              Taxa Dia Oficial: R$ 1,00 fixo
+            </Badge>
+            <Badge variant="outline" className="border-orange-300 text-orange-600 bg-orange-50/50">
+              Taxa Outros Dias: {earlyWithdrawalFeePercent}% antecipação
+            </Badge>
+            <Badge variant="outline">
+              Comissão App: {appFeePercent}% por corrida
+            </Badge>
           </div>
         </CardContent>
       </Card>
