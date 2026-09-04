@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,11 @@ import {
   User,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles
+  Sparkles,
+  Check,
+  X,
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 
 // Formatação monetária pt-BR estrita e segura
@@ -38,12 +42,12 @@ const formatCurrency = (value: number | null | undefined): string => {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 };
 
-// Formatação de data e hora pt-BR estrita
+// Formatação de data pt-BR legível
 const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return "—";
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    if (isNaN(d.getTime())) return "—";
     return d.toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -52,104 +56,91 @@ const formatDate = (dateStr: string | null | undefined): string => {
       minute: "2-digit",
     });
   } catch {
-    return dateStr;
+    return "—";
   }
 };
 
-const formatDateOnly = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
-// Tipos auxiliares locais
-interface CreditCodeRecord {
+// Tipagens estritas das estruturas do Supabase
+export interface CreditCodeRecord {
   id: string;
   code: string;
   value: number;
-  assigned_to_user_id: string | null;
-  used_by: string | null;
   is_used: boolean;
   used_at: string | null;
+  used_by: string | null;
   created_at: string;
+  assigned_to_user_id?: string | null;
 }
 
-interface StoreCreditRecord {
+export interface StoreCreditRecord {
   id: string;
   user_id: string;
   balance: number;
-  updated_at: string;
-}
-
-interface DeliveryRequestRecord {
-  id: string;
-  store_owner_id: string;
-  driver_id: string | null;
-  restaurant_id: string | null;
-  driver_fee: number;
-  credit_cost: number;
-  status: string;
   created_at: string;
   updated_at: string;
-  restaurants?: { name: string; owner_id: string | null } | null;
 }
 
-interface DriverEarningRecord {
+export interface DeliveryRequestRecord {
   id: string;
+  created_at: string;
+  status: string;
+  driver_fee?: number | null;
+  credit_cost?: number | null;
+  store_owner_id?: string | null;
+  driver_id?: string | null;
+  restaurant_id?: string | null;
+  pickup_address?: string | null;
+  delivery_address?: string | null;
+}
+
+export interface DriverEarningRecord {
+  id: string;
+  created_at: string;
   driver_id: string;
-  delivery_request_id: string | null;
+  delivery_request_id?: string | null;
   amount: number;
-  status: string;
-  created_at: string;
 }
 
-interface WithdrawalRequestRecord {
+export interface WithdrawalRequestRecord {
   id: string;
+  created_at: string;
   driver_id: string;
   driver_user_id: string;
   amount: number;
   fee_percent: number;
   fee_amount: number;
   net_amount: number;
-  status: string;
   pix_key: string | null;
   pix_key_type: string | null;
-  created_at: string;
+  status: string;
   processed_at: string | null;
 }
 
-interface DriverProfileRecord {
+export interface DriverProfileRecord {
   id: string;
   user_id: string;
   full_name: string;
   phone: string;
-  pix_key: string | null;
-  pix_key_type: string | null;
-  is_active: boolean;
-  created_at: string;
+  is_active?: boolean | null;
+  pix_key?: string | null;
+  pix_key_type?: string | null;
 }
 
-interface StoreOwnerProfileRecord {
+export interface StoreOwnerProfileRecord {
   user_id: string;
   full_name: string;
   phone: string;
   email?: string;
 }
 
-const FinancialTab = () => {
+export const FinancialTab = () => {
   const queryClient = useQueryClient();
 
-  // Estados dos Filtros
-  const [period, setPeriod] = useState<string>("mes_atual");
+  // Estado local para controle de ações em andamento (trava de duplo clique)
+  const [processingWithdrawalId, setProcessingWithdrawalId] = useState<string | null>(null);
+
+  // Estados dos filtros globais
+  const [period, setPeriod] = useState<string>("30d");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selectedStoreId, setSelectedStoreId] = useState<string>("todos");
@@ -157,24 +148,11 @@ const FinancialTab = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>("todos");
   const [selectedType, setSelectedType] = useState<string>("todos");
 
-  // Estados de seleção detalhada para modais / visões focadas
+  // Estado de seleção individual para detalhamento
   const [detailDriverId, setDetailDriverId] = useState<string | null>(null);
   const [detailStoreUserId, setDetailStoreUserId] = useState<string | null>(null);
 
-  // Queries de Dados Supabase
-  const { data: deliveryConfig } = useQuery({
-    queryKey: ["financial-delivery-config"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("delivery_config")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
+  // 1. CONSULTAS AO BANCO DE DADOS (SUPABASE REAL)
   const { data: creditCodes = [], isLoading: loadingCodes } = useQuery({
     queryKey: ["financial-credit-codes"],
     queryFn: async () => {
@@ -192,7 +170,8 @@ const FinancialTab = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("store_credits")
-        .select("*");
+        .select("*")
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data || []) as StoreCreditRecord[];
     },
@@ -203,7 +182,7 @@ const FinancialTab = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("delivery_requests")
-        .select("*, restaurants(name, owner_id)")
+        .select("id, created_at, status, driver_fee, credit_cost, store_owner_id, driver_id, restaurant_id, pickup_address, delivery_address")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as DeliveryRequestRecord[];
@@ -285,7 +264,35 @@ const FinancialTab = () => {
     },
   });
 
-  // Recarregar dados
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["financial-delivery-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("delivery_config").select("*").limit(1).maybeSingle();
+      return data;
+    },
+  });
+
+  // Inscrever no Realtime do Supabase para atualizar antecipações automaticamente
+  useEffect(() => {
+    const channel = supabase
+      .channel("financial-tab-realtime-withdrawals")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "withdrawal_requests" },
+        () => {
+          console.log("[Financeiro:realtime]", "Atualização recebida na tabela withdrawal_requests");
+          queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] });
+          queryClient.invalidateQueries({ queryKey: ["financial-driver-earnings"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  // Recarregar dados manualmente
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["financial-credit-codes"] });
     queryClient.invalidateQueries({ queryKey: ["financial-store-credits"] });
@@ -297,6 +304,112 @@ const FinancialTab = () => {
     toast.success("Dados financeiros atualizados com sucesso!");
   };
 
+  // 2. AÇÕES DE ANTECIPAÇÃO (ACEITAR E NEGAR COM VALIDAÇÃO E IMPEDIMENTO DE DUPLO CLIQUE)
+  const handleAcceptWithdrawal = async (withdrawalId: string) => {
+    if (processingWithdrawalId) return;
+    console.log("[Financeiro:aceitar_antecipacao]", { withdrawalId });
+    setProcessingWithdrawalId(withdrawalId);
+
+    try {
+      // 1. Validação backend: verifica se a solicitação ainda está pendente no banco
+      const { data: currentReq, error: fetchErr } = await supabase
+        .from("withdrawal_requests")
+        .select("id, status, amount, net_amount, driver_user_id")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      if (fetchErr || !currentReq) {
+        toast.error("Solicitação de antecipação não encontrada no servidor.");
+        return;
+      }
+
+      if (currentReq.status !== "pending") {
+        toast.error(`Esta solicitação já foi processada anteriormente (Status atual: ${currentReq.status}).`);
+        queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] });
+        return;
+      }
+
+      // 2. Atualização segura para o status 'approved' (Pago)
+      const { error: updateErr } = await supabase
+        .from("withdrawal_requests")
+        .update({
+          status: "approved",
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawalId)
+        .eq("status", "pending");
+
+      if (updateErr) throw updateErr;
+
+      toast.success("Solicitação de antecipação aceita! O pagamento foi registrado com sucesso.");
+
+      // 3. Atualização automática dos totais e das telas
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] }),
+        queryClient.invalidateQueries({ queryKey: ["financial-driver-earnings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-withdrawals"] }),
+      ]);
+    } catch (err: any) {
+      console.error("[Financeiro:erro_aceitar_antecipacao]", err);
+      toast.error(err.message || "Erro ao aprovar a solicitação de antecipação.");
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
+  };
+
+  const handleRejectWithdrawal = async (withdrawalId: string) => {
+    if (processingWithdrawalId) return;
+    console.log("[Financeiro:negar_antecipacao]", { withdrawalId });
+    setProcessingWithdrawalId(withdrawalId);
+
+    try {
+      // 1. Validação backend: verifica se a solicitação ainda está pendente no banco
+      const { data: currentReq, error: fetchErr } = await supabase
+        .from("withdrawal_requests")
+        .select("id, status")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      if (fetchErr || !currentReq) {
+        toast.error("Solicitação de antecipação não encontrada no servidor.");
+        return;
+      }
+
+      if (currentReq.status !== "pending") {
+        toast.error(`Esta solicitação já foi processada anteriormente.`);
+        queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] });
+        return;
+      }
+
+      // 2. Atualização para o status 'rejected' (Negado)
+      const { error: updateErr } = await supabase
+        .from("withdrawal_requests")
+        .update({
+          status: "rejected",
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawalId)
+        .eq("status", "pending");
+
+      if (updateErr) throw updateErr;
+
+      toast.success("Solicitação de antecipação negada com sucesso.");
+
+      // 3. Atualização das telas
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["financial-withdrawals"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-withdrawals"] }),
+      ]);
+    } catch (err: any) {
+      console.error("[Financeiro:erro_negar_antecipacao]", err);
+      toast.error(err.message || "Erro ao negar a solicitação.");
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
+  };
+
   // Cálculo dos limites de datas conforme filtro de período selecionado
   const dateBounds = useMemo(() => {
     const now = new Date();
@@ -304,28 +417,30 @@ const FinancialTab = () => {
     let end: Date | null = null;
 
     if (period === "hoje") {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     } else if (period === "7d") {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      start = new Date();
+      start.setDate(now.getDate() - 7);
       start.setHours(0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (period === "30d") {
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      start = new Date();
+      start.setDate(now.getDate() - 30);
       start.setHours(0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (period === "mes_atual") {
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     } else if (period === "mes_anterior") {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
     } else if (period === "custom") {
       if (dateFrom) {
-        start = new Date(`${dateFrom}T00:00:00`);
+        start = new Date(dateFrom);
+        start.setHours(0, 0, 0, 0);
       }
       if (dateTo) {
-        end = new Date(`${dateTo}T23:59:59.999`);
+        end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
       }
     }
 
@@ -333,15 +448,18 @@ const FinancialTab = () => {
   }, [period, dateFrom, dateTo]);
 
   // Função auxiliar de checagem de intervalo de data
-  const isWithinPeriod = useCallback((dateStr: string | null | undefined): boolean => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return false;
+  const isWithinPeriod = useCallback(
+    (dateStr: string | null | undefined): boolean => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
 
-    if (dateBounds.start && d < dateBounds.start) return false;
-    if (dateBounds.end && d > dateBounds.end) return false;
-    return true;
-  }, [dateBounds.start, dateBounds.end]);
+      if (dateBounds.start && d < dateBounds.start) return false;
+      if (dateBounds.end && d > dateBounds.end) return false;
+      return true;
+    },
+    [dateBounds.start, dateBounds.end]
+  );
 
   // Mapeamentos rápidos por ID
   const storeOwnerMap = useMemo(() => {
@@ -360,95 +478,86 @@ const FinancialTab = () => {
     return { mapByUserId, mapById };
   }, [drivers]);
 
-  // 1. PROCESSAMENTO DAS ENTRADAS (Recargas Comuns + Recargas Diretas)
+  // Taxa de comissão do aplicativo configurada
+  const appFeePercentConfig = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
+
+  // 3. PROCESSAMENTO E DEDUPLICAÇÃO DE ENTRADAS FINANCEIRAS
   const filteredEntries = useMemo(() => {
     const list: Array<{
       id: string;
-      created_at: string;
       type: "Recarga" | "Recarga Direta";
-      store_owner_id: string;
-      store_name: string;
+      store_id?: string;
       owner_name: string;
+      store_name: string;
       value: number;
-      status: "Aprovada" | "Pendente" | "Recusada";
+      status: "Aprovada" | "Pendente";
+      created_at: string;
+      raw_object: any;
     }> = [];
 
-    // Deduplicação por ID
     const seenIds = new Set<string>();
 
-    // A) Códigos de Crédito Resgatados/Gerados
-    creditCodes.forEach((c) => {
-      if (seenIds.has(c.id)) return;
-      seenIds.add(c.id);
+    // A. Recargas pagas via credit_codes
+    creditCodes.forEach((code) => {
+      if (!code.is_used || seenIds.has(code.id)) return;
+      seenIds.add(code.id);
 
-      if (!isWithinPeriod(c.created_at)) return;
+      if (!isWithinPeriod(code.used_at || code.created_at)) return;
 
-      const ownerId = c.used_by || c.assigned_to_user_id || "";
-      if (selectedStoreId !== "todos" && ownerId !== selectedStoreId) return;
+      const userId = code.used_by || code.assigned_to_user_id;
+      if (selectedStoreId !== "todos" && userId !== selectedStoreId) return;
+      if (selectedType !== "todos" && selectedType !== "recargas") return;
+      if (selectedStatus !== "todos" && selectedStatus !== "concluido") return;
 
-      const owner = storeOwnerMap.get(ownerId);
-      const ownerName = owner?.full_name || owner?.email || (ownerId ? ownerId.slice(0, 8) : "—");
-      const rest = restaurants.find((r) => r.owner_id === ownerId);
-      const storeName = rest?.name || "Loja Cadastrada";
-
-      // Se foi atribuído sem código resgatado especificamente pelo admin, pode ser recarga direta via código ou recarga comum
-      const isDirect = !c.code || c.code.startsWith("DIRECT_") || !c.used_by;
-      const typeLabel = isDirect ? "Recarga Direta" : "Recarga";
-
-      if (selectedType !== "todos" && selectedType !== "entradas") {
-        if (selectedType === "corridas" || selectedType === "saques") return;
-      }
+      const owner = userId ? storeOwnerMap.get(userId) : undefined;
+      const rest = userId ? restaurants.find((r) => r.owner_id === userId) : undefined;
 
       list.push({
-        id: c.id,
-        created_at: c.created_at,
-        type: typeLabel,
-        store_owner_id: ownerId,
-        store_name: storeName,
-        owner_name: ownerName,
-        value: Number(c.value) || 0,
-        status: c.is_used ? "Aprovada" : "Pendente",
+        id: code.id,
+        type: "Recarga",
+        owner_name: owner?.full_name || owner?.email || "Lojista Desconhecido",
+        store_name: rest?.name || "Loja Cadastrada",
+        value: Number(code.value) || 0,
+        status: "Aprovada",
+        created_at: code.used_at || code.created_at,
+        raw_object: code,
       });
     });
 
-    // B) Recargas Diretas registradas em store_credits (quando o saldo for atualizado sem registro prévio de código)
+    // B. Recarga Direta via store_credits (contabilizada 1 única vez por registro financeiro de crédito)
     storeCredits.forEach((sc) => {
+      const directId = `direct-${sc.id}`;
+      if (seenIds.has(directId)) return;
+      seenIds.add(directId);
+
+      if (!isWithinPeriod(sc.updated_at || sc.created_at)) return;
+
       if (selectedStoreId !== "todos" && sc.user_id !== selectedStoreId) return;
-      if (!isWithinPeriod(sc.updated_at)) return;
+      if (selectedType !== "todos" && selectedType !== "recarga_direta") return;
+      if (selectedStatus !== "todos" && selectedStatus !== "concluido") return;
 
-      // Para evitar duplicidade com os códigos resgatados acima, incluímos apenas se sc tiver histórico ou se não houver código
-      const hasCodeForStore = creditCodes.some(
-        (c) => (c.used_by === sc.user_id || c.assigned_to_user_id === sc.user_id) && c.is_used
-      );
+      const owner = storeOwnerMap.get(sc.user_id);
+      const rest = restaurants.find((r) => r.owner_id === sc.user_id);
 
-      if (!hasCodeForStore && sc.balance > 0) {
-        const scId = `sc-direct-${sc.id}`;
-        if (seenIds.has(scId)) return;
-        seenIds.add(scId);
-
-        const owner = storeOwnerMap.get(sc.user_id);
-        const ownerName = owner?.full_name || owner?.email || sc.user_id.slice(0, 8);
-        const rest = restaurants.find((r) => r.owner_id === sc.user_id);
-
-        if (selectedType === "todos" || selectedType === "entradas") {
-          list.push({
-            id: scId,
-            created_at: sc.updated_at,
-            type: "Recarga Direta",
-            store_owner_id: sc.user_id,
-            store_name: rest?.name || "Loja Cadastrada",
-            owner_name: ownerName,
-            value: Number(sc.balance) || 0,
-            status: "Aprovada",
-          });
-        }
+      const val = Number(sc.balance) || 0;
+      if (val > 0) {
+        list.push({
+          id: sc.id,
+          type: "Recarga Direta",
+          owner_name: owner?.full_name || owner?.email || "Lojista Desconhecido",
+          store_name: rest?.name || "Loja Cadastrada",
+          value: val,
+          status: "Aprovada",
+          created_at: sc.updated_at || sc.created_at,
+          raw_object: sc,
+        });
       }
     });
 
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [creditCodes, storeCredits, storeOwnerMap, restaurants, isWithinPeriod, selectedStoreId, selectedType]);
+  }, [creditCodes, storeCredits, isWithinPeriod, selectedStoreId, selectedType, selectedStatus, storeOwnerMap, restaurants]);
 
-  // 2. PROCESSAMENTO DAS CORRIDAS (Gross & Net Drivers)
+  // 4. PROCESSAMENTO DAS CORRIDAS (DELIVERY_REQUESTS)
   const filteredDeliveries = useMemo(() => {
     const seenIds = new Set<string>();
     return deliveryRequests.filter((req) => {
@@ -456,8 +565,12 @@ const FinancialTab = () => {
       seenIds.add(req.id);
 
       if (!isWithinPeriod(req.created_at)) return false;
+
       if (selectedStoreId !== "todos" && req.store_owner_id !== selectedStoreId) return false;
-      if (selectedDriverId !== "todos" && req.driver_id !== selectedDriverId) return false;
+
+      if (selectedDriverId !== "todos") {
+        if (req.driver_id !== selectedDriverId) return false;
+      }
 
       if (selectedStatus !== "todos") {
         if (selectedStatus === "concluido" && req.status !== "delivered") return false;
@@ -470,14 +583,14 @@ const FinancialTab = () => {
     });
   }, [deliveryRequests, isWithinPeriod, selectedStoreId, selectedDriverId, selectedStatus, selectedType]);
 
-  // 3. PROCESSAMENTO DOS SAQUES E ANTECIPAÇÕES
+  // 5. PROCESSAMENTO DOS SAQUES E ANTECIPAÇÕES (WITHDRAWAL_REQUESTS)
   const filteredWithdrawals = useMemo(() => {
     const seenIds = new Set<string>();
     return withdrawals.filter((w) => {
       if (seenIds.has(w.id)) return false;
       seenIds.add(w.id);
 
-      const reqDate = w.processed_at || w.created_at;
+      const reqDate = w.created_at;
       if (!isWithinPeriod(reqDate)) return false;
 
       if (selectedDriverId !== "todos") {
@@ -487,7 +600,7 @@ const FinancialTab = () => {
       if (selectedStatus !== "todos") {
         if (selectedStatus === "concluido" && w.status !== "approved") return false;
         if (selectedStatus === "pendente" && w.status !== "pending") return false;
-        if (selectedStatus === "recusado" && w.status !== "rejected") return false;
+        if (selectedStatus === "recusado" && (w.status !== "rejected" && w.status !== "denied")) return false;
       }
 
       if (selectedType !== "todos" && selectedType !== "saques") return false;
@@ -496,7 +609,12 @@ const FinancialTab = () => {
     });
   }, [withdrawals, isWithinPeriod, selectedDriverId, selectedStatus, selectedType]);
 
-  // 4. MAPA DE GANHOS LÍQUIDOS DOS MOTORISTAS POR ENTREGA (driver_earnings)
+  // Lista de solicitações de antecipação PENDENTES de ação do Admin
+  const pendingWithdrawals = useMemo(() => {
+    return withdrawals.filter((w) => w.status === "pending");
+  }, [withdrawals]);
+
+  // 6. MAPA DE GANHOS LÍQUIDOS DOS MOTORISTAS POR ENTREGA (driver_earnings)
   const earningsByDeliveryMap = useMemo(() => {
     const map = new Map<string, number>();
     driverEarnings.forEach((e) => {
@@ -507,10 +625,44 @@ const FinancialTab = () => {
     return map;
   }, [driverEarnings]);
 
-  // Taxa de comissão do aplicativo configurada
-  const appFeePercentConfig = Number((deliveryConfig as any)?.app_fee_per_delivery ?? 2);
+  // Função utilitária para calcular o saldo real disponível de um motorista
+  const getDriverAvailableBalance = useCallback(
+    (driverIdOrUserId: string | null | undefined): number => {
+      if (!driverIdOrUserId) return 0;
+      const driverObj = driverMap.mapById.get(driverIdOrUserId) || driverMap.mapByUserId.get(driverIdOrUserId);
+      if (!driverObj) return 0;
 
-  // 5. CÁLCULO DOS 10 INDICADORES FINANCEIROS (Formulas Oficiais)
+      const userOrIdList = [driverObj.id, driverObj.user_id];
+
+      // Total líquido de entregas efetuadas
+      const myRides = deliveryRequests.filter(
+        (r) => userOrIdList.includes(r.driver_id || "") && r.status === "delivered"
+      );
+
+      const netGenerated = myRides.reduce((sum, r) => {
+        const earningNet = earningsByDeliveryMap.get(r.id);
+        if (earningNet !== undefined) return sum + earningNet;
+        return sum + Math.max(0, Number(r.driver_fee || 0) * (1 - appFeePercentConfig / 100));
+      }, 0);
+
+      // Saques aprovados/pagos
+      const myApprovedWithdrawals = withdrawals.filter(
+        (w) => (userOrIdList.includes(w.driver_id) || userOrIdList.includes(w.driver_user_id)) && w.status === "approved"
+      );
+      const totalPaid = myApprovedWithdrawals.reduce((sum, w) => sum + Number(w.net_amount || 0), 0);
+
+      // Saques pendentes
+      const myPendingWithdrawals = withdrawals.filter(
+        (w) => (userOrIdList.includes(w.driver_id) || userOrIdList.includes(w.driver_user_id)) && w.status === "pending"
+      );
+      const totalPending = myPendingWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+
+      return Math.max(0, netGenerated - totalPaid - totalPending);
+    },
+    [driverMap, deliveryRequests, earningsByDeliveryMap, appFeePercentConfig, withdrawals]
+  );
+
+  // 7. CÁLCULO DOS 10 INDICADORES FINANCEIROS (Formulas Oficiais)
   const metrics = useMemo(() => {
     // 1. Total de Recargas (Aprovadas/Resgatadas)
     const totalRecargas = filteredEntries
@@ -538,7 +690,6 @@ const FinancialTab = () => {
       if (netFromEarnings !== undefined) {
         return sum + netFromEarnings;
       }
-      // Fallback histórico com base na taxa configurada se earnings não estiver populado
       const gross = Number(r.driver_fee || 0);
       const net = Math.max(0, gross * (1 - appFeePercentConfig / 100));
       return sum + net;
@@ -554,7 +705,7 @@ const FinancialTab = () => {
     // 7. Comissão das Corridas = Valor Bruto das Corridas - Valor Líquido dos Motoristas
     const comissaoCorridas = Math.max(0, valorBrutoCorridas - valorGeradoMotoristas);
 
-    // 8. Taxas de Antecipação (Soma das taxas cobradas em saques concluídos)
+    // 8. Taxas de Antecipação (Soma das taxas cobradas em saques concluídos/aprovados)
     const taxasAntecipacao = approvedWithdrawalsList.reduce(
       (sum, w) => sum + Number(w.fee_amount || 0),
       0
@@ -614,7 +765,7 @@ const FinancialTab = () => {
     const totalPaid = approvedWithdrawals.reduce((sum, w) => sum + Number(w.net_amount || 0), 0);
     const totalFeesPaid = approvedWithdrawals.reduce((sum, w) => sum + Number(w.fee_amount || 0), 0);
 
-    // Saldo disponível = Líquido gerado - Total pago e saques pendentes
+    // Saldo disponível
     const pendingWithdrawalsSum = myWithdrawals
       .filter((w) => w.status === "pending")
       .reduce((sum, w) => sum + Number(w.amount || 0), 0);
@@ -628,6 +779,7 @@ const FinancialTab = () => {
       historicCommission,
       netGenerated,
       availableBalance,
+      myWithdrawals,
       withdrawalsCount: myWithdrawals.length,
       approvedWithdrawalsCount: approvedWithdrawals.length,
       totalFeesPaid,
@@ -683,31 +835,127 @@ const FinancialTab = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loadingAny}>
-            <RefreshCw className={`w-4 h-4 mr-1.5 ${loadingAny ? "animate-spin" : ""}`} /> Atualizar Dados
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loadingAny}
+            className="h-9 text-xs transition-all duration-200"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingAny ? "animate-spin" : ""}`} />
+            Atualizar Dados
           </Button>
         </div>
       </div>
 
-      {/* PAINEL DE FILTROS COMPLETOS */}
-      <Card className="shadow-sm border-primary/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-bold flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-primary" /> Filtros Financeiros Globais
-            </span>
-            <Badge variant="outline" className="text-[11px] font-normal">
-              {metrics.countDeliveries} corridas entregues · {metrics.countWithdrawals} saques pagos
-            </Badge>
+      {/* PAINEL DE SOLICITAÇÕES DE ANTECIPAÇÃO PENDENTES */}
+      {pendingWithdrawals.length > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5 shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4 text-amber-600 animate-pulse" />
+              Solicitações de Antecipação / Saque Pendentes ({pendingWithdrawals.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-amber-500/10 hover:bg-amber-500/10">
+                  <TableHead className="text-xs font-bold text-foreground">Data / Hora</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Motorista</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">PIX Key</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Saldo Disponível</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Valor Solicitado</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Taxa Antecipação</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Valor Líquido</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Status</TableHead>
+                  <TableHead className="text-xs font-bold text-center">Decisão Admin</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingWithdrawals.map((w) => {
+                  const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id);
+                  const availableBal = getDriverAvailableBalance(w.driver_id || w.driver_user_id);
+                  const isProcessingThis = processingWithdrawalId === w.id;
+
+                  return (
+                    <TableRow key={`pending-${w.id}`} className="text-xs bg-background/80">
+                      <TableCell className="whitespace-nowrap font-medium">{formatDate(w.created_at)}</TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-foreground">{drv?.full_name || "Motorista —"}</div>
+                        <div className="text-[10px] text-muted-foreground">Tel: {drv?.phone || "—"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-[11px]">{w.pix_key || drv?.pix_key || "Não informada"}</span>
+                        <span className="text-[10px] text-muted-foreground block">
+                          ({w.pix_key_type || drv?.pix_key_type || "PIX"})
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-bold text-primary">{formatCurrency(availableBal)}</TableCell>
+                      <TableCell className="font-bold text-foreground">{formatCurrency(w.amount)}</TableCell>
+                      <TableCell className="text-orange-600 font-medium">
+                        {formatCurrency(w.fee_amount)} ({w.fee_percent}%)
+                      </TableCell>
+                      <TableCell className="font-bold text-purple-600">{formatCurrency(w.net_amount)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300">
+                          Pendente
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-8 text-xs transition-all duration-200"
+                            disabled={processingWithdrawalId !== null}
+                            onClick={() => handleAcceptWithdrawal(w.id)}
+                          >
+                            {isProcessingThis ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            Aceitar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-8 text-xs font-bold transition-all duration-200"
+                            disabled={processingWithdrawalId !== null}
+                            onClick={() => handleRejectWithdrawal(w.id)}
+                          >
+                            {isProcessingThis ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            ) : (
+                              <X className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            Negar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PAINEL DE FILTROS GLOBAIS */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="pb-3 pt-4">
+          <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+            <Filter className="w-4 h-4 text-primary" /> Filtros Globais do Módulo Financeiro
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {/* Período */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Período</Label>
+            <div>
+              <Label className="text-xs">Período</Label>
               <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="h-9 text-xs">
+                <SelectTrigger className="h-9 text-xs mt-1">
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
@@ -721,18 +969,18 @@ const FinancialTab = () => {
               </Select>
             </div>
 
-            {/* Lojista / Loja */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Lojista / Loja</Label>
+            {/* Lojista */}
+            <div>
+              <Label className="text-xs">Lojista / Loja</Label>
               <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os Lojistas" />
+                <SelectTrigger className="h-9 text-xs mt-1">
+                  <SelectValue placeholder="Todas as lojas" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os Lojistas</SelectItem>
-                  {storeOwners.map((o) => (
-                    <SelectItem key={o.user_id} value={o.user_id}>
-                      {o.full_name || o.email}
+                  {storeOwners.map((owner) => (
+                    <SelectItem key={owner.user_id} value={owner.user_id}>
+                      {owner.full_name || owner.email}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -740,17 +988,17 @@ const FinancialTab = () => {
             </div>
 
             {/* Motorista */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Motorista</Label>
+            <div>
+              <Label className="text-xs">Motorista</Label>
               <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os Motoristas" />
+                <SelectTrigger className="h-9 text-xs mt-1">
+                  <SelectValue placeholder="Todos os motoristas" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os Motoristas</SelectItem>
-                  {drivers.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.full_name}
+                  {drivers.map((drv) => (
+                    <SelectItem key={drv.id} value={drv.id}>
+                      {drv.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -758,65 +1006,83 @@ const FinancialTab = () => {
             </div>
 
             {/* Status */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Status das Operações</Label>
+            <div>
+              <Label className="text-xs">Status da Operação</Label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os Status" />
+                <SelectTrigger className="h-9 text-xs mt-1">
+                  <SelectValue placeholder="Todos os status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os Status</SelectItem>
-                  <SelectItem value="concluido">Concluídos / Aprovados</SelectItem>
-                  <SelectItem value="pendente">Pendentes</SelectItem>
-                  <SelectItem value="recusado">Recusados / Cancelados</SelectItem>
+                  <SelectItem value="concluido">Concluído / Pago / Aprovado</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="recusado">Recusado / Negado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Datas personalizadas quando período === 'custom' */}
-          {period === "custom" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
-              <div className="space-y-1">
-                <Label className="text-xs">Data Inicial</Label>
-                <Input
-                  type="date"
-                  className="h-9 text-xs"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Data Final</Label>
-                <Input
-                  type="date"
-                  className="h-9 text-xs"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
+          {/* Segunda linha de filtros: tipo e datas customizadas */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border/40">
+            <div>
+              <Label className="text-xs">Tipo de Movimentação</Label>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="h-9 text-xs mt-1">
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas as Movimentações</SelectItem>
+                  <SelectItem value="recargas">Recargas de Crédito</SelectItem>
+                  <SelectItem value="recarga_direta">Recarga Direta</SelectItem>
+                  <SelectItem value="corridas">Corridas / Entregas</SelectItem>
+                  <SelectItem value="saques">Saques e Antecipações</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            {period === "custom" && (
+              <>
+                <div>
+                  <Label className="text-xs">Data Inicial</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="h-9 text-xs mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Data Final</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="h-9 text-xs mt-1"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* DASHBOARD DE 10 CARDS FINANCEIROS (Reagem aos mesmos filtros) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* DASHBOARD DOS 10 INDICADORES OFICIAIS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {/* 1. Total de Recargas */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
-              1. Total Recargas
+              1. Recargas (Código)
             </p>
             <p className="text-lg sm:text-xl font-extrabold text-foreground mt-1">
               {formatCurrency(metrics.totalRecargas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Códigos resgatados</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Lançadas via PIX/código</p>
           </CardContent>
         </Card>
 
         {/* 2. Total de Recarga Direta */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
               2. Recarga Direta
@@ -824,12 +1090,12 @@ const FinancialTab = () => {
             <p className="text-lg sm:text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
               {formatCurrency(metrics.totalRecargaDireta)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Créditos diretos admin</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Saldo efetivado na loja</p>
           </CardContent>
         </Card>
 
         {/* 3. Total de Entradas */}
-        <Card className="shadow-sm bg-green-50/40 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+        <Card className="shadow-sm bg-green-50/60 dark:bg-green-950/20 border-green-200 dark:border-green-800">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-green-700 dark:text-green-300 font-bold uppercase tracking-wider">
               3. Total Entradas
@@ -842,7 +1108,7 @@ const FinancialTab = () => {
         </Card>
 
         {/* 4. Valor Bruto das Corridas */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
               4. Valor Bruto Corridas
@@ -850,38 +1116,38 @@ const FinancialTab = () => {
             <p className="text-lg sm:text-xl font-extrabold text-foreground mt-1">
               {formatCurrency(metrics.valorBrutoCorridas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Faturamento bruto entregas</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.countDeliveries} entregas válidas</p>
           </CardContent>
         </Card>
 
         {/* 5. Valor Gerado para Motoristas */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
-              5. Gerado P/ Motoristas
+              5. Gerado Motoristas
             </p>
-            <p className="text-lg sm:text-xl font-extrabold text-primary mt-1">
+            <p className="text-lg sm:text-xl font-extrabold text-green-600 dark:text-green-400 mt-1">
               {formatCurrency(metrics.valorGeradoMotoristas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Líquido de corridas</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Valor líquido gerado</p>
           </CardContent>
         </Card>
 
         {/* 6. Pago aos Motoristas */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
-              6. Pago Aos Motoristas
+              6. Pago Motoristas
             </p>
             <p className="text-lg sm:text-xl font-extrabold text-purple-600 dark:text-purple-400 mt-1">
               {formatCurrency(metrics.pagoAosMotoristas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Saques/antecipações pagos</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.countWithdrawals} saques efetuados</p>
           </CardContent>
         </Card>
 
         {/* 7. Comissão das Corridas */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
               7. Comissão Corridas
@@ -894,7 +1160,7 @@ const FinancialTab = () => {
         </Card>
 
         {/* 8. Taxas de Antecipação */}
-        <Card className="shadow-sm hover:border-primary/40 transition-colors">
+        <Card className="shadow-sm border-border/60">
           <CardContent className="p-3.5 text-center">
             <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
               8. Taxas Antecipação
@@ -1040,7 +1306,8 @@ const FinancialTab = () => {
                     <TableHead className="text-xs">Comissão App</TableHead>
                     <TableHead className="text-xs">Taxa Antecipação</TableHead>
                     <TableHead className="text-xs">Valor Líquido</TableHead>
-                    <TableHead className="text-xs text-right">Status</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs text-right">Ação Admin</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1065,7 +1332,7 @@ const FinancialTab = () => {
                         <TableCell className="text-amber-600 font-medium">{formatCurrency(comm)}</TableCell>
                         <TableCell className="text-muted-foreground">—</TableCell>
                         <TableCell className="font-bold text-green-600">{formatCurrency(net)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
                           <Badge
                             variant={req.status === "delivered" ? "default" : "secondary"}
                             className="text-[10px]"
@@ -1073,13 +1340,17 @@ const FinancialTab = () => {
                             {req.status === "delivered" ? "Concluída" : req.status}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right text-muted-foreground text-[10px]">—</TableCell>
                       </TableRow>
                     );
                   })}
 
-                  {/* Saques */}
+                  {/* Saques e Antecipações */}
                   {filteredWithdrawals.map((w) => {
                     const drv = driverMap.mapById.get(w.driver_id) || driverMap.mapByUserId.get(w.driver_user_id);
+                    const isProcessingThis = processingWithdrawalId === w.id;
+                    const isPending = w.status === "pending";
+
                     return (
                       <TableRow key={`with-${w.id}`} className="text-xs bg-muted/20">
                         <TableCell className="whitespace-nowrap">{formatDate(w.created_at)}</TableCell>
@@ -1095,13 +1366,64 @@ const FinancialTab = () => {
                           {formatCurrency(w.fee_amount)} ({w.fee_percent}%)
                         </TableCell>
                         <TableCell className="font-bold text-purple-600">{formatCurrency(w.net_amount)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
                           <Badge
-                            variant={w.status === "approved" ? "default" : w.status === "rejected" ? "destructive" : "outline"}
-                            className="text-[10px]"
+                            variant={
+                              w.status === "approved"
+                                ? "default"
+                                : w.status === "rejected" || w.status === "denied"
+                                ? "destructive"
+                                : "outline"
+                            }
+                            className={`text-[10px] ${
+                              w.status === "approved"
+                                ? "bg-green-600 hover:bg-green-700"
+                                : w.status === "pending"
+                                ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300"
+                                : ""
+                            }`}
                           >
-                            {w.status === "approved" ? "Pago / Aprovado" : w.status === "rejected" ? "Recusado" : "Pendente"}
+                            {w.status === "approved"
+                              ? "Pago"
+                              : w.status === "rejected" || w.status === "denied"
+                              ? "Negado"
+                              : "Pendente"}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isPending ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-2.5 text-[11px] transition-all duration-200"
+                                disabled={processingWithdrawalId !== null}
+                                onClick={() => handleAcceptWithdrawal(w.id)}
+                              >
+                                {isProcessingThis ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <Check className="w-3 h-3 mr-1" />
+                                )}
+                                Aceitar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 px-2.5 text-[11px] font-bold transition-all duration-200"
+                                disabled={processingWithdrawalId !== null}
+                                onClick={() => handleRejectWithdrawal(w.id)}
+                              >
+                                {isProcessingThis ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <X className="w-3 h-3 mr-1" />
+                                )}
+                                Negar
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">Concluído</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -1109,7 +1431,7 @@ const FinancialTab = () => {
 
                   {filteredDeliveries.length === 0 && filteredWithdrawals.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         Nenhuma movimentação de motorista registrada para os filtros aplicados.
                       </TableCell>
                     </TableRow>
@@ -1170,11 +1492,11 @@ const FinancialTab = () => {
                       <p className="text-lg font-bold text-foreground mt-0.5">{selectedDriverData.ridesCount}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background text-center">
-                      <span className="text-[11px] text-muted-foreground">Valor Bruto Historico</span>
+                      <span className="text-[11px] text-muted-foreground">Valor Bruto Histórico</span>
                       <p className="text-lg font-bold text-foreground mt-0.5">{formatCurrency(selectedDriverData.grossTotal)}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background text-center">
-                      <span className="text-[11px] text-muted-foreground">Comissão Historica App</span>
+                      <span className="text-[11px] text-muted-foreground">Comissão Histórica App</span>
                       <p className="text-lg font-bold text-amber-600 mt-0.5">{formatCurrency(selectedDriverData.historicCommission)}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background text-center">
@@ -1199,6 +1521,117 @@ const FinancialTab = () => {
                     <div className="p-3 border rounded-lg bg-primary/10 border-primary/30 text-center">
                       <span className="text-[11px] text-primary font-bold">Saldo Disponível Atual</span>
                       <p className="text-lg font-black text-primary mt-0.5">{formatCurrency(selectedDriverData.availableBalance)}</p>
+                    </div>
+                  </div>
+
+                  {/* TABELA DE SOLICITAÇÕES DE ANTECIPAÇÃO DO MOTORISTA */}
+                  <div className="pt-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                      Histórico de Saques e Antecipações do Motorista
+                    </h4>
+                    <div className="border rounded-lg overflow-x-auto bg-background">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Data / Hora</TableHead>
+                            <TableHead className="text-xs">ID Operação</TableHead>
+                            <TableHead className="text-xs">Valor Solicitado</TableHead>
+                            <TableHead className="text-xs">Taxa Antecipação</TableHead>
+                            <TableHead className="text-xs">Valor Líquido</TableHead>
+                            <TableHead className="text-xs">Status Real</TableHead>
+                            <TableHead className="text-xs text-right">Ação Admin</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedDriverData.myWithdrawals.map((w) => {
+                            const isPending = w.status === "pending";
+                            const isProcessingThis = processingWithdrawalId === w.id;
+
+                            return (
+                              <TableRow key={`drv-w-${w.id}`} className="text-xs">
+                                <TableCell className="whitespace-nowrap">{formatDate(w.created_at)}</TableCell>
+                                <TableCell className="font-mono text-[10px] text-muted-foreground">
+                                  {w.id.slice(0, 13)}
+                                </TableCell>
+                                <TableCell className="font-semibold">{formatCurrency(w.amount)}</TableCell>
+                                <TableCell className="text-orange-600 font-medium">
+                                  {formatCurrency(w.fee_amount)} ({w.fee_percent}%)
+                                </TableCell>
+                                <TableCell className="font-bold text-purple-600">
+                                  {formatCurrency(w.net_amount)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      w.status === "approved"
+                                        ? "default"
+                                        : w.status === "rejected" || w.status === "denied"
+                                        ? "destructive"
+                                        : "outline"
+                                    }
+                                    className={`text-[10px] ${
+                                      w.status === "approved"
+                                        ? "bg-green-600 hover:bg-green-700"
+                                        : w.status === "pending"
+                                        ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300"
+                                        : ""
+                                    }`}
+                                  >
+                                    {w.status === "approved"
+                                      ? "Pago"
+                                      : w.status === "rejected" || w.status === "denied"
+                                      ? "Negado"
+                                      : "Pendente"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isPending ? (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <Button
+                                        size="sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-2 text-[10px] transition-all duration-200"
+                                        disabled={processingWithdrawalId !== null}
+                                        onClick={() => handleAcceptWithdrawal(w.id)}
+                                      >
+                                        {isProcessingThis ? (
+                                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                        ) : (
+                                          <Check className="w-3 h-3 mr-1" />
+                                        )}
+                                        Aceitar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="h-7 px-2 text-[10px] font-bold transition-all duration-200"
+                                        disabled={processingWithdrawalId !== null}
+                                        onClick={() => handleRejectWithdrawal(w.id)}
+                                      >
+                                        {isProcessingThis ? (
+                                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                        ) : (
+                                          <X className="w-3 h-3 mr-1" />
+                                        )}
+                                        Negar
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+
+                          {selectedDriverData.myWithdrawals.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                                Nenhum saque ou antecipação registrado para este motorista.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 </div>
@@ -1281,10 +1714,5 @@ const FinancialTab = () => {
     </div>
   );
 };
-
-// Função auxiliar para chave de depuração do React useMemo
-function creditCreditsMapKey(codes: CreditCodeRecord[]): string {
-  return codes.map((c) => c.id).join(",");
-}
 
 export default FinancialTab;
