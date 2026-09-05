@@ -179,7 +179,7 @@ async function sendPushTestFallback(
   const count = subs?.length || 0;
 
   try {
-    await supabase.from("notification_delivery_logs").insert({
+    await (supabase as any).from("notification_delivery_logs").insert({
       event_type: `test_${mode}`,
       platform: platform === "all" ? "multimodal" : platform,
       recipients_requested: count,

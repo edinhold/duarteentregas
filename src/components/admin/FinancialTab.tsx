@@ -253,12 +253,12 @@ export const FinancialTab = () => {
       // 4. Buscar profiles para todos esses IDs
       const profilesMap = new Map<string, { full_name?: string; phone?: string; pix_key?: string; pix_key_type?: string }>();
       if (allIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles } = await (supabase as any)
           .from("profiles")
           .select("user_id, full_name, phone, pix_key, pix_key_type")
           .in("user_id", allIds);
-        (profiles || []).forEach((p) => {
-          if (p.user_id) profilesMap.set(p.user_id, p);
+        ((profiles as any[]) || []).forEach((p: any) => {
+          if (p?.user_id) profilesMap.set(p.user_id, p);
         });
       }
 

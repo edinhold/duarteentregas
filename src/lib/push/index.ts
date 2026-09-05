@@ -276,7 +276,7 @@ async function fallbackNotifyAvailableDrivers(pedidoId: string) {
       .eq("is_online", true);
 
     const count = drivers?.length || 0;
-    await supabase.from("notification_delivery_logs").insert({
+    await (supabase as any).from("notification_delivery_logs").insert({
       pedido_id: pedidoId,
       event_type: "nova_entrega_fallback",
       recipients_requested: count,
