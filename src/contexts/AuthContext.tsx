@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { safeSessionStorage } from "@/lib/safeStorage";
 
 export type AppRole = "admin" | "store_owner" | "driver" | "customer";
 
@@ -21,25 +22,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
-  // Guards against double initialization (React StrictMode / remounts):
-  // only ONE getSession() + ONE onAuthStateChange listener may exist.
   const initializedRef = useRef(false);
-
 
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    console.log("[Auth] App iniciou");
+    console.log("[App:auth]", "AuthProvider inicializado");
 
-    // Track last processed uid + access token to avoid re-running side effects
-    // for duplicate auth events (INITIAL_SESSION + SIGNED_IN + TOKEN_REFRESHED
-    // all fire and each carries a fresh object reference, which was causing
-    // downstream effects that depend on `user` to re-run in a loop).
     let lastUid: string | null | undefined = undefined;
     let lastToken: string | null | undefined = undefined;
     let handled = false;
-
-
 
     const enforceSuspension = async () => {
       try {
@@ -52,7 +44,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await supabase.auth.signOut();
           return true;
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[App:auth] Falha ao verificar suspensão:", err);
+      }
       return false;
     };
 
@@ -67,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (list.includes("store_owner")) return "store_owner";
         if (list.includes("driver")) return "driver";
 
-        // Fallback: infer from associated data (legacy accounts without a row in user_roles)
         const [{ data: driverProfile }, { data: ownedRest }] = await Promise.all([
           supabase.from("drivers").select("id").eq("user_id", uid).maybeSingle(),
           supabase.from("restaurants").select("id").eq("owner_id", uid).maybeSingle(),
@@ -80,7 +73,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await supabase.from("user_roles").insert({ user_id: uid, role: "store_owner" as any }).then(() => {}, () => {});
           return "store_owner";
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[App:auth] Falha ao resolver role:", err);
+      }
       return "customer";
     };
 
@@ -91,18 +86,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       setRoleLoading(true);
-      const suspended = await enforceSuspension();
-      if (suspended) {
-        setRole(null);
+      try {
+        const suspended = await enforceSuspension();
+        if (suspended) {
+          setRole(null);
+          return;
+        }
+        const resolved = await resolveRole(uid);
+        console.log("[App:auth]", "Role carregada:", resolved);
+        setRole(resolved);
+      } catch (err) {
+        console.error("[App:auth] Erro ao carregar dados do usuário:", err);
+        setRole("customer");
+      } finally {
         setRoleLoading(false);
-        return;
       }
-      const resolved = await resolveRole(uid);
-      console.log("[Auth] Role carregada:", resolved);
-      setRole(resolved);
-      setRoleLoading(false);
     };
-
 
     const apply = (nextSession: Session | null, source: string) => {
       const uid = nextSession?.user?.id ?? null;
@@ -110,7 +109,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const sameUser = uid === lastUid;
       const sameToken = token === lastToken;
 
-      // Always clear loading on the first signal so UI doesn't hang.
       if (!handled) {
         handled = true;
         setSession(nextSession);
@@ -118,22 +116,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         lastUid = uid;
         lastToken = token;
-        console.log("[Auth] Sessão inicial", { source, uid });
+        console.log("[App:auth]", "Sessão inicial estabelecida:", { source, uid });
         handleUser(uid ?? undefined);
         return;
       }
 
       if (sameUser && sameToken) {
-        // Duplicate event (e.g. INITIAL_SESSION after getSession): skip.
         return;
       }
 
       setSession(nextSession);
-      // Only swap the user object reference when the uid actually changes,
-      // so downstream `useEffect([user])` doesn't re-fire on token refresh.
       if (!sameUser) {
         setUser(nextSession?.user ?? null);
-        console.log("[Auth] Sessão alterada", { source, uid });
+        console.log("[App:auth]", "Sessão alterada:", { source, uid });
         handleUser(uid ?? undefined);
       }
       lastUid = uid;
@@ -141,26 +136,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[Auth] onAuthStateChange:", event);
+      console.log("[App:auth]", "onAuthStateChange:", event);
       apply(session, `event:${event}`);
     });
-    console.log("[Auth] Listener registrado");
 
-    console.log("[Auth] Recuperando sessão");
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      apply(session, "getSession");
-    });
+    console.log("[App:auth]", "Recuperando sessão do Supabase");
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        apply(session, "getSession");
+      })
+      .catch((err) => {
+        console.error("[App:auth] Erro ao recuperar sessão do Supabase:", err);
+        apply(null, "getSession:error");
+      });
+
+    // Timer de segurança de 4s para garantir que loading nunca fique trancado
+    const safetyTimer = setTimeout(() => {
+      if (!handled) {
+        console.warn("[App:auth] Timeout de recuperação de sessão atingido, liberando interface");
+        apply(null, "getSession:timeout");
+      }
+    }, 4000);
 
     return () => {
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
-      console.log("[Auth] Listener removido");
+      console.log("[App:auth]", "Listener de autenticação desinstalado");
     };
   }, []);
 
-
-
   const signOut = async () => {
-    try { sessionStorage.removeItem("authRedirectDone"); } catch {}
+    safeSessionStorage.removeItem("authRedirectDone");
     await supabase.auth.signOut();
   };
 

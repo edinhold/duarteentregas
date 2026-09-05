@@ -1,17 +1,18 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import splashLogo from "@/assets/splash-logo.jpeg";
+import { safeSessionStorage } from "@/lib/safeStorage";
 
 const SplashScreen = () => {
   const [visible, setVisible] = useState(() => {
     // Show splash only once per session
-    if (sessionStorage.getItem("splashShown")) return false;
+    if (safeSessionStorage.getItem("splashShown")) return false;
     return true;
   });
 
   useEffect(() => {
     if (!visible) return;
-    sessionStorage.setItem("splashShown", "true");
+    safeSessionStorage.setItem("splashShown", "true");
     const timer = setTimeout(() => setVisible(false), 2500);
     return () => clearTimeout(timer);
   }, [visible]);

@@ -43,22 +43,30 @@ export function deviceName(): string {
 
 export async function getAppId(): Promise<string | null> {
   if (appIdCache) return appIdCache;
-  try {
-    const { data, error } = await supabase.functions.invoke("push-config", { body: {} });
-    if (!error && data?.app_id) {
-      appIdCache = data.app_id;
-      return appIdCache;
-    }
-  } catch {
-    /* fallback to env */
-  }
 
-  // Fallback to VITE_ONESIGNAL_APP_ID if set in environment
+  // 1. Tentar ler do env local primeiro se disponível para velocidade instantânea
   const envAppId = import.meta.env.VITE_ONESIGNAL_APP_ID;
   if (envAppId) {
     appIdCache = envAppId;
     return appIdCache;
   }
+
+  // 2. Tentar buscar da Edge Function com timeout seguro de 3s
+  try {
+    const fetchConfigPromise = supabase.functions.invoke("push-config", { body: {} });
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error("push-config timeout") }), 3000)
+    );
+
+    const { data, error } = await Promise.race([fetchConfigPromise, timeoutPromise]);
+    if (!error && data?.app_id) {
+      appIdCache = data.app_id;
+      return appIdCache;
+    }
+  } catch (err) {
+    console.warn("[App:onesignal]", "Edge Function push-config indisponível:", err);
+  }
+
   return null;
 }
 
@@ -77,13 +85,14 @@ function loadWebSdk(): Promise<void> {
   });
 }
 
-/** Inicializa o SDK do OneSignal exatamente 1 vez */
+/** Inicializa o SDK do OneSignal exatamente 1 vez de forma assíncrona não bloqueante */
 export async function initPush(): Promise<boolean> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
+    console.log("[App:onesignal]", "Inicializando serviço de push em segundo plano");
     const appId = await getAppId();
     if (!appId) {
-      console.warn("[push] OneSignal App ID não encontrado.");
+      console.warn("[App:onesignal]", "OneSignal App ID não encontrado. Notificações desativadas.");
       return false;
     }
 
@@ -105,15 +114,16 @@ export async function initPush(): Promise<boolean> {
             // Registrar event listeners para Web PWA
             OneSignal.Notifications?.addEventListener?.("click", (ev: any) => handleClick(ev?.notification?.additionalData));
             OneSignal.User?.PushSubscription?.addEventListener?.("change", () => void syncCurrentSubscription());
+            console.log("[App:onesignal]", "OneSignal Web SDK inicializado com sucesso");
           } catch (e) {
-            console.warn("[push] init web", e);
+            console.warn("[App:onesignal]", "Erro ao inicializar OneSignal:", e);
           }
           resolve();
         });
       });
       return true;
     } catch (err) {
-      console.warn("[push] Erro no initPush:", err);
+      console.warn("[App:onesignal]", "Erro no carregamento do OneSignal:", err);
       return false;
     }
   })();

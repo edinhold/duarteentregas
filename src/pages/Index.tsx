@@ -15,6 +15,7 @@ import { User, LogOut, Map, List, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import logoDuarteFull from "@/assets/logo-duarte-full.jpeg";
+import { safeSessionStorage } from "@/lib/safeStorage";
 
 const ROLE_HOME: Record<string, string> = {
   admin: "/admin",
@@ -28,20 +29,18 @@ const Index = () => {
   const redirectedRef = useRef(false);
 
   // Redirecionamento ÚNICO para o painel correspondente.
-  // Só ocorre depois que a sessão e a role foram carregadas, e apenas
-  // uma vez por sessão do navegador (evita loop ao voltar para a home).
   useEffect(() => {
     if (loading || roleLoading) return;
     if (!user || !role) return;
     if (redirectedRef.current) return;
 
-    const alreadyRedirected = sessionStorage.getItem("authRedirectDone") === user.id;
+    const alreadyRedirected = safeSessionStorage.getItem("authRedirectDone") === user.id;
     const target = ROLE_HOME[role];
     if (!target || alreadyRedirected) return;
 
     redirectedRef.current = true;
-    sessionStorage.setItem("authRedirectDone", user.id);
-    console.log("[Auth] Redirect:", target);
+    safeSessionStorage.setItem("authRedirectDone", user.id);
+    console.log("[App:auth]", "Redirecionando usuário autenticado para:", target);
     navigate(target, { replace: true });
   }, [loading, roleLoading, user, role, navigate]);
 
@@ -55,9 +54,9 @@ const Index = () => {
 
   useEffect(() => {
     const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsInstalled(standalone);
+      (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+      (typeof window !== "undefined" && (window.navigator as unknown as { standalone?: boolean })?.standalone === true);
+    setIsInstalled(Boolean(standalone));
 
     const onPrompt = (e: Event) => {
       e.preventDefault();

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { safeLocalStorage } from "@/lib/safeStorage";
 
 const STORAGE_KEY = "lastRoute";
 
@@ -28,7 +29,7 @@ const RouteRestorer = () => {
   useEffect(() => {
     const path = location.pathname + location.search;
     if (!isExcludedRoute(location.pathname) && (!isProtectedPanelRoute(location.pathname) || user)) {
-      localStorage.setItem(STORAGE_KEY, path);
+      safeLocalStorage.setItem(STORAGE_KEY, path);
     }
   }, [location, user]);
 
@@ -39,7 +40,7 @@ const RouteRestorer = () => {
     restoreAttempted = true;
     if (isExcludedRoute(location.pathname)) return;
 
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = safeLocalStorage.getItem(STORAGE_KEY);
     if (
       saved &&
       saved !== "/" &&
@@ -47,7 +48,7 @@ const RouteRestorer = () => {
       !isExcludedRoute(saved) &&
       (!isProtectedPanelRoute(saved) || user)
     ) {
-      console.log("[Auth] Redirect:", saved);
+      console.log("[App:router]", "Restaurando rota salva:", saved);
       navigate(saved, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

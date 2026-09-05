@@ -26,45 +26,57 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RouteRestorer from "./components/RouteRestorer";
 import SplashScreen from "./components/SplashScreen";
 
+import RootErrorBoundary from "@/components/RootErrorBoundary";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <CartProvider>
-          <Toaster />
-          <SplashScreen />
-          
-          <Sonner />
-          <BrowserRouter>
-            <RouteRestorer />
+const App = () => {
+  console.log("[App:boot]", "App montado com sucesso");
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <CartProvider>
+            <Toaster />
+            <SplashScreen />
+            <Sonner />
+            <BrowserRouter>
+              <RouteRestorer />
 
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/restaurant/:id" element={<RestaurantDetail />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/auth" element={<Auth />} />
-              
-              <Route path="/cadastro/entregador" element={<RegisterDriver />} />
-              <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/financeiro" element={<FinanceiroPage />} />
-              <Route path="/lojista" element={<StoreOwnerPanel />} />
-              <Route path="/entregador" element={<DriverPanel />} />
-              <Route path="/pedido/:id/rastreio" element={<OrderTracking />} />
-              <Route path="/instalar" element={<Install />} />
-              <Route path="/privacidade" element={<PrivacyPolicy />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </CartProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+              <RootErrorBoundary fallbackTitle="Erro de Navegação">
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/restaurant/:id" element={<RestaurantDetail />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/auth" element={<Auth />} />
+                  
+                  <Route path="/cadastro/entregador" element={<RegisterDriver />} />
+                  <Route path="/cadastro/lojista" element={<RegisterStoreOwner />} />
+                  <Route path="/admin/login" element={<AdminLogin />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/financeiro" element={<FinanceiroPage />} />
+                  <Route path="/lojista" element={<StoreOwnerPanel />} />
+                  <Route path="/entregador" element={<DriverPanel />} />
+                  <Route path="/pedido/:id/rastreio" element={<OrderTracking />} />
+                  <Route path="/instalar" element={<Install />} />
+                  <Route path="/privacidade" element={<PrivacyPolicy />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </RootErrorBoundary>
+            </BrowserRouter>
+          </CartProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
