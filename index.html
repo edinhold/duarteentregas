@@ -15,6 +15,18 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // Remove qualquer service worker antigo que causava tela branca.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => {
+            const url = r.active && r.active.scriptURL ? r.active.scriptURL : "";
+            if (url.indexOf("OneSignal") === -1) r.unregister();
+          });
+        });
+      }
+    </script>
 
     <!-- OG Tags -->
     <meta property="og:title" content="Duarte Delivery" />

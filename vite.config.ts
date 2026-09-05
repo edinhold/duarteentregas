@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { VitePWA } from "vite-plugin-pwa";
+
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -16,50 +16,8 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "pwa-192x192.png", "pwa-512x512.png"],
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        globIgnores: ["**/OneSignalSDKWorker.js"],
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/OneSignalSDKWorker\.js$/],
-      },
+  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
 
-
-      manifest: {
-        name: "Duarte Delivery",
-        short_name: "Duarte",
-        description: "Peça comida e receba na sua porta com o Duarte Delivery",
-        theme_color: "#f97316",
-        background_color: "#ffffff",
-        display: "standalone",
-        orientation: "portrait",
-        scope: "/",
-        start_url: "/",
-        icons: [
-          {
-            src: "pwa-192x192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-          {
-            src: "pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
-    }),
-  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
