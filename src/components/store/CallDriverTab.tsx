@@ -259,8 +259,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     : roadDistanceKm > 0 ? "mapbox" : "none";
 
   const statusLabels: Record<string, string> = {
-    pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Finalizado", cancelled: "Cancelado",
+    pending: "Procurando motorista...", accepted: "Aceito", picked_up: "Coletado", delivered: "Finalizado", cancelled: "Cancelado",
   };
+
+  // Impede chamar um novo entregador enquanto já existe corrida em andamento
+  const hasActiveRequest = (requests ?? []).some((r: any) =>
+    ["pending", "accepted", "picked_up"].includes(r?.status)
+  );
 
   // Busca rota via Mapbox Directions API v5 quando origem/destino estão definidos ou perfil muda
   useEffect(() => {
