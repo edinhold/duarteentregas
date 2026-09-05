@@ -318,27 +318,25 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
 
   const accept = useCallback(async () => {
     if (!delivery || !user) return;
+    console.log("[DeliveryAcceptance:action]", { action: "overlay_accept_start", requestId: delivery.id });
     try {
       const { error } = await (supabase as any).rpc("accept_delivery_request", {
         p_request_id: delivery.id,
       });
       if (error) throw error;
 
-
-
-
-      console.log("[Delivery] Motorista aceitou (overlay)", {
-        request_id: delivery.id,
-        driver_user_id: user.id,
-        response_time_ms: shownAtRef.current ? Date.now() - shownAtRef.current : null,
-        at: new Date().toISOString(),
+      console.log("[DeliveryAcceptance:action]", {
+        action: "overlay_accept_success",
+        requestId: delivery.id,
+        driverUserId: user.id,
+        responseTimeMs: shownAtRef.current ? Date.now() - shownAtRef.current : null,
       });
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
       onAccepted?.(delivery);
       close();
     } catch (err: any) {
-      console.log("[DeliveryOverlay] Falha ao aceitar", err);
+      console.log("[DeliveryAcceptance:action]", { action: "overlay_accept_error", requestId: delivery.id, error: err?.message });
       const msg = String(err?.message ?? "");
       if (/já foi assumida|já foi aceita|direcionada/i.test(msg)) {
         toast.info("Esta entrega já foi aceita por outro motorista.");
@@ -347,7 +345,6 @@ export function useDeliveryOverlay({ standby, timeoutMs = 30000, onAccepted }: O
         return;
       }
       setState("error");
-
     }
   }, [delivery, user, queryClient, onAccepted, close]);
 

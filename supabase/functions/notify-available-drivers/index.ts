@@ -81,11 +81,11 @@ Deno.serve(async (req) => {
         platform,
         headings: { pt: "🚚 Nova entrega disponível", en: "New delivery available" },
         contents: {
-          pt: "Um lojista solicitou um motorista. Toque para visualizar.",
-          en: "A merchant requested a driver. Tap to view.",
+          pt: "Um novo chamado de entrega foi criado. Abra o aplicativo para visualizar os detalhes.",
+          en: "A new delivery order was created. Open the app to view details.",
         },
-        data: { tipo: "nova_entrega", pedido_id: pedidoId, rota: `/entregador?pedido=${pedidoId}`, evento_id: `nova_entrega:${pedidoId}` },
-        url: `${APP_BASE_URL}/entregador?pedido=${pedidoId}`,
+        data: { tipo: "nova_entrega", pedido_id: pedidoId, rota: `/motorista?pedido=${pedidoId}`, evento_id: `nova_entrega:${pedidoId}` },
+        url: `${APP_BASE_URL}/motorista?pedido=${pedidoId}`,
         ttl: 300,
         buttonLabel: "Ver entrega",
       });

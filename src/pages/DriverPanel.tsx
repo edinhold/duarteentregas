@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar, PanelLeft } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, MessageSquare, Send, Check, DollarSign, Key, Wallet, XCircle, Home, History, Settings, Map as MapIcon, Signal, SignalZero, Calendar, Radar, PanelLeft, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -356,17 +356,19 @@ const DriverPanel = () => {
         }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "delivery_requests" }, (payload: any) => {
-        console.log("Delivery request updated:", payload);
+        console.log("[AvailableDeliveries:action]", { action: "realtime_update", requestId: payload.new?.id, status: payload.new?.status, driverId: payload.new?.driver_id });
         queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
         queryClient.invalidateQueries({ queryKey: ["driver-my-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["driver-completed-requests", user.id] });
         queryClient.invalidateQueries({ queryKey: ["my-earnings", driverProfile?.id] });
         
-        // If status changed to accepted and I am the driver, or if it was accepted by someone else
+        // Se a entrega foi aceita
         if (payload.new?.status === "accepted") {
           if (payload.new?.driver_id === user.id) {
             playNotificationSound();
             toast.success("✅ Pedido confirmado para você!");
+          } else {
+            toast.info("Um chamado foi aceito por outro motorista.");
           }
         }
       })
@@ -389,12 +391,10 @@ const DriverPanel = () => {
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log("Realtime subscribed successfully");
+          console.log("[AvailableDeliveries:action]", { action: "realtime_subscribed" });
         }
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           console.error("Realtime connection issues:", status);
-          // Don't reload, Supabase will try to reconnect automatically
-          // Just show a subtle warning if it stays closed for too long
         }
       });
 
@@ -403,10 +403,12 @@ const DriverPanel = () => {
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
       window.removeEventListener("delivery-unavailable", handleUnavailable);
-
     };
   }, [user, activeRequest?.id, driverProfile?.id]);
   
+  // State de bloqueio para evitar cliques múltiplos em aceite
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
   // Keep driver active+online status synced while panel is open
   useEffect(() => {
     if (!user?.id) return;
@@ -432,32 +434,34 @@ const DriverPanel = () => {
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
-      // Do not mark offline on background/route unload: mobile browsers and
-      // WebViews pause/unmount pages aggressively, but the driver must remain
-      // eligible for push while recently active. The backend already filters by
-      // last_seen_at, so stale sessions naturally expire.
     };
   }, [user?.id]);
 
   const acceptRequest = async (requestId: string) => {
+    if (acceptingId) return;
+    setAcceptingId(requestId);
+    console.log("[DeliveryAcceptance:action]", { action: "accept_start", requestId, driverId: user.id });
     try {
-      console.log("[Delivery] Motorista tentando aceitar", requestId);
       const { data, error } = await (supabase as any).rpc("accept_delivery_request", {
         p_request_id: requestId,
       });
       if (error) throw error;
       const fee = Number((data as any)?.driver_fee || 0);
       const netFee = getNetFee(fee);
-      console.log("[Delivery] Motorista aceitou", requestId, data);
+      console.log("[DeliveryAcceptance:action]", { action: "accept_success", requestId, data });
       toast.success(netFee > 0 ? `Entrega aceita com sucesso! Ganho líquido: R$ ${netFee.toFixed(2)}` : "Entrega aceita com sucesso!");
       void cancelDeliveryNotification(requestId);
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-my-requests"] });
+      setActiveTab("home");
     } catch (err: any) {
       const raw = err?.message || "Erro ao aceitar";
+      console.log("[DeliveryAcceptance:action]", { action: "accept_conflict_or_error", requestId, error: raw });
       const conflict = /já foi assumida|já foi aceita|direcionada/i.test(raw);
       toast.error(conflict ? "Esta entrega já foi aceita por outro motorista." : raw);
       queryClient.invalidateQueries({ queryKey: ["driver-pending-requests"] });
+    } finally {
+      setAcceptingId(null);
     }
   };
 
@@ -819,8 +823,9 @@ const DriverPanel = () => {
                                 }}>
                                   Recusar
                                 </Button>
-                                <Button size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest}>
-                                  <Check className="w-4 h-4 mr-1" /> Aceitar
+                                <Button size="sm" onClick={() => acceptRequest(r.id)} disabled={!!activeRequest || acceptingId === r.id}>
+                                  {acceptingId === r.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
+                                  {acceptingId === r.id ? "Aceitando..." : "Aceitar"}
                                 </Button>
                               </div>
                             </div>

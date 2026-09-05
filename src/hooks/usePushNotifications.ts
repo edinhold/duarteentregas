@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { enablePush, initPush, syncCurrentSubscription, type PushState } from "@/lib/push";
+import { enablePush, initPush, removeDevice, syncCurrentSubscription, type PushState } from "@/lib/push";
 
 export function usePushNotifications(userId?: string | null, profileType = "driver") {
   const [state, setState] = useState<PushState | null>(null);
@@ -60,5 +60,17 @@ export function usePushNotifications(userId?: string | null, profileType = "driv
     }
   }, [userId, profileType]);
 
-  return { state, loading, activate, sync };
+  const remove = useCallback(async (subscriptionId: string) => {
+    if (!subscriptionId) return false;
+    setLoading(true);
+    try {
+      const ok = await removeDevice(subscriptionId);
+      if (ok) setState(null);
+      return ok;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { state, loading, activate, remove, sync };
 }

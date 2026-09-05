@@ -144,8 +144,27 @@ function initCordova(appId: string): Promise<boolean> {
   });
 }
 
-function handleClick(data: any) {
-  const rota = data?.rota;
+async function handleClick(data: any) {
+  console.log("[OneSignal:action]", { action: "notification_click", data });
+  const pedidoId = data?.pedido_id;
+  const rota = data?.rota || "/motorista";
+
+  if (pedidoId) {
+    try {
+      const { data: req } = await supabase
+        .from("delivery_requests")
+        .select("status, driver_id")
+        .eq("id", pedidoId)
+        .maybeSingle();
+
+      if (req && (req.status !== "pending" || req.driver_id)) {
+        window.dispatchEvent(new CustomEvent("delivery-unavailable", { detail: { pedidoId } }));
+      }
+    } catch {
+      /* ignore check failure */
+    }
+  }
+
   if (rota && typeof rota === "string") window.location.assign(rota);
 }
 
@@ -193,7 +212,6 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
 
       subscriptionId = OneSignal?.User?.PushSubscription?.id ?? null;
 
-      // Se a permissão foi concedida mas o subscriptionId ainda está gerando, aguarda breves retentativas
       if (permission === "granted" && !subscriptionId) {
         for (let i = 0; i < 7; i++) {
           await new Promise((r) => setTimeout(r, 300));
@@ -207,8 +225,26 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
   }
 
   const uid = userId ?? (await supabase.auth.getUser()).data.user?.id ?? null;
-  if (uid && subscriptionId) {
-    // 1. Inativa inscrições antigas do mesmo usuário para evitar duplicidade de envio
+  if (uid && subscriptionId && permission === "granted") {
+    console.log("[DeviceRegistration:action]", {
+      action: "register_single_device",
+      userId: uid,
+      subscriptionId,
+      platform,
+      profileType,
+    });
+
+    // 1. Chamar RPC atômica registrar_dispositivo_motorista (desativa dispositivos anteriores)
+    try {
+      await (supabase as any).rpc("registrar_dispositivo_motorista", {
+        p_subscription_id: subscriptionId,
+        p_plataforma: platform,
+      });
+    } catch (rpcErr) {
+      console.warn("[push] RPC registrar_dispositivo_motorista fallback to push_subscriptions:", rpcErr);
+    }
+
+    // 2. Inativa inscrições antigas do mesmo usuário na push_subscriptions para retrocompatibilidade
     try {
       await supabase
         .from("push_subscriptions")
@@ -219,7 +255,7 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
       /* ignore cleanup error */
     }
 
-    // 2. Upsert da inscrição atualizada
+    // 3. Upsert da inscrição atualizada
     await supabase.from("push_subscriptions").upsert(
       {
         user_id: uid,
@@ -243,7 +279,24 @@ export async function syncCurrentSubscription(userId?: string, profileType = "dr
   return { supported: true, platform, permission, subscriptionId, externalId: uid };
 }
 
+/** Exclusão manual de dispositivo do motorista */
+export async function removeDevice(subscriptionId: string): Promise<boolean> {
+  console.log("[DeviceRegistration:action]", { action: "delete_device", subscriptionId });
+  try {
+    const { error } = await (supabase as any).rpc("remover_dispositivo_motorista", {
+      p_subscription_id: subscriptionId,
+    });
+    if (error) throw error;
+    await logoutPush();
+    return true;
+  } catch (err) {
+    console.error("[DeviceRegistration:action:error]", err);
+    return false;
+  }
+}
+
 export async function logoutPush() {
+  console.log("[OneSignal:action]", { action: "logout" });
   try {
     if (detectPlatform() === "android_apk") await (window.plugins?.OneSignal || window.OneSignal)?.logout?.();
     else await window.OneSignal?.logout?.();
@@ -252,6 +305,7 @@ export async function logoutPush() {
 
 /** Disparo resiliente de notificação para motoristas */
 export async function notifyAvailableDrivers(pedidoId: string) {
+  console.log("[DeliveryNotification:action]", { action: "notify_available_drivers", pedidoId });
   try {
     const { data, error } = await supabase.functions.invoke("notify-available-drivers", { body: { pedido_id: pedidoId } });
     if (error) {
