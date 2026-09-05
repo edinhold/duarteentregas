@@ -259,8 +259,13 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     : roadDistanceKm > 0 ? "mapbox" : "none";
 
   const statusLabels: Record<string, string> = {
-    pending: "Aguardando", accepted: "Aceito", picked_up: "Coletado", delivered: "Finalizado", cancelled: "Cancelado",
+    pending: "Procurando motorista...", accepted: "Aceito", picked_up: "Coletado", delivered: "Finalizado", cancelled: "Cancelado",
   };
+
+  // Impede chamar um novo entregador enquanto já existe corrida em andamento
+  const hasActiveRequest = (requests ?? []).some((r: any) =>
+    ["pending", "accepted", "picked_up"].includes(r?.status)
+  );
 
   // Busca rota via Mapbox Directions API v5 quando origem/destino estão definidos ou perfil muda
   useEffect(() => {
@@ -932,7 +937,23 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
     }
   };
 
+  const callingRef = useRef(false);
+
   const handleCallDriver = async () => {
+    if (callingRef.current) return;
+    if (hasActiveRequest) {
+      toast.error("Já existe uma corrida em andamento para esta loja. Aguarde a finalização ou cancele-a.");
+      return;
+    }
+    callingRef.current = true;
+    try {
+      await runCallDriver();
+    } finally {
+      callingRef.current = false;
+    }
+  };
+
+  const runCallDriver = async () => {
     if (!callForm.pickup.trim() || !callForm.delivery.trim() || !callForm.delivery_number.trim()) {
       toast.error("Preencha endereço de coleta, entrega e número do imóvel");
       return;
@@ -1520,8 +1541,8 @@ const CallDriverTab = ({ user, restaurant, requests, activeRequest, chatMessages
             </div>
           </div>
 
-          <Button onClick={handleCallDriver} disabled={calling || distanceKm <= 0 || loadingRoute} className="w-full">
-            {calling ? "Chamando..." : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${(deliveryCost ?? 0).toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
+          <Button onClick={handleCallDriver} disabled={calling || hasActiveRequest || distanceKm <= 0 || loadingRoute} className="w-full">
+            {calling ? "Chamando..." : hasActiveRequest ? "🚚 Corrida em andamento" : loadingRoute ? "Calculando rota..." : distanceKm > 0 ? `📲 Chamar Entregador (R$ ${(deliveryCost ?? 0).toFixed(2).replace(".", ",")})` : "📲 Defina o ponto de entrega"}
           </Button>
         </CardContent>
       </Card>
